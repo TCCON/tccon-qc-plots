@@ -8,13 +8,13 @@ Requires anaconda3 to be installed and **conda** console commands available.
 
 The script **install.sh** will check if you have the **tccon-qc** environment installed. If not it will install it from the environment.yml file.
 
-To run the install scriptr use:
+To run the install script use:
 
 > ./install.sh
 
 ### Usage ###
 
-## variables.json ##
+#### variables.json ####
 
 This is the only input file.
 
@@ -22,10 +22,11 @@ It is a json with the main keys being the x-axis variables and values being list
 
 The variable must have exactly the same name as in the netcdf files
 
-## How to run the code ##
+#### How to run the code ####
 
-Use qc_plots.sh to make sure the code runs with the correct environment.
-If you use qc_plots.py make sure that you activated the tccon-qc environment with
+Use **qc_plots.sh** to make sure the code runs with the correct environment.
+
+If you use **qc_plots.py** make sure that you activated the **tccon-qc** environment with
 
 > conda activate tccon-qc
 
