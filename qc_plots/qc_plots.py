@@ -98,6 +98,54 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
     return fig
 
 
+def flag_analysis(code_dir,nc):
+    """
+    Make a histogram to summarize flags
+    """
+    flag_df = pd.DataFrame()
+    flag_df_pcnt = pd.DataFrame()
+    flag_set = list(set(nc['flag'][:]))
+    N = nc['time'].size
+    print('Summary of flags:')
+    print('  #  Parameter              N_flag      %')
+    nflag_tot = 0
+    for flag in sorted(flag_set):
+        if flag==0:
+            continue
+        where_flagged = nc['flag'][:]==flag
+        nflag = np.count_nonzero(where_flagged)
+        nflag_pcnt = 100*nflag/N
+        nflag_tot += nflag
+        flagged_var_name = nc['flagged_var_name'][where_flagged][0]
+        print('{:>3}  {:<20} {:>6}   {:>8.3f}'.format(flag,flagged_var_name,nflag,nflag_pcnt))
+        flag_df[flagged_var_name] = pd.Series([nflag])
+        flag_df_pcnt[flagged_var_name] = pd.Series([nflag_pcnt])
+    
+    print('     {:<20} {:>6}   {:>8.3f}'.format('TOTAL',nflag_tot,100*nflag_tot/N))
+    flag_df['Total'] = nflag_tot
+    flag_df_pcnt['Total'] = 100*nflag_tot/N
+    
+    fig, ax = subplots(2,1)
+    ax[0].set_ylabel('Count')
+    ax[1].set_ylabel('Count (%)')
+    ax[0].set_title('{} total spectra from {}'.format(N,nc.long_name))
+    fig.suptitle('Summary of flags')
+    barplot = flag_df.plot(kind='bar',ax=ax[0])
+    barplot_pcnt = flag_df_pcnt.plot(kind='bar',ax=ax[1])
+    for elem in ax:
+        elem.axes.get_xaxis().set_visible(False)
+        elem.grid()
+
+    prec = ['{:.0f}','{:.2f}']
+    for i,curplot in enumerate([barplot,barplot_pcnt]):
+        for p in curplot.patches:
+            curplot.annotate(prec[i].format(p.get_height()), (p.get_x() * 1.005, p.get_height() * 1.005))
+
+    fig_path = os.path.join(code_dir.parent,'outputs','flags_summary.jpg')
+    fig.savefig(fig_path,bbox_inches='tight')
+
+    return fig_path
+
 def main():
     if 'tccon-qc' not in sys.executable:
         print('Running qc_plots.py with',sys.executable)
@@ -137,6 +185,9 @@ def main():
 
         flag0 = np.where(nc['flag'][:]==0)[0]
         flagged = np.where(nc['flag'][:]!=0)[0]
+
+        if not args.flag0:
+            fig_path_list += [flag_analysis(code_dir,nc)]
 
         fnum = 0
         for xvar in vardata.keys():
