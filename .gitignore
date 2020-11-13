@@ -48,3 +48,9 @@ Thumbs.db
 *.mov
 *.wmv
 
+# pdf files
+*.pdf
+
+# the conda source file created by install.sh
+.init_conda
+
