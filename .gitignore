@@ -51,6 +51,12 @@ Thumbs.db
 # pdf files
 *.pdf
 
+# images
+*.png
+*.jpg
+*.tif
+*.bmp
+
 # the conda source file created by install.sh
 .init_conda
 
