@@ -64,9 +64,9 @@ def add_qc_lines(args,nc,ax,xvar,yvar,kind=''):
 
 def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     if type(yvar)==list:
-        fig_name = '{}_minus{}_VS_{}_{}.jpg'.format(yvar[0],yvar[1],xvar,plot_type)
+        fig_name = '{}_minus{}_VS_{}_{}.png'.format(yvar[0],yvar[1],xvar,plot_type)
     else:
-        fig_name = '{}_VS_{}_{}.jpg'.format(yvar,xvar,plot_type)
+        fig_name = '{}_VS_{}_{}.png'.format(yvar,xvar,plot_type)
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
     fig.savefig(fig_path,bbox_inches='tight')
     return fig_path
@@ -155,7 +155,7 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
             extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), nc[yvar].vmin, nc[yvar].vmax)
         else:
             extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), np.min(nc[yvar][flag0]), np.max(nc[yvar][flag0]))
-        hb = ax.hexbin(nc[xvar][:],ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap)
+        hb = ax.hexbin(nc[xvar][flag0],ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap)
     cb = fig.colorbar(hb,ax=ax)
 
     return fig
@@ -204,7 +204,7 @@ def flag_analysis(code_dir,nc):
         for p in curplot.patches:
             curplot.annotate(prec[i].format(p.get_height()), (p.get_x() * 1.005, p.get_height() * 1.005))
 
-    fig_path = os.path.join(code_dir.parent,'outputs','flags_summary.jpg')
+    fig_path = os.path.join(code_dir.parent,'outputs','flags_summary.png')
     fig.savefig(fig_path,bbox_inches='tight')
 
     return fig_path
@@ -214,13 +214,16 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
     fig_path_list = []
     for yvar in vardata[xvar]:
         if type(yvar)==list:
-            print("\t{} minus {}".format(*yvar))
+            print("\t {} minus {}".format(*yvar))
             fig_path_list += [savefig(make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
                 continue
-            print('\t',yvar,freq,kind)
+            if kind:
+                print(yvar,freq,kind)
+            else:
+                print('\t',yvar)
             fig_path_list += [savefig(make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
             close('all')
 
@@ -229,6 +232,102 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 close('all')
     return fig_path_list
 
+
+def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
+    """
+    Make (70-80SZA AM - 70-80SZA PM) and (70-80SZA PM - 40-50SZA PM) plots for xluft
+    """
+    fig_path_list = []
+    if 'xluft' not in nc.variables:
+        return fig_path_list
+
+    xluft = nc['xluft'][:]
+    solzen = nc['solzen'][:]
+    azim = nc['azim'][:]
+
+    df = pd.DataFrame().from_dict({'x':nc_time,'y':xluft})
+
+    all_ids = np.arange(nc['xluft'].size)
+
+    AM = all_ids[azim<=180]
+    PM = all_ids[azim>180]
+
+    high_sza = all_ids[(70<=solzen) & (solzen<=80)]
+    mid_sza = all_ids[(40<=solzen) & (solzen<=50)]
+    low_sza = all_ids[(20<=solzen) & (solzen<=30)]
+
+    if args.flag0:
+        all_ids = flag0
+
+    AM_high_sza = np.array(set(all_ids).intersection(set(AM),set(high_sza)))
+    PM_high_sza = np.array(set(all_ids).intersection(set(PM),set(high_sza)))
+
+    AM_mid_sza = np.array(set(all_ids).intersection(set(AM),set(mid_sza)))
+    PM_mid_sza = np.array(set(all_ids).intersection(set(PM),set(mid_sza)))
+
+    AM_low_sza = np.array(set(all_ids).intersection(set(AM),set(low_sza)))
+    PM_low_sza = np.array(set(all_ids).intersection(set(PM),set(low_sza)))
+
+    df_AM_high_sza = df.loc[AM_high_sza].set_index('x').resample('W').median()
+    df_PM_high_sza = df.loc[PM_high_sza].set_index('x').resample('W').median()
+    df_AM_mid_sza = df.loc[AM_mid_sza].set_index('x').resample('W').median()
+    df_PM_mid_sza = df.loc[PM_mid_sza].set_index('x').resample('W').median()
+    df_AM_low_sza = df.loc[AM_low_sza].set_index('x').resample('W').median()
+    df_PM_low_sza = df.loc[PM_low_sza].set_index('x').resample('W').median()
+
+    # 70-80 SZA AM and 70-80 SZA PM
+    if df_AM_high_sza['y'].size!=0 and df_PM_high_sza['y'].size!=0:
+        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
+        ax.set_title('Weekly medians')
+        ax.set_ylim(0.99,1.01)
+        df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
+        df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='70<=SZA<=80 PM')
+        fig_path = os.path.join(code_dir.parent,'outputs','xluft_high_sza_AM_high_sza_PM_vs_time.png')
+        ax.grid()
+        ax.legend()
+        if not args.flag0:
+            add_qc_lines(args,nc,ax,'time','xluft')
+        fig.savefig(fig_path,bbox_inches='tight')
+        close('all')
+        fig_path_list += [fig_path]
+
+    # 70-80 SZA PM and 40-50 SZA PM and 20-30 SZA PM
+    if df_PM_high_sza['y'].size!=0 and df_PM_mid_sza['y'].size!=0:
+        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
+        ax.set_title('Weekly medians')
+        ax.set_ylim(0.99,1.01)
+        df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 PM')
+        df_PM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 PM')
+        if df_PM_low_sza['y'].size!=0:
+            df_PM_low_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='green',label='20<=SZA<=30 PM')
+        ax.grid()
+        ax.legend()
+        if not args.flag0:
+            add_qc_lines(args,nc,ax,'time','xluft')
+        fig_path = os.path.join(code_dir.parent,'outputs','xluft_sza_PM_vs_time.png')
+        fig.savefig(fig_path,bbox_inches='tight')
+        close('all')
+        fig_path_list += [fig_path]
+
+    # 70-80 SZA PM and 40-50 SZA PM and 20-30 SZA PM
+    if df_AM_high_sza['y'].size!=0 and df_AM_mid_sza['y'].size!=0:
+        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
+        ax.set_title('Weekly medians')
+        ax.set_ylim(0.99,1.01)
+        df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
+        df_AM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 AM')
+        if df_AM_low_sza['y'].size!=0:
+            df_AM_low_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='green',label='20<=SZA<=30 AM')
+        if not args.flag0:
+            add_qc_lines(args,nc,ax,'time','xluft')
+        ax.grid()
+        ax.legend()
+        fig_path = os.path.join(code_dir.parent,'outputs','xluft_sza_AM_vs_time.png')
+        fig.savefig(fig_path,bbox_inches='tight')
+        close('all')
+        fig_path_list += [fig_path]
+
+    return fig_path_list
 
 def main():
     if 'tccon-qc' not in sys.executable:
@@ -271,11 +370,16 @@ def main():
         else:
             ref = None
             ref_time = None
-        flag0 = np.where(nc['flag'][:]==0)[0]
-        flagged = np.where(nc['flag'][:]!=0)[0]
+
+        all_ids = np.arange(nc['time'].size)
+        flag0 = all_ids[nc['flag'][:]==0]
+        flagged = all_ids[nc['flag'][:]!=0]
 
         if not args.flag0:
             fig_path_list += [flag_analysis(code_dir,nc)]
+
+        print('Making default plots')
+        fig_path_list += default_plots(args,code_dir,nc,nc_time,flag0,flagged)
 
         fnum = 0
         for xvar in vardata.keys():
@@ -296,8 +400,8 @@ def main():
             # end of for yvar loop
         # end of for xvar loop
 
-        # concatenate all .jpg file into a .pdf file
-        im_list = [stack.enter_context(Image.open(fig_path)) for fig_path in fig_path_list]
+        # concatenate all .png file into a .pdf file
+        im_list = [stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
         im_list[0].save(pdf_path, "PDF" ,resolution=100.0, save_all=True, append_images=im_list[1:])
 
 if __name__=="__main__":
