@@ -20,6 +20,14 @@ It is a json file with the main keys being the x-axis variables and values being
 
 The variables must have exactly the same names as in the netcdf files
 
+The items in the list of variables can be a list of two variables, in that case the plot will be the first variable minus the second variable
+
+Instead of the x-axis variable, a speciel key can be given to plot timeseries of statistics on resampled data
+
+The format for this special key is *freq_stat* where freq is a pandas offset alias (https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases)
+
+and *freq* is one of *mean*, *median*, or *std* for standard deviation. For example to make time series of 3-hourly mean, use *3H_mean*, for daily medians use *D_median*
+
 #### How to run the code ####
 
 Use **qc_plots.sh** to make sure the code runs with the correct environment.

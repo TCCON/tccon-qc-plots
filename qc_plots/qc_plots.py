@@ -25,74 +25,137 @@ def cm2inch(*tupl):
         return tuple(i/inch for i in tupl)
 
 
-def make_fig(args,nc,xvar,yvar,width=20,height=10):
+def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
     fig,ax = subplots()
     fig.set_size_inches(cm2inch(width,height))
     ax.grid()
-    if 'units' in nc[yvar].ncattrs():
-        ax.set_ylabel('{} ({})'.format(yvar,nc[yvar].units))
+    if kind:
+        ax.set_title('{} of data resampled with frequency={}'.format(kind,freq))
+     # if showing only flag=0 data, set the axis ranges to the vmin and vmax values of the variable.
+    if xvar!='time' and args.flag0 and 'vmin' in nc[yvar].ncattrs():
+        ax.set_xlim(nc[xvar].vmin,nc[xvar].vmax)
+    if type(yvar)==list:
+        ylab = '{} minus {}'.format(*yvar)
+        yvar = yvar[0]
     else:
-        ax.set_ylabel(yvar)
+        ylab = yvar
+        if args.flag0 and 'vmin' in nc[yvar].ncattrs() and kind!='std':
+            ax.set_ylim(nc[yvar].vmin,nc[yvar].vmax)
+
+    if 'units' in nc[yvar].ncattrs():
+        ax.set_ylabel('{} ({})'.format(ylab,nc[yvar].units))
+    else:
+        ax.set_ylabel(ylab)    
     if xvar!='time' and 'units' in nc[xvar].ncattrs():
         ax.set_xlabel('{} ({})'.format(xvar,nc[xvar].units))
     else:
         ax.set_xlabel(xvar)
-    
-    # if showing only flag=0 data, set the axis ranges to the vmin and vmax values of the variable.
-    if args.flag0 and 'vmin' in nc[yvar].ncattrs():
-        ax.set_ylim(nc[yvar].vmin,nc[yvar].vmax)
-    if xvar!='time' and args.flag0 and 'vmin' in nc[yvar].ncattrs():
-        ax.set_xlim(nc[xvar].vmin,nc[xvar].vmax)
 
     return fig,ax
 
 
-def add_qc_lines(args,nc,ax,xvar,yvar):
+def add_qc_lines(args,nc,ax,xvar,yvar,kind=''):
     for elem in ['vmin','vmax']:
-        if elem in nc[yvar].ncattrs():
+        if type(yvar)!=list and kind!='std' and (elem in nc[yvar].ncattrs()): # don't add the line for difference plots and standard deviation plots
             ax.axhline(y=nc[yvar].getncattr(elem),linestyle='dashed',color='black')
         if elem in nc[xvar].ncattrs():
             ax.axvline(x=nc[xvar].getncattr(elem),linestyle='dashed',color='black')
 
 
 def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
-    fig_name = '{}_VS_{}_{}.jpg'.format(yvar,xvar,plot_type)
+    if type(yvar)==list:
+        fig_name = '{}_minus{}_VS_{}_{}.jpg'.format(yvar[0],yvar[1],xvar,plot_type)
+    else:
+        fig_name = '{}_VS_{}_{}.jpg'.format(yvar,xvar,plot_type)
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
     fig.savefig(fig_path,bbox_inches='tight')
     return fig_path
 
 
-def make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged):
-    fig,ax = make_fig(args,nc,xvar,yvar)
+def make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind='',freq=''):
+    if xvar not in nc.variables:
+        xvar = 'time'
+    fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq)
+    if type(yvar)==list:
+        ydata = nc[yvar[0]][:]-nc[yvar[1]][:] # used for the resampled plots without --flag0
+        if args.ref:
+            ref_data = ref[yvar[0]][:]-ref[yvar[1]][:]
+    else:
+        ydata = nc[yvar][:] # used for the resampled plots without --flag0
+        if args.ref:
+            ref_data = ref[yvar][:]
+
+    if kind:
+        if args.flag0:
+            ydata = ydata[flag0]
+            nc_time = nc_time[flag0]
+        if kind=='mean':
+            main_frame = pd.DataFrame().from_dict({'x':nc_time,'y':ydata}).set_index('x').resample(freq).mean()
+        elif kind=='median':
+            main_frame = pd.DataFrame().from_dict({'x':nc_time,'y':ydata}).set_index('x').resample(freq).median()
+        elif kind=='std':
+            main_frame = pd.DataFrame().from_dict({'x':nc_time,'y':ydata}).set_index('x').resample(freq).std(ddof=1)
+        ydata = main_frame['y'].values
+        nc_time = np.array([pd.Timestamp(x).to_pydatetime() for x in main_frame.index])
+
+        if args.ref:
+            if kind=='mean':
+                ref_frame = pd.DataFrame().from_dict({'x':ref_time,'y':ref_data}).set_index('x').resample(freq).mean()
+            elif kind=='median':
+                ref_frame = pd.DataFrame().from_dict({'x':ref_time,'y':ref_data}).set_index('x').resample(freq).median()
+            elif kind=='std':
+                ref_frame = pd.DataFrame().from_dict({'x':ref_time,'y':ref_data}).set_index('x').resample(freq).std(ddof=1)
+            ref_time = np.array([pd.Timestamp(x).to_pydatetime() for x in ref_frame.index])
+            ref_data = ref_frame['y'].values
+
     if xvar == 'time':
         ax.set_xlim(nc_time[0]-timedelta(days=2),nc_time[-1]+timedelta(days=2))
         if args.ref:
-            ax.plot(ref_time,ref[yvar][:],linewidth=0,marker='o',markersize=1,color='lightgray',label=ref.long_name)
-        if not args.flag0:
-            ax.plot(nc_time[flagged],nc[yvar][flagged],linewidth=0,marker='o',markersize=1,color='red',label='flagged')
-        ax.plot(nc_time[flag0],nc[yvar][flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='flag=0')
+            ax.plot(ref_time,ref_data,linewidth=0,marker='o',markersize=1,color='lightgray',label=ref.long_name)
+        if kind:
+            ax.plot(nc_time,ydata,linewidth=0,marker='o',markersize=1,color='royalblue',label=nc.long_name)
+        else:
+            if not args.flag0:
+                ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='flagged')
+            ax.plot(nc_time[flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='flag=0')
     else:
         if not args.flag0:
-            ax.plot(nc[xvar][flagged],nc[yvar][flagged],linewidth=0,marker='o',markersize=1,color='red',label='flagged')
-        ax.plot(nc[xvar][flag0],nc[yvar][flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='flag=0')
+            ax.plot(nc[xvar][flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='flagged')
+        ax.plot(nc[xvar][flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='flag=0')
 
     # if the variables have a vmin and/or vmax attribute, add lines to the plot
     if not args.flag0:
-        add_qc_lines(args,nc,ax,xvar,yvar)
+        add_qc_lines(args,nc,ax,xvar,yvar,kind='')
 
     ax.legend()
 
-    return fig
+    return fig    
 
 
 def make_hexbin_plots(args,nc,xvar,yvar,flag0):
     fig,ax = make_fig(args,nc,xvar,yvar)
-    if not args.flag0:
-        hb = ax.hexbin(nc[xvar][:],nc[yvar][:],bins='log',mincnt=1,cmap=args.cmap)
-        add_qc_lines(args,nc,ax,xvar,yvar)
+    if type(yvar)==list:
+        if not args.flag0:
+            ydata = nc[yvar[0]][:]-nc[yvar[1]][:]
+        else:
+            ydata = nc[yvar[0]][flag0]-nc[yvar[1]][flag0]
     else:
-        extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), nc[yvar].vmin, nc[yvar].vmax)
-        hb = ax.hexbin(nc[xvar][:],nc[yvar][:],bins='log',mincnt=1,extent=extent,cmap=args.cmap)
+        if not args.flag0:
+            ydata = nc[yvar][:]
+        else:
+            ydata = nc[yvar][flag0]
+
+    if not args.flag0:
+        hb = ax.hexbin(nc[xvar][:],ydata,bins='log',mincnt=1,cmap=args.cmap)
+        add_qc_lines(args,nc,ax,xvar,yvar,kind='')
+    else:
+        if type(yvar)==list:
+            yvar = yvar[0]
+        if 'vmin' in nc[yvar].ncattrs():
+            extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), nc[yvar].vmin, nc[yvar].vmax)
+        else:
+            extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), np.min(nc[yvar][flag0]), np.max(nc[yvar][flag0]))
+        hb = ax.hexbin(nc[xvar][:],ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap)
     cb = fig.colorbar(hb,ax=ax)
 
     return fig
@@ -146,6 +209,27 @@ def flag_analysis(code_dir,nc):
 
     return fig_path
 
+
+def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='',freq=''):
+    fig_path_list = []
+    for yvar in vardata[xvar]:
+        if type(yvar)==list:
+            print("\t{} minus {}".format(*yvar))
+            fig_path_list += [savefig(make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+        else:
+            if yvar not in nc.variables:
+                print('\t',yvar,'is not in the netCDF file')
+                continue
+            print('\t',yvar,freq,kind)
+            fig_path_list += [savefig(make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            close('all')
+
+            if xvar=='solzen':
+                fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0),code_dir,xvar,yvar,plot_type='hex')]
+                close('all')
+    return fig_path_list
+
+
 def main():
     if 'tccon-qc' not in sys.executable:
         print('Running qc_plots.py with',sys.executable)
@@ -180,9 +264,13 @@ def main():
     fig_path_list = []
     with ExitStack() as stack:
         nc = stack.enter_context(netCDF4.Dataset(args.nc_file,'r')) # input netcdf file
+        nc_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(nc['time'][:],units=nc['time'].units,calendar=nc['time'].calendar)])
         if args.ref:
             ref = stack.enter_context(netCDF4.Dataset(args.ref,'r')) # input reference netcdf file
-
+            ref_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(ref['time'][:],units=ref['time'].units,calendar=ref['time'].calendar)])
+        else:
+            ref = None
+            ref_time = None
         flag0 = np.where(nc['flag'][:]==0)[0]
         flagged = np.where(nc['flag'][:]!=0)[0]
 
@@ -191,27 +279,20 @@ def main():
 
         fnum = 0
         for xvar in vardata.keys():
-            if xvar not in nc.variables:
+            if xvar.endswith("median"):
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='median',freq=xvar.split('_')[0])
+                continue
+            elif xvar.endswith("mean"):
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='mean',freq=xvar.split('_')[0])
+                continue
+            elif xvar.endswith("std"):
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='std',freq=xvar.split('_')[0])
+                continue
+            elif xvar not in [v for v in nc.variables]:
                 print(xvar,'is not in the netCDF file')
                 continue
             print('Making plots vs',xvar)
-            if xvar == 'time':
-                nc_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(nc['time'][:],units=nc['time'].units,calendar=nc['time'].calendar)])
-                if args.ref:
-                    ref_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(ref['time'][:],units=ref['time'].units,calendar=ref['time'].calendar)])
-            else:
-                nc_time = None
-            for yvar in vardata[xvar]:
-                if yvar not in nc.variables:
-                    print('\t',yvar,'is not in the netCDF file')
-                    continue
-                print('\t',yvar)
-                fig_path_list += [savefig(make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged),code_dir,xvar,yvar,plot_type='sc')]
-                close('all')
-
-                if xvar=='solzen':
-                    fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0),code_dir,xvar,yvar,plot_type='hex')]
-                    close('all')
+            fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged)
             # end of for yvar loop
         # end of for xvar loop
 
