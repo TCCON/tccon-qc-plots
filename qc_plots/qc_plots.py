@@ -291,7 +291,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     if df_AM_high_sza['y'].size!=0 and df_PM_high_sza['y'].size!=0:
         fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.99,1.01)
+        ax.set_ylim(0.98,1.02)
         df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='70<=SZA<=80 PM')
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_high_sza_AM_high_sza_PM_vs_time.png')
@@ -307,7 +307,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     if df_PM_high_sza['y'].size!=0 and df_PM_mid_sza['y'].size!=0:
         fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.99,1.01)
+        ax.set_ylim(0.98,1.02)
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 PM')
         df_PM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 PM')
         if df_PM_low_sza['y'].size!=0:
@@ -325,7 +325,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     if df_AM_high_sza['y'].size!=0 and df_AM_mid_sza['y'].size!=0:
         fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.99,1.01)
+        ax.set_ylim(0.98,1.02)
         df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
         df_AM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 AM')
         if df_AM_low_sza['y'].size!=0:
