@@ -219,8 +219,15 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
     fig_path_list = []
     for yvar in vardata[xvar]:
         if type(yvar)==list:
+            check = False
+            for v in yvar:
+                if v not in nc.variables:
+                    print('\t',v,'is not in the netCDF file')
+                    check = True
+            if check:
+                continue
             print("\t {} minus {}".format(*yvar))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
