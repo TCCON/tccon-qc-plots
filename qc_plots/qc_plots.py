@@ -16,7 +16,7 @@ from pathlib import Path
 
 def cm2inch(*tupl):
     """
-    Converts reasonable units into terrible units.
+    Converts reasonable units (cm) into terrible units (inches).
     """
     inch = 2.54
     if isinstance(tupl[0], tuple):
@@ -72,7 +72,7 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     return fig_path
 
 
-def make_scatter_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind='',freq=''):
+def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind='',freq=''):
     if xvar not in nc.variables:
         xvar = 'time'
     fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq)
@@ -187,6 +187,10 @@ def flag_analysis(code_dir,nc):
     print('     {:<20} {:>6}   {:>8.3f}'.format('TOTAL',nflag_tot,100*nflag_tot/N))
     flag_df['Total'] = nflag_tot
     flag_df_pcnt['Total'] = 100*nflag_tot/N
+
+    drop_list = [var for var in flag_df_pcnt if flag_df_pcnt[var][0]>0.05]
+    flag_df = flag_df.drop(columns=drop_list)
+    flag_df_pcnt = flag_df_pcnt.drop(columns=drop_list)
     
     fig, ax = subplots(2,1)
     ax[0].set_ylabel('Count')
@@ -194,10 +198,11 @@ def flag_analysis(code_dir,nc):
     ax[0].set_title('{} total spectra from {}'.format(N,nc.long_name))
     fig.suptitle('Summary of flags')
     barplot = flag_df.plot(kind='bar',ax=ax[0])
-    barplot_pcnt = flag_df_pcnt.plot(kind='bar',ax=ax[1])
+    barplot_pcnt = flag_df_pcnt.plot(kind='bar',ax=ax[1],legend=False)
     for elem in ax:
         elem.axes.get_xaxis().set_visible(False)
         elem.grid()
+    ax[0].legend(prop=dict(size=8))
 
     prec = ['{:.0f}','{:.2f}']
     for i,curplot in enumerate([barplot,barplot_pcnt]):
