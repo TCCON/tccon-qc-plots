@@ -12,6 +12,7 @@ from pylab import *
 from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
+from PyPDF2 import PdfFileWriter, PdfFileReader
 
 
 def cm2inch(*tupl):
@@ -492,9 +493,25 @@ def main():
             # end of for yvar loop
         # end of for xvar loop
 
-        # concatenate all .png file into a .pdf file
+        # concatenate all .png file into a temporary .pdf file
+        temp_pdf_path = pdf_path.replace('.pdf','temp.pdf')
         im_list = [stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
-        im_list[0].save(pdf_path, "PDF" ,resolution=100.0, save_all=True, append_images=im_list[1:])
+        im_list[0].save(temp_pdf_path, "PDF" ,resolution=100.0, save_all=True, append_images=im_list[1:])
+
+        # add bookmarks to the temporary pdf file
+        pdf_in = stack.enter_context(open(temp_pdf_path,'rb'))
+        pdf_out = stack.enter_context(open(pdf_path,'wb'))
+
+        input = PdfFileReader(pdf_in)
+        output = PdfFileWriter()
+        
+        for i,fig_path in enumerate(fig_path_list):
+            output.addPage(input.getPage(i))
+            output.addBookmark(os.path.basename(fig_path).strip('.jpg'),i)
+
+        output.write(pdf_out)
+
+    os.remove(temp_pdf_path) # remove the temporary pdf file
 
 if __name__=="__main__":
     main()
