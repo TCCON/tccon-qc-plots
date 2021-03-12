@@ -22,8 +22,8 @@ The variables must have exactly the same names as in the netcdf files
 
 The items in the list of variables can be:
 
-- a list of two variables e.g. [a,b], in that case the plot will be the first variable minus the second variable
-- a list containing a list of two variables e.g. [[a,b]], in that case there will be two subplots with 1:3 size ratio, with variable a in the larger bottom plot
+- a list of two variables e.g. **[a,b]**, in that case the plot will be the first variable minus the second variable
+- a list containing a list of two variables e.g. **[[a,b]]**, in that case there will be two subplots with 1:3 size ratio, with variable **a** in the larger bottom plot
 
 Instead of the x-axis variable, a speciel key can be given to plot timeseries of statistics on resampled data (also supports the [a,b], and [[a,b]] notations)
 
