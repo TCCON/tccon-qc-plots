@@ -217,9 +217,9 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
         if type(yvar)==list:
             yvar = yvar[0]
         if 'vmin' in nc[yvar].ncattrs():
-            extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), nc[yvar].vmin, nc[yvar].vmax)
+            extent = (np.nanmin(nc[xvar][flag0]), np.nanmax(nc[xvar][flag0]), nc[yvar].vmin, nc[yvar].vmax)
         else:
-            extent = (np.nanmin(nc['solzen'][flag0]), np.nanmax(nc['solzen'][flag0]), np.min(nc[yvar][flag0]), np.max(nc[yvar][flag0]))
+            extent = (np.nanmin(nc[xvar][flag0]), np.nanmax(nc[xvar][flag0]), np.min(nc[yvar][flag0]), np.max(nc[yvar][flag0]))
         hb = ax.hexbin(nc[xvar][flag0],ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap)
     cb = fig.colorbar(hb,ax=ax)
 
@@ -323,7 +323,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
             close('all')
 
-            if xvar=='solzen':
+            if '_' not in xvar and xvar!='time':
                 fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0),code_dir,xvar,yvar,plot_type='hex')]
                 close('all')
     return fig_path_list
