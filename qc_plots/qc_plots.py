@@ -26,14 +26,29 @@ def cm2inch(*tupl):
 
 
 def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
-    fig,ax = subplots()
+    two_subplots = type(yvar)==list and type(yvar[0])==list
+    if two_subplots:
+        fig,axes = subplots(2,1,sharex=True,gridspec_kw={'height_ratios':[1,3]})
+        axes[0].grid()
+        axes[1].grid()
+        yvar2 = yvar[0][1] # for the top plot
+        yvar = yvar[0][0] # for the bottom plot
+        ax = axes[1] # the bottom plot
+        if 'units' in nc[yvar2].ncattrs():
+            axes[0].set_ylabel('{} ({})'.format(yvar2,nc[yvar2].units))
+        else:
+            axes[0].set_ylabel(yvar2)
+    else:
+        fig,ax = subplots()
+        ax.grid()
     fig.set_size_inches(cm2inch(width,height))
-    ax.grid()
+    
     if kind:
-        ax.set_title('{} of data resampled with frequency={}'.format(kind,freq))
+        fig.suptitle('{} of data resampled with frequency={}'.format(kind,freq))
      # if showing only flag=0 data, set the axis ranges to the vmin and vmax values of the variable.
     if xvar!='time' and args.flag0 and 'vmin' in nc[yvar].ncattrs():
         ax.set_xlim(nc[xvar].vmin,nc[xvar].vmax)
+
     if type(yvar)==list:
         ylab = '{} minus {}'.format(*yvar)
         yvar = yvar[0]
@@ -41,16 +56,21 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
         ylab = yvar
         if args.flag0 and 'vmin' in nc[yvar].ncattrs() and kind!='std':
             ax.set_ylim(nc[yvar].vmin,nc[yvar].vmax)
+        if two_subplots and args.flag0 and 'vmin' in nc[yvar2].ncattrs() and kind!='std':
+            axes[0].set_ylim(nc[yvar2].vmin,nc[yvar2].vmax)
 
     if 'units' in nc[yvar].ncattrs():
         ax.set_ylabel('{} ({})'.format(ylab,nc[yvar].units))
     else:
-        ax.set_ylabel(ylab)    
+        ax.set_ylabel(ylab)
+
     if xvar!='time' and 'units' in nc[xvar].ncattrs():
         ax.set_xlabel('{} ({})'.format(xvar,nc[xvar].units))
     else:
         ax.set_xlabel(xvar)
 
+    if two_subplots:
+        ax = axes
     return fig,ax
 
 
@@ -63,8 +83,10 @@ def add_qc_lines(args,nc,ax,xvar,yvar,kind=''):
 
 
 def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
-    if type(yvar)==list:
-        fig_name = '{}_minus{}_VS_{}_{}.png'.format(yvar[0],yvar[1],xvar,plot_type)
+    if type(yvar)==list and type(yvar[0])==list:
+        fig_name = '{}_and_{}_VS_{}_{}.png'.format(yvar[0][0],yvar[0][1],xvar,plot_type)
+    elif type(yvar)==list:
+        fig_name = '{}_minus_{}_VS_{}_{}.png'.format(yvar[0],yvar[1],xvar,plot_type)
     else:
         fig_name = '{}_VS_{}_{}.png'.format(yvar,xvar,plot_type)
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
@@ -75,7 +97,19 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
 def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind='',freq=''):
     if xvar not in nc.variables:
         xvar = 'time'
+
     fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq)
+
+    two_subplots = type(yvar)==list and type(yvar[0])==list
+    if two_subplots:
+        ax2 = ax[0]
+        ax = ax[1]
+        yvar2 = yvar[0][1]
+        yvar = yvar[0][0]
+        ydata2 = nc[yvar2][:]
+        if args.ref:
+            ref_data2 = ref[yvar2][:]
+    
     if type(yvar)==list:
         ydata = nc[yvar[0]][:]-nc[yvar[1]][:] # used for the resampled plots without --flag0
         if args.ref:
@@ -89,43 +123,70 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind
         if args.flag0:
             ydata = ydata[flag0]
             nc_time = nc_time[flag0]
+        if two_subplots:
+            data_dict = {'x':nc_time,'y':ydata,'y2':ydata2}
+        else:
+            data_dict = {'x':nc_time,'y':ydata}
+
         if kind=='mean':
-            main_frame = pd.DataFrame().from_dict({'x':nc_time,'y':ydata}).set_index('x').resample(freq).mean()
+            main_frame = pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq).mean()
         elif kind=='median':
-            main_frame = pd.DataFrame().from_dict({'x':nc_time,'y':ydata}).set_index('x').resample(freq).median()
+            main_frame = pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq).median()
         elif kind=='std':
-            main_frame = pd.DataFrame().from_dict({'x':nc_time,'y':ydata}).set_index('x').resample(freq).std(ddof=1)
+            main_frame = pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq).std(ddof=1)
         ydata = main_frame['y'].values
         nc_time = np.array([pd.Timestamp(x).to_pydatetime() for x in main_frame.index])
+        if two_subplots:
+            ydata2 = main_frame['y2'].values
 
         if args.ref:
+            if two_subplots:
+                ref_data_dict = {'x':nc_time,'y':ref_data,'y2':ref_data2}
+            else:
+                ref_data_dict = {'x':nc_time,'y':ref_data}            
             if kind=='mean':
-                ref_frame = pd.DataFrame().from_dict({'x':ref_time,'y':ref_data}).set_index('x').resample(freq).mean()
+                ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).mean()
             elif kind=='median':
-                ref_frame = pd.DataFrame().from_dict({'x':ref_time,'y':ref_data}).set_index('x').resample(freq).median()
+                ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).median()
             elif kind=='std':
-                ref_frame = pd.DataFrame().from_dict({'x':ref_time,'y':ref_data}).set_index('x').resample(freq).std(ddof=1)
+                ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).std(ddof=1)
             ref_time = np.array([pd.Timestamp(x).to_pydatetime() for x in ref_frame.index])
             ref_data = ref_frame['y'].values
+            if two_subplots:
+                ref_data2 = ref_frame['y2'].values
 
     if xvar == 'time':
         ax.set_xlim(nc_time[0]-timedelta(days=2),nc_time[-1]+timedelta(days=2))
         if args.ref:
             ax.plot(ref_time,ref_data,linewidth=0,marker='o',markersize=1,color='lightgray',label=ref.long_name)
+            if two_subplots:
+                ax2.plot(ref_time,ref_data2,linewidth=0,marker='o',markersize=1,color='lightgray')
         if kind:
             ax.plot(nc_time,ydata,linewidth=0,marker='o',markersize=1,color='royalblue',label=nc.long_name)
+            if two_subplots:
+               ax2.plot(nc_time,ydata2,linewidth=0,marker='o',markersize=1,color='royalblue') 
         else:
             if not args.flag0:
-                ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='flagged')
-            ax.plot(nc_time[flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='flag=0')
+                ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
+                if two_subplots:
+                    ax2.plot(nc_time[flagged],ydata2[flagged],linewidth=0,marker='o',markersize=1,color='red')
+            ax.plot(nc_time[flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+            if two_subplots:
+                ax2.plot(nc_time[flag0],ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
     else:
         if not args.flag0:
-            ax.plot(nc[xvar][flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='flagged')
-        ax.plot(nc[xvar][flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='flag=0')
+            ax.plot(nc[xvar][flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
+            if two_subplots:
+                ax2.plot(nc[xvar][flagged],ydata2[flagged],linewidth=0,marker='o',markersize=1,color='red')
+        ax.plot(nc[xvar][flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+        if two_subplots:
+            ax2.plot(nc[xvar][flag0],ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
 
     # if the variables have a vmin and/or vmax attribute, add lines to the plot
     if not args.flag0:
         add_qc_lines(args,nc,ax,xvar,yvar,kind='')
+        if two_subplots:
+            add_qc_lines(args,nc,ax2,xvar,yvar2,kind='')
 
     ax.legend()
 
@@ -218,11 +279,27 @@ def flag_analysis(code_dir,nc):
 def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='',freq=''):
     fig_path_list = []
     for yvar in vardata[xvar]:
-        if type(yvar)==list:
+        if type(yvar)==list and type(yvar[0])==list: # two plots with 1:3 ratio
+            check = False
+            for v in yvar[0]:
+                if v not in nc.variables:
+                    print('\t',v,'is not in the netCDF file')
+                    check = True
+                elif np.count_nonzero(nc[v][:].mask)==nc[v].size:
+                    print('\t',v,'has only masked values')
+                    check = True
+            if check:
+                continue
+            print("\t {} and {}".format(*yvar[0]))
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+        elif type(yvar)==list: # difference plot
             check = False
             for v in yvar:
                 if v not in nc.variables:
                     print('\t',v,'is not in the netCDF file')
+                    check = True
+                elif np.count_nonzero(nc[v][:].mask)==nc[v].size:
+                    print('\t',v,'has only masked values')
                     check = True
             if check:
                 continue
@@ -231,6 +308,9 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
+                continue
+            elif np.count_nonzero(nc[yvar][:].mask)==nc[yvar].size:
+                print('\t',yvar,'has only masked values')
                 continue
             if kind:
                 print(yvar,freq,kind)
@@ -247,7 +327,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
 
 def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     """
-    Make (70-80SZA AM - 70-80SZA PM) and (70-80SZA PM - 40-50SZA PM) plots for xluft
+    Make (70-80 SZA AM - 70-80 SZA PM) and (70-80 SZA PM - 40-50 SZA PM) plots for xluft
     """
     fig_path_list = []
     if 'xluft' not in nc.variables:

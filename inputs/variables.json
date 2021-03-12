@@ -1,5 +1,5 @@
 {
-	"time":["xluft","xluft_error","xco2","xco2_error","xch4","xch4_error","xco","xco_error","xh2o","xh2o_error","xhdo","xhdo_error","xhf","xhf_error","xn2o","xn2o_error",
+	"time":[[["xluft","xluft_error"]],[["xco2","xco2_error"]],[["xch4","xch4_error"]],[["xco","xco_error"]],[["xh2o","xh2o_error"]],[["xhdo","xhdo_error"]],[["xhf","xhf_error"]],[["xn2o","xn2o_error"]],
 		"vsf_co2","vsf_lco2","vsf_wco2","vsf_hcl","vsf_o2","vsf_n2o","vsf_hf","vsf_h2o",
 		"fvsi","lse","lsu","solzen","o2_7885_fs","o2_7885_sg","zco2_4852a_zo",
 		"fco2_6154_cfampocl","fco2_6154_cfperiod","fco2_6154_cfphase",
