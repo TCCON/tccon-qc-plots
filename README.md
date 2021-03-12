@@ -52,7 +52,7 @@ The optional **--ref** argument can be used to give a reference input file. If g
 
 The optional **--json** argument can be used to give the full path to a different json input file than the one already in the **inputs** folder
 
-The optional **--cmap** argument can be used to change the colormap used in the plots, it must be one of the matplotlib named colormaps https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
+The optional **--cmap** argument can be used to change the colormap used in the plots, it must be one of the [matplotlib named colormaps](https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html)
 
 ### Who do I talk to? ###
 
