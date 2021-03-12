@@ -47,7 +47,7 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
     if kind:
         fig.suptitle('{} of data resampled with frequency={}'.format(kind,freq))
      # if showing only flag=0 data, set the axis ranges to the vmin and vmax values of the variable.
-    if xvar!='time' and args.flag0 and 'vmin' in nc[yvar].ncattrs():
+    if xvar!='time' and args.flag0 and 'vmin' in nc[xvar].ncattrs():
         ax.set_xlim(nc[xvar].vmin,nc[xvar].vmax)
 
     if type(yvar)==list:
@@ -323,7 +323,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
             close('all')
 
-            if '_' not in xvar and xvar!='time':
+            if xvar!='time' and not np.count_nonzero([i in xvar for i in ['median','mean','std']]):
                 fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0),code_dir,xvar,yvar,plot_type='hex')]
                 close('all')
     return fig_path_list
