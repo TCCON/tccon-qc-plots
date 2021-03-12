@@ -188,7 +188,7 @@ def flag_analysis(code_dir,nc):
     flag_df['Total'] = nflag_tot
     flag_df_pcnt['Total'] = 100*nflag_tot/N
 
-    drop_list = [var for var in flag_df_pcnt if flag_df_pcnt[var][0]>0.05]
+    drop_list = [var for var in flag_df_pcnt if flag_df_pcnt[var][0]<0.05]
     flag_df = flag_df.drop(columns=drop_list)
     flag_df_pcnt = flag_df_pcnt.drop(columns=drop_list)
     
@@ -196,7 +196,7 @@ def flag_analysis(code_dir,nc):
     ax[0].set_ylabel('Count')
     ax[1].set_ylabel('Count (%)')
     ax[0].set_title('{} total spectra from {}'.format(N,nc.long_name))
-    fig.suptitle('Summary of flags')
+    fig.suptitle('Summary of flags with count>0.05%')
     barplot = flag_df.plot(kind='bar',ax=ax[0])
     barplot_pcnt = flag_df_pcnt.plot(kind='bar',ax=ax[1],legend=False)
     for elem in ax:
