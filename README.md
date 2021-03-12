@@ -28,7 +28,7 @@ The items in the list of variables can be:
 
 Instead of the x-axis variable, a speciel key can be given to plot timeseries of statistics on resampled data (also supports the [a,b], and [[a,b]] notations)
 
-The format for this special key is **freq_stat** where **freq** is a pandas offset alias (see https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases as well as https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#anchored-offsets)
+The format for this special key is **freq_stat** where **freq** is a pandas [offset alias](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases) (also see [anchored offsets](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#anchored-offsets))
 
 and **freq** is one of **mean**, **median**, or **std** for standard deviation. For example to make time series of 3-hourly mean, use **3H_mean**, for daily medians use **D_median**
 
