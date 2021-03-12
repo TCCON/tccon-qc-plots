@@ -107,11 +107,12 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind
         ax = ax[1]
         yvar2 = yvar[0][1]
         yvar = yvar[0][0]
+        ydata = nc[yvar][:]
         ydata2 = nc[yvar2][:]
         if args.ref:
+            ref_data = ref[yvar][:]
             ref_data2 = ref[yvar2][:]
-    
-    if type(yvar)==list:
+    elif type(yvar)==list:
         ydata = nc[yvar[0]][:]-nc[yvar[1]][:] # used for the resampled plots without --flag0
         if args.ref:
             ref_data = ref[yvar[0]][:]-ref[yvar[1]][:]
@@ -124,6 +125,8 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind
         if args.flag0:
             ydata = ydata[flag0]
             nc_time = nc_time[flag0]
+            if two_subplots:
+                ydata2 = ydata2[flag0]
         if two_subplots:
             data_dict = {'x':nc_time,'y':ydata,'y2':ydata2}
         else:
@@ -142,9 +145,9 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind
 
         if args.ref:
             if two_subplots:
-                ref_data_dict = {'x':nc_time,'y':ref_data,'y2':ref_data2}
+                ref_data_dict = {'x':ref_time,'y':ref_data,'y2':ref_data2}
             else:
-                ref_data_dict = {'x':nc_time,'y':ref_data}            
+                ref_data_dict = {'x':ref_time,'y':ref_data}            
             if kind=='mean':
                 ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).mean()
             elif kind=='median':
@@ -490,8 +493,8 @@ def main():
                 continue
             print('Making plots vs',xvar)
             fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged)
-            # end of for yvar loop
-        # end of for xvar loop
+            # end of "for yvar" loop
+        # end of "for xvar" loop
 
         # concatenate all .png file into a temporary .pdf file
         temp_pdf_path = pdf_path.replace('.pdf','temp.pdf')
