@@ -10,8 +10,8 @@ dependencies:
   - backports.functools_lru_cache=1.6.1=py_0
   - bzip2=1.0.8=h516909a_3
   - c-ares=1.16.1=h516909a_3
-  - ca-certificates=2020.11.8=ha878542_0
-  - certifi=2020.11.8=py37h89c1867_0
+  - ca-certificates=2020.12.5=ha878542_0
+  - certifi=2020.12.5=py37h89c1867_1
   - cftime=1.2.1=py37h161383b_1
   - curl=7.71.1=he644dc0_8
   - cycler=0.10.0=py_2
@@ -75,7 +75,7 @@ dependencies:
   - nss=3.58=h27285de_1
   - numpy=1.19.4=py37h7e9df27_1
   - olefile=0.46=pyh9f0ad1d_1
-  - openssl=1.1.1h=h516909a_0
+  - openssl=1.1.1j=h7f98852_0
   - pandas=1.1.4=py37h10a2094_0
   - parso=0.7.1=pyh9f0ad1d_0
   - pcre=8.44=he1b5a44_0
@@ -88,6 +88,7 @@ dependencies:
   - ptyprocess=0.6.0=py_1001
   - pygments=2.7.2=py_0
   - pyparsing=2.4.7=pyh9f0ad1d_0
+  - pypdf2=1.26.0=py_2
   - pyqt=5.12.3=py37h8685d9f_4
   - python=3.7.8=h6f2ec95_1_cpython
   - python-dateutil=2.8.1=py_0
