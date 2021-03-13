@@ -95,7 +95,7 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     return fig_path
 
 
-def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind='',freq=''):
+def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq=''):
     if xvar not in nc.variables:
         xvar = 'time'
 
@@ -109,16 +109,23 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind
         yvar = yvar[0][0]
         ydata = nc[yvar][:]
         ydata2 = nc[yvar2][:]
-        if args.ref:
+        if args.ref and args.flag0 and 'flag' in ref.variables:
+            ref_data = ref[yvar][ref_flag0]
+            ref_data2 = ref[yvar2][ref_flag0]            
+        elif args.ref:
             ref_data = ref[yvar][:]
             ref_data2 = ref[yvar2][:]
     elif type(yvar)==list:
         ydata = nc[yvar[0]][:]-nc[yvar[1]][:] # used for the resampled plots without --flag0
-        if args.ref:
+        if args.ref and args.flag0 and 'flag' in ref.variables:
+            ref_data = ref[yvar[0]][ref_flag0]-ref[yvar[1]][ref_flag0]
+        elif args.ref:
             ref_data = ref[yvar[0]][:]-ref[yvar[1]][:]
     else:
         ydata = nc[yvar][:] # used for the resampled plots without --flag0
-        if args.ref:
+        if args.ref and args.flag0 and 'flag' in ref.variables:
+            ref_data = ref[yvar][ref_flag0]
+        elif args.ref:
             ref_data = ref[yvar][:]
 
     if kind:
@@ -187,10 +194,9 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind
             ax2.plot(nc[xvar][flag0],ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
 
     # if the variables have a vmin and/or vmax attribute, add lines to the plot
-    if not args.flag0:
-        add_qc_lines(args,nc,ax,xvar,yvar,kind='')
-        if two_subplots:
-            add_qc_lines(args,nc,ax2,xvar,yvar2,kind='')
+    add_qc_lines(args,nc,ax,xvar,yvar,kind='')
+    if two_subplots:
+        add_qc_lines(args,nc,ax2,xvar,yvar2,kind='')
 
     ax.legend()
 
@@ -280,7 +286,7 @@ def flag_analysis(code_dir,nc):
     return fig_path
 
 
-def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='',freq=''):
+def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='',freq=''):
     fig_path_list = []
     for yvar in vardata[xvar]:
         if type(yvar)==list and type(yvar[0])==list: # two plots with 1:3 ratio
@@ -295,7 +301,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} and {}".format(*yvar[0]))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
         elif type(yvar)==list: # difference plot
             check = False
             for v in yvar:
@@ -308,7 +314,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} minus {}".format(*yvar))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
@@ -320,7 +326,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 print(yvar,freq,kind)
             else:
                 print('\t',yvar)
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
             close('all')
 
             if xvar!='time' and not np.count_nonzero([i in xvar for i in ['median','mean','std']]):
@@ -463,13 +469,24 @@ def main():
         if args.ref:
             ref = stack.enter_context(netCDF4.Dataset(args.ref,'r')) # input reference netcdf file
             ref_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(ref['time'][:],units=ref['time'].units,calendar=ref['time'].calendar)])
+            all_ref_ids = np.arange(ref['time'].size)
+            if args.flag0 and 'flag' in ref.variables:
+                ref_flag0 = all_ref_ids[ref['flag'][:]==0]
+                ref_time = ref_time[ref_flag0]
+            else:
+                ref_flag0 = all_ref_ids
         else:
             ref = None
             ref_time = None
+            ref_flag0 = None
 
         all_ids = np.arange(nc['time'].size)
-        flag0 = all_ids[nc['flag'][:]==0]
-        flagged = all_ids[nc['flag'][:]!=0]
+        if 'flag' in nc.variables:
+            flag0 = all_ids[nc['flag'][:]==0]
+            flagged = all_ids[nc['flag'][:]!=0]
+        else:
+            flag0 = all_ids
+            flagged = []
 
         if not args.flag0:
             fig_path_list += [flag_analysis(code_dir,nc)]
@@ -480,19 +497,19 @@ def main():
         fnum = 0
         for xvar in vardata.keys():
             if xvar.endswith("median"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='median',freq=xvar.split('_')[0])
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='median',freq=xvar.split('_')[0])
                 continue
             elif xvar.endswith("mean"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='mean',freq=xvar.split('_')[0])
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='mean',freq=xvar.split('_')[0])
                 continue
             elif xvar.endswith("std"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,kind='std',freq=xvar.split('_')[0])
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='std',freq=xvar.split('_')[0])
                 continue
             elif xvar not in [v for v in nc.variables]:
                 print(xvar,'is not in the netCDF file')
                 continue
             print('Making plots vs',xvar)
-            fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged)
+            fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0)
             # end of "for yvar" loop
         # end of "for xvar" loop
 
@@ -501,7 +518,7 @@ def main():
         im_list = [stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
         im_list[0].save(temp_pdf_path, "PDF" ,resolution=100.0, save_all=True, append_images=im_list[1:])
 
-        # add bookmarks to the temporary pdf file
+        # add bookmarks to the temporary pdf file and save the final file
         pdf_in = stack.enter_context(open(temp_pdf_path,'rb'))
         pdf_out = stack.enter_context(open(pdf_path,'wb'))
 
