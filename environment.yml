@@ -75,7 +75,7 @@ dependencies:
   - nss=3.58=h27285de_1
   - numpy=1.19.4=py37h7e9df27_1
   - olefile=0.46=pyh9f0ad1d_1
-  - openssl=1.1.1j=h7f98852_0
+  - openssl=1.1.1k=h7f98852_0
   - pandas=1.1.4=py37h10a2094_0
   - parso=0.7.1=pyh9f0ad1d_0
   - pcre=8.44=he1b5a44_0
@@ -96,6 +96,7 @@ dependencies:
   - pytz=2020.4=pyhd8ed1ab_0
   - qt=5.12.9=h1f2b2cb_0
   - readline=8.0=he28a2e2_2
+  - scipy=1.6.1=py37h14a347d_0
   - setuptools=49.6.0=py37he5f6b98_2
   - six=1.15.0=pyh9f0ad1d_0
   - sqlite=3.33.0=h4cf870e_1

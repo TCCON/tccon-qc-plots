@@ -13,6 +13,8 @@ from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
 from PyPDF2 import PdfFileWriter, PdfFileReader
+from scipy.optimize import curve_fit
+from scipy.stats import pearsonr
 
 
 def cm2inch(*tupl):
@@ -93,6 +95,36 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
     fig.savefig(fig_path,bbox_inches='tight')
     return fig_path
+
+
+def lin_model(x,a,b):
+    return a*x+b
+
+
+def add_linfit(ax,x,y,yerr=None):
+    """
+    Add a line with the results of a linear fit to y = a*x + b
+    Also shows the squared pearson correlation coefficient
+
+    Inputs:
+        - ax: matplotlib subplot
+        - x: x axis data
+        - y: y axis data
+    """
+    
+    # linear fit using y = a*x + b
+    if yerr:
+        fit,cov = curve_fit(lin_model,x,y,p0=[1,0],sigma=yerr)
+    else:
+        fit,cov = curve_fit(lin_model,x,y,p0=[1,0])
+    
+    # pearson correlation coefficient
+    R = pearsonr(x,y)[0]
+
+    leg = 'y=({:.4f} +/-{:.4f})*x + ({:.4f} +/-{:.4f}); R²={:.3f}'.format(fit[0],fit[1],np.sqrt(cov[0][0]),np.sqrt(cov[1][1]),R**2) 
+
+    # plot line fits
+    ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',label=leg,color="C1")
 
 
 def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq=''):
@@ -189,9 +221,12 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
             ax.plot(nc[xvar][flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
             if two_subplots:
                 ax2.plot(nc[xvar][flagged],ydata2[flagged],linewidth=0,marker='o',markersize=1,color='red')
-        ax.plot(nc[xvar][flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+        x = nc[xvar][flag0]
+        y = ydata[flag0]
+        ax.plot(x,y,linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+        add_linfit(ax,x,y) # only add the linear fit to the flag=0 data, even when plotting all data
         if two_subplots:
-            ax2.plot(nc[xvar][flag0],ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
+            ax2.plot(x,ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
 
     # if the variables have a vmin and/or vmax attribute, add lines to the plot
     add_qc_lines(args,nc,ax,xvar,yvar,kind='')
