@@ -218,6 +218,9 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
         elif args.ref:
             ref_data = ref[yvar][:]
 
+    if len(set(ydata.data)) in [1,0]:
+        ax.text(0.5,0.5,'{} is constant'.format(yvar),transform=ax.transAxes,color='black')
+
     if kind:
         if args.flag0:
             ydata = ydata[flag0]
