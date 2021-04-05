@@ -93,7 +93,7 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     else:
         fig_name = '{}_VS_{}_{}.png'.format(yvar,xvar,plot_type)
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
-    fig.savefig(fig_path,bbox_inches='tight')
+    fig.savefig(fig_path,bbox_inches='tight',dpi=300)
     return fig_path
 
 
