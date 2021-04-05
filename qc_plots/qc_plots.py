@@ -27,6 +27,63 @@ def cm2inch(*tupl):
     else:
         return tuple(i/inch for i in tupl)
 
+def get_limits(nc,var):
+
+    limits = [None,None]
+
+    if 'vsf_h2o' in var or 'vsf_hdo' in var or 'vsf_hf' in var:
+        limits = [0.3,2]
+    elif 'vsf_hcl' in var:
+        limits = [0.7,1.4]
+    elif 'vsf_' in var:
+        limits = [0.9,1.1]
+    elif var.endswith('_fs'):
+        limits = [-2,2]
+    elif var.endswith('_sg'):
+        limits = [-8,8]
+    elif var.endswith('_zo'):
+        limits = [-0.006,0.006]
+    elif var.endswith('_cfampocl'):
+        limits = [0,0.005]
+    elif var.endswith('_cfperiod'):
+        limits = [-1,50]
+    elif var == 'xluft':
+        limits = [0.975,1.025]
+    elif var == 'xch4':
+        limits = [1.6,2.0]
+    elif var == 'xco':
+        limits = [0,200]
+    elif var == 'xn2o':
+        limits = [200,400]
+    elif var == 'xhdo':
+        limits = [0,10000]
+    elif var == 'xh2o':
+        limits = [0,10000]
+    elif var == 'xch4_error':
+        limits = [0,0.05]
+    elif var == 'xco_error':
+        limits = [0,10]
+    elif var == 'xhdo_error':
+        limits = [0,100]
+    elif var == 'xh2o_error':
+        limits = [0,100]
+    elif var == 'xhf_error':
+        limits = [0,50]
+    elif var == 'xn2o_error':
+        limits = [0,25]
+    elif var == 'dip':
+        limits = [-0.05,0.05]
+    elif var == 'mvd':
+        limits = [-5,250]
+    elif var == 'lse':
+        limits = [-0.1,0.1]
+    elif var == 'lsu':
+        limits = [0,0.06]
+    elif 'vmin' in nc[var].ncattrs():
+        limits = [nc[var].vmin,nc[var].vmax]  
+
+    return limits
+
 
 def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
     two_subplots = type(yvar)==list and type(yvar[0])==list
@@ -48,19 +105,20 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
     
     if kind:
         fig.suptitle('{} of data resampled with frequency={}'.format(kind,freq))
-     # if showing only flag=0 data, set the axis ranges to the vmin and vmax values of the variable.
-    if xvar!='time' and args.flag0 and 'vmin' in nc[xvar].ncattrs():
-        ax.set_xlim(nc[xvar].vmin,nc[xvar].vmax)
+
+    if not args.show_all:
+        if kind!='std':
+            ax.set_ylim(get_limits(nc,yvar))
+        if xvar!='time':
+            ax.set_xlim(get_limits(nc,xvar))
+        if two_subplots:
+            axes[0].set_ylim(get_limits(nc,yvar2))
 
     if type(yvar)==list:
         ylab = '{} minus {}'.format(*yvar)
         yvar = yvar[0]
     else:
         ylab = yvar
-        if args.flag0 and 'vmin' in nc[yvar].ncattrs() and kind!='std':
-            ax.set_ylim(nc[yvar].vmin,nc[yvar].vmax)
-        if two_subplots and args.flag0 and 'vmin' in nc[yvar2].ncattrs() and kind!='std':
-            axes[0].set_ylim(nc[yvar2].vmin,nc[yvar2].vmax)
 
     if 'units' in nc[yvar].ncattrs():
         ax.set_ylabel('{} ({})'.format(ylab,nc[yvar].units))
@@ -251,17 +309,24 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
         else:
             ydata = nc[yvar][flag0]
 
-    if not args.flag0:
-        hb = ax.hexbin(nc[xvar][:],ydata,bins='log',mincnt=1,cmap=args.cmap)
-        add_qc_lines(args,nc,ax,xvar,yvar,kind='')
+    if args.flag0:
+        xdata = nc[xvar][flag0]
     else:
-        if type(yvar)==list:
-            yvar = yvar[0]
-        if 'vmin' in nc[yvar].ncattrs():
-            extent = (np.nanmin(nc[xvar][flag0]), np.nanmax(nc[xvar][flag0]), nc[yvar].vmin, nc[yvar].vmax)
-        else:
-            extent = (np.nanmin(nc[xvar][flag0]), np.nanmax(nc[xvar][flag0]), np.min(nc[yvar][flag0]), np.max(nc[yvar][flag0]))
-        hb = ax.hexbin(nc[xvar][flag0],ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap)
+        xdata = nc[xvar][:]
+
+    if type(yvar)==list:
+        yvar = yvar[0]
+
+    xmin, xmax = get_limits(nc,xvar)
+    ymin, ymax = get_limits(nc,yvar)
+    if None in [xmin,xmax]:
+        xmin, xmax = [np.nanmin(xdata), np.nanmax(xdata)]
+    if None in [ymin,ymax]:
+         ymin, ymax = [np.nanmin(ydata), np.nanmax(ydata)]
+
+    extent = (xmin, xmax, ymin, ymax)
+
+    hb = ax.hexbin(xdata,ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap,linewidths=(0,))
     cb = fig.colorbar(hb,ax=ax)
 
     return fig
@@ -416,7 +481,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     if df_AM_high_sza['y'].size!=0 and df_PM_high_sza['y'].size!=0:
         fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.98,1.02)
+        ax.set_ylim(0.975,1.025)
         df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='70<=SZA<=80 PM')
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_high_sza_AM_high_sza_PM_vs_time.png')
@@ -432,7 +497,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     if df_PM_high_sza['y'].size!=0 and df_PM_mid_sza['y'].size!=0:
         fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.98,1.02)
+        ax.set_ylim(0.975,1.025)
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 PM')
         df_PM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 PM')
         if df_PM_low_sza['y'].size!=0:
@@ -450,7 +515,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
     if df_AM_high_sza['y'].size!=0 and df_AM_mid_sza['y'].size!=0:
         fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.98,1.02)
+        ax.set_ylim(0.975,1.025)
         df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
         df_AM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 AM')
         if df_AM_low_sza['y'].size!=0:
@@ -478,6 +543,7 @@ def main():
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
     parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file')
+    parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
     args = parser.parse_args()
 
     if not os.path.exists(args.nc_file):

@@ -53,6 +53,8 @@ The optional **--json** argument can be used to give the full path to a differen
 
 The optional **--cmap** argument can be used to change the colormap used in the plots, it must be one of the [matplotlib named colormaps](https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html)
 
+The optional **--show-all** argument can be used so that plots don't make use of fixed axis ranges, when given all the data points will appear in the plots, even huge outliers.
+
 ### Who do I talk to? ###
 
 sebastien.roche@mail.utoronto.ca
