@@ -179,7 +179,7 @@ def add_linfit(ax,x,y,yerr=None):
     # pearson correlation coefficient
     R = pearsonr(x,y)[0]
 
-    leg = 'y=({:.4f} +/-{:.4f})*x + ({:.4f} +/-{:.4f}); R²={:.3f}'.format(fit[0],fit[1],np.sqrt(cov[0][0]),np.sqrt(cov[1][1]),R**2) 
+    leg = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(fit[0],np.sqrt(cov[0][0]),fit[1],np.sqrt(cov[1][1]),R**2) 
 
     # plot line fits
     ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',label=leg,color="C1")
