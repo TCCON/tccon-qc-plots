@@ -623,7 +623,7 @@ def main():
         # concatenate all .png file into a temporary .pdf file
         temp_pdf_path = pdf_path.replace('.pdf','temp.pdf')
         im_list = [stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
-        im_list[0].save(temp_pdf_path, "PDF" ,resolution=100.0, save_all=True, append_images=im_list[1:])
+        im_list[0].save(temp_pdf_path, "PDF" ,quality=100, save_all=True, append_images=im_list[1:])
 
         # add bookmarks to the temporary pdf file and save the final file
         pdf_in = stack.enter_context(open(temp_pdf_path,'rb'))
