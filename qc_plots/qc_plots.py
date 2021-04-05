@@ -332,6 +332,9 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
     hb = ax.hexbin(xdata,ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap,linewidths=(0,))
     cb = fig.colorbar(hb,ax=ax)
 
+    add_linfit(ax,nc[xvar][flag0],nc[yvar][flag0])
+    ax.legend()
+
     return fig
 
 
