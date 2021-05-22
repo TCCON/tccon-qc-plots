@@ -189,7 +189,8 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     else:
         fig_name = '{}_VS_{}_{}.png'.format(yvar,xvar,plot_type)
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
-    fig.savefig(fig_path,bbox_inches='tight',dpi=300)
+    tight_layout()
+    fig.savefig(fig_path,dpi=300)
     return fig_path
 
 
@@ -372,6 +373,7 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
 
     add_linfit(ax,nc[xvar][flag0],nc[yvar][flag0])
     ax.legend()
+    tight_layout()
 
     return fig
 
@@ -426,7 +428,8 @@ def flag_analysis(code_dir,nc):
             curplot.annotate(prec[i].format(p.get_height()), (p.get_x() * 1.005, p.get_height() * 1.005))
 
     fig_path = os.path.join(code_dir.parent,'outputs','flags_summary.png')
-    fig.savefig(fig_path,bbox_inches='tight')
+    tight_layout()
+    fig.savefig(fig_path,dpi=300)
 
     return fig_path
 
@@ -534,7 +537,8 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
         ax.legend()
         if not args.flag0:
             add_qc_lines(args,nc,ax,'time','xluft')
-        fig.savefig(fig_path,bbox_inches='tight')
+        tight_layout()
+        fig.savefig(fig_path,dpi=300)
         close('all')
         fig_path_list += [fig_path]
 
@@ -552,7 +556,8 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
         if not args.flag0:
             add_qc_lines(args,nc,ax,'time','xluft')
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_sza_PM_vs_time.png')
-        fig.savefig(fig_path,bbox_inches='tight')
+        tight_layout()
+        fig.savefig(fig_path,dpi=300)
         close('all')
         fig_path_list += [fig_path]
 
@@ -570,7 +575,8 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
         ax.grid()
         ax.legend()
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_sza_AM_vs_time.png')
-        fig.savefig(fig_path,bbox_inches='tight')
+        tight_layout()
+        fig.savefig(fig_path,dpi=300)
         close('all')
         fig_path_list += [fig_path]
 
@@ -681,10 +687,10 @@ def main():
     os.remove(temp_pdf_path) # remove the temporary pdf file
 
     if args.email[0]:
-        print('Sending {} by email from {} to {}'.format(pdf_out,args.email[0],args.email[1]))
-        subject = 'TCCON QC plots for '
+        print('Sending {} by email from {} to {}'.format(os.path.basename(pdf_path),args.email[0],args.email[1]))
+        subject = 'TCCON QC plots: {}'.format(os.path.basename(pdf_path))
         body = "This email was sent from the python program qc_plots"
-        send_email(subjetc,body,args.email[0],args.email[1],pdf_out)
+        send_email(subject,body,args.email[0],args.email[1],pdf_path)
 
 
 if __name__=="__main__":
