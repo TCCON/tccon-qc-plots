@@ -16,6 +16,43 @@ from PyPDF2 import PdfFileWriter, PdfFileReader
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
 
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from email import encoders
+from getpass import getpass
+
+def send_email(subject,body,send_from,send_to,attachment):
+    """
+    Sends an email with an attachement
+
+    Inputs:
+        - subject: email subject
+        - body: email text
+        - send_from: email address with which the email will be sent
+        - send_to: email address the email will be sent to
+        - attachment: full path to a file that will be attached to the email
+    """
+
+    # settup the message
+    message = MIMEMultipart()
+    message['From'] = send_from
+    message['To'] = send_to
+    message['Subject'] = subject
+    message.attach(MIMEText(body,'plain'))
+    with open(attachment,'rb') as infile:
+        payload = MIMEApplication(infile.read(),_subtype='pdf')
+    encoders.encode_base64(payload)
+    payload.add_header('Content-Disposition','attachment',filename=os.path.basename(attachment))
+    message.attach(payload)
+
+    # send the message with SMTP
+    with smtplib.SMTP('smtp.gmail.com', 587) as session: #use gmail with port
+        session.starttls() #enable security
+        session.login(send_from, getpass()) #login with mail_id and password
+        session.sendmail(send_from, send_to, message.as_string())
+
 
 def cm2inch(*tupl):
     """
@@ -552,6 +589,7 @@ def main():
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
     parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file')
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
+    parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
     args = parser.parse_args()
 
     if not os.path.exists(args.nc_file):
@@ -641,6 +679,13 @@ def main():
         output.write(pdf_out)
 
     os.remove(temp_pdf_path) # remove the temporary pdf file
+
+    if args.email[0]:
+        print('Sending {} by email from {} to {}'.format(pdf_out,args.email[0],args.email[1]))
+        subject = 'TCCON QC plots for '
+        body = "This email was sent from the python program qc_plots"
+        send_email(subjetc,body,args.email[0],args.email[1],pdf_out)
+
 
 if __name__=="__main__":
     main()
