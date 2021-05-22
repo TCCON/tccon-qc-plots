@@ -55,7 +55,7 @@ The optional **--cmap** argument can be used to change the colormap used in the 
 
 The optional **--show-all** argument can be used so that plots don't make use of fixed axis ranges, when given all the data points will appear in the plots, even huge outliers.
 
-The optional **--email** argument can be used to send the .pdf file of plots by email. The first argument is the sender email and the second argument is the recipient's email (comma separated for multiple recipients). Only tested for sender gmail accounts that enabled less secured apps access.
+The optional **--email** argument can be used to send the .pdf file of plots by email. The first argument is the sender email and the second argument is the recipient's email (comma separated for multiple recipients). Only tested for sender outlook accounts and gmail accounts that enabled less secured apps access.
 
 ### Who do I talk to? ###
 

@@ -48,7 +48,11 @@ def send_email(subject,body,send_from,send_to,attachment):
     message.attach(payload)
 
     # send the message with SMTP
-    with smtplib.SMTP('smtp.gmail.com', 587) as session: #use gmail with port
+    if '@gmail' in send_from:
+        smtp_server = 'gmail'
+    else:
+        smtp_server = 'outlook'
+    with smtplib.SMTP('smtp.{}.com'.format(smtp_server), 587) as session: #use gmail with port
         session.starttls() #enable security
         session.login(send_from, getpass()) #login with mail_id and password
         session.sendmail(send_from, send_to, message.as_string())
@@ -595,7 +599,7 @@ def main():
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
     parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file')
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
-    parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
+    parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender outlook accounts and gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
     args = parser.parse_args()
 
     if not os.path.exists(args.nc_file):
