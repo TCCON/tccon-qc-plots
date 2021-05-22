@@ -27,6 +27,7 @@ def cm2inch(*tupl):
     else:
         return tuple(i/inch for i in tupl)
 
+
 def get_limits(nc,var):
 
     limits = [None,None]
@@ -370,6 +371,7 @@ def flag_analysis(code_dir,nc):
     flag_df_pcnt = flag_df_pcnt.drop(columns=drop_list)
     
     fig, ax = subplots(2,1)
+    fig.set_size_inches(cm2inch(20,10))
     ax[0].set_ylabel('Count')
     ax[1].set_ylabel('Count (%)')
     ax[0].set_title('{} total spectra from {}'.format(N,nc.long_name))
