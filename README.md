@@ -43,7 +43,7 @@ For usage info run:
 
 > ./qc_plots.sh --help
 
-The **nc_file** argument is the full path to the input netCDF file
+The **nc_in** argument is the full path to the input netCDF file or to an input folder that contains netCDF files
 
 The optional **--flag0** argument can be used to only show data with flag=0 and limit the x-axis and y-axis ranges to the Vmin and Vmax of each variable
 

@@ -121,7 +121,7 @@ def get_limits(nc,var):
         limits = [-0.1,0.1]
     elif var == 'lsu':
         limits = [0,0.06]
-    elif 'vmin' in nc[var].ncattrs():
+    elif 'vmin' in nc[var].__dict__:
         limits = [nc[var].vmin,nc[var].vmax]  
 
     return limits
@@ -136,7 +136,7 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
         yvar2 = yvar[0][1] # for the top plot
         yvar = yvar[0][0] # for the bottom plot
         ax = axes[1] # the bottom plot
-        if 'units' in nc[yvar2].ncattrs():
+        if 'units' in nc[yvar2].__dict__:
             axes[0].set_ylabel('{} ({})'.format(yvar2,nc[yvar2].units))
         else:
             axes[0].set_ylabel(yvar2)
@@ -162,12 +162,12 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
     else:
         ylab = yvar
 
-    if 'units' in nc[yvar].ncattrs():
+    if 'units' in nc[yvar].__dict__:
         ax.set_ylabel('{} ({})'.format(ylab,nc[yvar].units))
     else:
         ax.set_ylabel(ylab)
 
-    if xvar!='time' and 'units' in nc[xvar].ncattrs():
+    if xvar!='time' and 'units' in nc[xvar].__dict__:
         ax.set_xlabel('{} ({})'.format(xvar,nc[xvar].units))
     else:
         ax.set_xlabel(xvar)
@@ -179,10 +179,10 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
 
 def add_qc_lines(args,nc,ax,xvar,yvar,kind=''):
     for elem in ['vmin','vmax']:
-        if type(yvar)!=list and kind!='std' and (elem in nc[yvar].ncattrs()): # don't add the line for difference plots and standard deviation plots
-            ax.axhline(y=nc[yvar].getncattr(elem),linestyle='dashed',color='black')
-        if elem in nc[xvar].ncattrs():
-            ax.axvline(x=nc[xvar].getncattr(elem),linestyle='dashed',color='black')
+        if type(yvar)!=list and kind!='std' and (elem in nc[yvar].__dict__): # don't add the line for difference plots and standard deviation plots
+            ax.axhline(y=nc[yvar].__dict__[elem],linestyle='dashed',color='black')
+        if elem in nc[xvar].__dict__:
+            ax.axvline(x=nc[xvar].__dict__[elem],linestyle='dashed',color='black')
 
 
 def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
@@ -212,9 +212,12 @@ def add_linfit(ax,x,y,yerr=None):
         - x: x axis data
         - y: y axis data
     """
+    x = np.array(x)
+    y = np.array(y)
     
     # linear fit using y = a*x + b
     if yerr:
+        yerr = np.array(yerr)
         fit,cov = curve_fit(lin_model,x,y,p0=[1,0],sigma=yerr)
     else:
         fit,cov = curve_fit(lin_model,x,y,p0=[1,0])
@@ -225,7 +228,7 @@ def add_linfit(ax,x,y,yerr=None):
     leg = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(fit[0],np.sqrt(cov[0][0]),fit[1],np.sqrt(cov[1][1]),R**2) 
 
     # plot line fits
-    ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',label=leg,color="C1")
+    ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',dashes=(5,20),label=leg,color="C1")
 
 
 def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq=''):
@@ -261,7 +264,7 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
         elif args.ref:
             ref_data = ref[yvar][:]
 
-    if len(set(ydata.data)) in [1,0]:
+    if len(set(list(ydata))) in [1,0]:
         ax.text(0.5,0.5,'{} is constant'.format(yvar),transform=ax.transAxes,color='black')
 
     if kind:
@@ -400,7 +403,7 @@ def flag_analysis(code_dir,nc):
         nflag = np.count_nonzero(where_flagged)
         nflag_pcnt = 100*nflag/N
         nflag_tot += nflag
-        flagged_var_name = nc['flagged_var_name'][where_flagged][0]
+        flagged_var_name = list(nc['flagged_var_name'][where_flagged])[0]
         print('{:>3}  {:<20} {:>6}   {:>8.3f}'.format(flag,flagged_var_name,nflag,nflag_pcnt))
         flag_df[flagged_var_name] = pd.Series([nflag])
         flag_df_pcnt[flagged_var_name] = pd.Series([nflag_pcnt])
@@ -447,7 +450,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 if v not in nc.variables:
                     print('\t',v,'is not in the netCDF file')
                     check = True
-                elif np.count_nonzero(nc[v][:].mask)==nc[v].size:
+                elif check_mask(nc[v]):
                     print('\t',v,'has only masked values')
                     check = True
             if check:
@@ -460,7 +463,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 if v not in nc.variables:
                     print('\t',v,'is not in the netCDF file')
                     check = True
-                elif np.count_nonzero(nc[v][:].mask)==nc[v].size:
+                elif check_mask(nc[v]):
                     print('\t',v,'has only masked values')
                     check = True
             if check:
@@ -471,7 +474,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
                 continue
-            elif np.count_nonzero(nc[yvar][:].mask)==nc[yvar].size:
+            elif check_mask(nc[yvar]):
                 print('\t',yvar,'has only masked values')
                 continue
             if kind:
@@ -586,6 +589,98 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
 
     return fig_path_list
 
+
+def descend_strings(obj):
+    '''
+    generator function to get all the strings in an iterable object
+    '''
+    if hasattr(obj,'__iter__') and type(obj)!=str:
+        if type(obj)==dict:
+            for key in obj:
+                for result in descend_strings(obj[key]):
+                    yield result
+        else:
+            for item in obj:
+                for result in descend_strings(item):
+                    yield result
+    elif type(obj)==str:
+        yield obj
+
+
+def merge_nc_files(ncin_list,var_list):
+    """
+    Inputs:
+        - nc_in_list: list of context managers for open .nc files
+        - var_list: the list of all the variables needed
+    Ouputs:
+        - data: dictionary with concatenated data
+    """
+
+    data = pd.DataFrame(columns=var_list)
+
+    # if the two files overlap in time, the most recent file data will be used for the overlap period
+    pop_list = [] # if a variable is missing from any of the files, don't use it at all
+    print('Merging {} files'.format(len(ncin_list)))
+    for i,nc in enumerate(ncin_list):
+        print('\t{}'.format(os.path.basename(nc.filepath())))
+        df = pd.DataFrame(columns=var_list)
+        if i<len(ncin_list)-1:
+            ids = np.where(nc['time'][:]<ncin_list[i+1]['time'][0])[0] # indices to slice for times in current file that come before the first time in the next file
+        else:
+            ids = np.arange(nc['time'].size) # for the last file, just get the whole thing
+        for var in var_list:
+            if var in pop_list:
+                continue
+            elif var not in [v for v in nc.variables]:
+                print('Variable "{}"" is not in {}; it will be ignored in other files'.format(var,os.path.basename(nc.filepath())))
+                pop_list += [var]
+                continue
+            df[var] = nc[var][ids]
+            if var!='flagged_var_name' and np.array(nc[var][ids].mask).any():
+                df[var].mask(nc[var][ids].mask,inplace=True)
+
+        data = data.append(df,ignore_index=True)
+
+    pop_list = list(set(pop_list))
+    data.drop(columns=pop_list,inplace=True)
+    setattr(data,'variables',np.array([i for i in var_list if i not in pop_list]))
+    setattr(data,'long_name',nc.long_name)
+
+    # set attributes
+    for var in [i for i in var_list if i not in pop_list]:
+        for key,val in nc[var].__dict__.items():
+            setattr(data[var],key,val)
+
+    return data
+
+
+def nc_fname(nc):
+    """
+    Inputs:
+        - nc: context manager of open netcdf file
+    Outputs:
+        - the file name
+    """
+
+    return os.path.basename(nc.filepath())
+
+
+def check_mask(x):
+    """
+    Inputs:
+        - x: dataframe column or netcdf variable
+    Outputs:
+        - return True is all data is NaN / masked and False otherwise
+    """
+
+    if hasattr(x[:],'data'): # masked array
+        check = np.count_nonzero(x[:].mask)==x.size
+    else:
+        check = np.count_nonzero(np.isnan(x[:]))==x.size
+
+    return check
+
+
 def main():
     if 'tccon-qc' not in sys.executable:
         print('Running qc_plots.py with',sys.executable)
@@ -593,7 +688,7 @@ def main():
     code_dir = Path(os.path.dirname(__file__)).absolute()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('nc_file',help='full path to the netCDF file from which plots should be made')
+    parser.add_argument('nc_in',help='full path to the netCDF file from which plots should be made')
     parser.add_argument('-r','--ref',default='',help='full path to another netCDF file to use as reference')
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
@@ -602,8 +697,8 @@ def main():
     parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender outlook accounts and gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
     args = parser.parse_args()
 
-    if not os.path.exists(args.nc_file):
-        sys.exit('Invalid path: {}'.format(args.nc_file))
+    if not os.path.exists(args.nc_in):
+        sys.exit('Invalid path: {}'.format(args.nc_in))
     if args.ref and not os.path.exists(args.ref):
         sys.exit('Invalid path: {}'.format(args.ref))
     if not os.path.exists(args.json):
@@ -615,13 +710,21 @@ def main():
     with open(args.json,'r') as f:
         vardata = json.load(f)
 
-    pdf_path = os.path.join(code_dir.parent,'outputs',os.path.basename(args.nc_file).replace('.nc','.pdf'))
-    if args.flag0:
-        pdf_path = os.path.join(code_dir.parent,'outputs',os.path.basename(args.nc_file).replace('.nc','flag0.pdf'))
+    var_list = list(set([i for i in descend_strings(vardata)]+['time','flag','flagged_var_name','azim','solzen','xluft']+list(vardata.keys())))
 
     fig_path_list = []
     with ExitStack() as stack:
-        nc = stack.enter_context(netCDF4.Dataset(args.nc_file,'r')) # input netcdf file
+        if os.path.isdir(args.nc_in):
+            nc_file_list = [i for i in os.listdir(args.nc_in) if i.endswith('.nc')]
+            if len(nc_file_list)==0:
+                sys.exit('There are no .nc files in {}'.format(args.nc_in))           
+            ncin_list = [stack.enter_context(netCDF4.Dataset(os.path.join(args.nc_in,nc_file),'r')) for nc_file in nc_file_list]
+            ncin_list = [ncin_list[i] for i in np.argsort([ncin['time'][0] for ncin in ncin_list])] # sort the list of .nc files by starting date
+            pdf_name = '{}{}'.format(nc_fname(ncin_list[0])[:10],nc_fname(ncin_list[-1])[10:]) # Use the first and last file names for the name of the output pdf  
+            nc = merge_nc_files(ncin_list,var_list)
+        else:
+            pdf_name = os.path.basename(args.nc_in)
+            nc = stack.enter_context(netCDF4.Dataset(args.nc_in,'r')) # input netcdf file
         nc_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(nc['time'][:],units=nc['time'].units,calendar=nc['time'].calendar)])
         if args.ref:
             ref = stack.enter_context(netCDF4.Dataset(args.ref,'r')) # input reference netcdf file
@@ -670,6 +773,9 @@ def main():
             # end of "for yvar" loop
         # end of "for xvar" loop
 
+        pdf_path = os.path.join(code_dir.parent,'outputs',pdf_name.replace('.nc','.pdf'))
+        if args.flag0:
+            pdf_path = os.path.join(code_dir.parent,'outputs',pdf_name.replace('.nc','flag0.pdf'))
         # concatenate all .png file into a temporary .pdf file
         temp_pdf_path = pdf_path.replace('.pdf','temp.pdf')
         im_list = [stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
