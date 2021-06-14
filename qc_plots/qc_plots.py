@@ -73,6 +73,19 @@ def get_limits(nc,var):
 
     limits = [None,None]
 
+    # special cases for difference plots
+    if type(var)==list and np.any([v in var for v in ['tout','pout','h2o_dmf_out']]):
+        if 'tout' in var:
+            limits = [-15,15] # degrees K and C (it's a difference)
+        elif 'pout' in var:
+            limits = [-10,10] # hPa
+        elif 'h2o_dmf_out' in var:
+            limits = [-0.01,0.01] # parts
+        return limits
+    elif type(var)==list: # for the rest just get the range of the concerned variable, this will likely be too large for differences
+        return get_limits(nc,var[0])
+
+    # "regular" series
     if 'vsf_h2o' in var or 'vsf_hdo' in var or 'vsf_hf' in var:
         limits = [0.3,2]
     elif 'vsf_hcl' in var:
