@@ -645,7 +645,8 @@ def merge_nc_files(ncin_list,var_list):
             if var in pop_list:
                 continue
             elif var not in [v for v in nc.variables]:
-                print('Variable "{}"" is not in {}; it will be ignored in other files'.format(var,os.path.basename(nc.filepath())))
+                if not np.any([i in var for i in ['mean','std','median']]):
+                    print('Variable "{}"" is not in {}; it will be ignored in other files'.format(var,os.path.basename(nc.filepath())))
                 pop_list += [var]
                 continue
             df[var] = nc[var][ids]
