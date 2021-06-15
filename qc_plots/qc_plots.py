@@ -69,13 +69,27 @@ def cm2inch(*tupl):
         return tuple(i/inch for i in tupl)
 
 
-def get_limits(nc,var):
+def get_limits(nc,var,json_limits=None):
+    """
+    Get the axis ranges for variables.
+
+    This hardcodes specific limits for some variables.
+
+    A given variable can be listed in the limits.json file to overwrite the axis range of specific variables.
+
+    If the variable has no hardcoded limits here or is not listed in the limits.json file, the vmin and vmax values for that variable are used (from the qc.dat file and saved as variable metadata in the netcdf file)
+    """
 
     limits = [None,None]
 
     # special cases for difference plots
     if type(var)==list and np.any([v in var for v in ['tout','pout','h2o_dmf_out']]):
-        if 'tout' in var:
+        json_dif_limits = {key.strip('_dif'):val for key,val in json_limits.items() if key.endswith('_dif')}
+        if json_dif_limits and np.any([key in var for key in json_dif_limits]):
+            for key in json_dif_limits:
+                if key in var:
+                    limits = json_dif_limits[key]
+        elif 'tout' in var:
             limits = [-15,15] # degrees K and C (it's a difference)
         elif 'pout' in var:
             limits = [-10,10] # hPa
@@ -83,10 +97,12 @@ def get_limits(nc,var):
             limits = [-0.01,0.01] # parts
         return limits
     elif type(var)==list: # for the rest just get the range of the concerned variable, this will likely be too large for differences
-        return get_limits(nc,var[0])
+        return get_limits(nc,var[0],json_limits=json_limits)
 
     # "regular" series
-    if 'vsf_h2o' in var or 'vsf_hdo' in var or 'vsf_hf' in var:
+    if json_limits and var in json_limits:
+        limits = json_limits[var]
+    elif 'vsf_h2o' in var or 'vsf_hdo' in var or 'vsf_hf' in var:
         limits = [0.3,2]
     elif 'vsf_hcl' in var:
         limits = [0.7,1.4]
@@ -142,7 +158,7 @@ def get_limits(nc,var):
     return limits
 
 
-def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
+def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq='',varlimits=None):
     two_subplots = type(yvar)==list and type(yvar[0])==list
     if two_subplots:
         fig,axes = subplots(2,1,sharex=True,gridspec_kw={'height_ratios':[1,3]})
@@ -165,11 +181,11 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq=''):
 
     if not args.show_all:
         if kind!='std':
-            ax.set_ylim(get_limits(nc,yvar))
+            ax.set_ylim(get_limits(nc,yvar,json_limits=varlimits))
         if xvar!='time':
-            ax.set_xlim(get_limits(nc,xvar))
+            ax.set_xlim(get_limits(nc,xvar,json_limits=varlimits))
         if two_subplots:
-            axes[0].set_ylim(get_limits(nc,yvar2))
+            axes[0].set_ylim(get_limits(nc,yvar2,json_limits=varlimits))
 
     if type(yvar)==list:
         ylab = '{} minus {}'.format(*yvar)
@@ -240,17 +256,17 @@ def add_linfit(ax,x,y,yerr=None):
     # pearson correlation coefficient
     R = pearsonr(x,y)[0]
 
-    leg = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(fit[0],np.sqrt(cov[0][0]),fit[1],np.sqrt(cov[1][1]),R**2) 
+    leg = 'Fit to flag=0 data: y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(fit[0],np.sqrt(cov[0][0]),fit[1],np.sqrt(cov[1][1]),R**2) 
 
     # plot line fits
     ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',dashes=(5,20),label=leg,color="C1")
 
 
-def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq=''):
+def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
     if xvar not in nc.variables:
         xvar = 'time'
 
-    fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq)
+    fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)
 
     two_subplots = type(yvar)==list and type(yvar[0])==list
     if two_subplots:
@@ -360,8 +376,8 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
     return fig    
 
 
-def make_hexbin_plots(args,nc,xvar,yvar,flag0):
-    fig,ax = make_fig(args,nc,xvar,yvar)
+def make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=None):
+    fig,ax = make_fig(args,nc,xvar,yvar,varlimits=varlimits)
     if type(yvar)==list:
         if not args.flag0:
             ydata = nc[yvar[0]][:]-nc[yvar[1]][:]
@@ -381,8 +397,8 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0):
     if type(yvar)==list:
         yvar = yvar[0]
 
-    xmin, xmax = get_limits(nc,xvar)
-    ymin, ymax = get_limits(nc,yvar)
+    xmin, xmax = get_limits(nc,xvar,json_limits=varlimits)
+    ymin, ymax = get_limits(nc,yvar,json_limits=varlimits)
     if None in [xmin,xmax]:
         xmin, xmax = [np.nanmin(xdata), np.nanmax(xdata)]
     if None in [ymin,ymax]:
@@ -456,7 +472,7 @@ def flag_analysis(code_dir,nc):
     return fig_path
 
 
-def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='',freq=''):
+def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
     fig_path_list = []
     for yvar in vardata[xvar]:
         if type(yvar)==list and type(yvar[0])==list: # two plots with 1:3 ratio
@@ -471,7 +487,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} and {}".format(*yvar[0]))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc')]
         elif type(yvar)==list: # difference plot
             check = False
             for v in yvar:
@@ -484,7 +500,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} minus {}".format(*yvar))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc')]
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
@@ -496,16 +512,16 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 print(yvar,freq,kind)
             else:
                 print('\t',yvar)
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc')]
             close('all')
 
             if xvar!='time' and not np.count_nonzero([i in xvar for i in ['median','mean','std']]):
-                fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0),code_dir,xvar,yvar,plot_type='hex')]
+                fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex')]
                 close('all')
     return fig_path_list
 
 
-def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
+def default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=None):
     """
     Make (70-80 SZA AM - 70-80 SZA PM) and (70-80 SZA PM - 40-50 SZA PM) plots for xluft
     """
@@ -549,9 +565,10 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
 
     # 70-80 SZA AM and 70-80 SZA PM
     if df_AM_high_sza['y'].size!=0 and df_PM_high_sza['y'].size!=0:
-        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
+        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='',varlimits=varlimits)
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.975,1.025)
+        if not varlimits or (varlimits and 'xluft' not in varlimits):
+            ax.set_ylim(0.975,1.025)
         df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='70<=SZA<=80 PM')
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_high_sza_AM_high_sza_PM_vs_time.png')
@@ -566,9 +583,10 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
 
     # 70-80 SZA PM and 40-50 SZA PM and 20-30 SZA PM
     if df_PM_high_sza['y'].size!=0 and df_PM_mid_sza['y'].size!=0:
-        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
+        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='',varlimits=varlimits)
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.975,1.025)
+        if not varlimits or (varlimits and 'xluft' not in varlimits):
+            ax.set_ylim(0.975,1.025)
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 PM')
         df_PM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 PM')
         if df_PM_low_sza['y'].size!=0:
@@ -585,9 +603,10 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged):
 
     # 70-80 SZA PM and 40-50 SZA PM and 20-30 SZA PM
     if df_AM_high_sza['y'].size!=0 and df_AM_mid_sza['y'].size!=0:
-        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='')
+        fig,ax = make_fig(args,nc,'time','xluft',width=20,height=10,kind='',freq='',varlimits=varlimits)
         ax.set_title('Weekly medians')
-        ax.set_ylim(0.975,1.025)
+        if not varlimits or (varlimits and 'xluft' not in varlimits):
+            ax.set_ylim(0.975,1.025)
         df_AM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='royalblue',label='70<=SZA<=80 AM')
         df_AM_mid_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='40<=SZA<=50 AM')
         if df_AM_low_sza['y'].size!=0:
@@ -708,7 +727,8 @@ def main():
     parser.add_argument('-r','--ref',default='',help='full path to another netCDF file to use as reference')
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
-    parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file')
+    parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file for variables to plot')
+    parser.add_argument('--json-limits',default=os.path.join(code_dir.parent,'inputs','limits.json'),help='full path to the input json file for axis ranges')
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
     parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender outlook accounts and gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
     args = parser.parse_args()
@@ -722,6 +742,10 @@ def main():
 
     if args.cmap not in colormaps():
         sys.exit('{} is an Invalid --cmap value, must be one of {}'.format(args.cmap,colormaps()))
+
+
+    with open(args.json_limits,'r') as f:
+        varlimits = json.load(f)
 
     with open(args.json,'r') as f:
         vardata = json.load(f)
@@ -768,24 +792,24 @@ def main():
             fig_path_list += [flag_analysis(code_dir,nc)]
 
         print('Making default plots')
-        fig_path_list += default_plots(args,code_dir,nc,nc_time,flag0,flagged)
+        fig_path_list += default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=varlimits)
 
         fnum = 0
         for xvar in vardata.keys():
             if xvar.endswith("median"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='median',freq=xvar.split('_')[0])
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='median',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("mean"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='mean',freq=xvar.split('_')[0])
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='mean',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("std"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='std',freq=xvar.split('_')[0])
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='std',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar not in [v for v in nc.variables]:
                 print(xvar,'is not in the netCDF file')
                 continue
             print('Making plots vs',xvar)
-            fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0)
+            fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,varlimits=varlimits)
             # end of "for yvar" loop
         # end of "for xvar" loop
 
