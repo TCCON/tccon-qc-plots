@@ -134,6 +134,8 @@ def get_limits(nc,var):
         limits = [-0.1,0.1]
     elif var == 'lsu':
         limits = [0,0.06]
+    elif var == 'fvsi':
+        limits = [0.0,20]
     elif 'vmin' in nc[var].__dict__:
         limits = [nc[var].vmin,nc[var].vmax]  
 
