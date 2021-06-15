@@ -9,6 +9,7 @@ import argparse
 import json
 from contextlib import ExitStack
 from pylab import *
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -216,7 +217,7 @@ def add_qc_lines(args,nc,ax,xvar,yvar,kind=''):
             ax.axvline(x=nc[xvar].__dict__[elem],linestyle='dashed',color='black')
 
 
-def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
+def savefig(fig,code_dir,xvar,yvar,plot_type='sc',tight=True):
     if type(yvar)==list and type(yvar[0])==list:
         fig_name = '{}_and_{}_VS_{}_{}.png'.format(yvar[0][0],yvar[0][1],xvar,plot_type)
     elif type(yvar)==list:
@@ -224,7 +225,8 @@ def savefig(fig,code_dir,xvar,yvar,plot_type='sc'):
     else:
         fig_name = '{}_VS_{}_{}.png'.format(yvar,xvar,plot_type)
     fig_path = os.path.join(code_dir.parent,'outputs',fig_name)
-    tight_layout()
+    if tight:
+        tight_layout()
     fig.savefig(fig_path,dpi=300)
     return fig_path
 
@@ -266,9 +268,20 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
     if xvar not in nc.variables:
         xvar = 'time'
 
-    fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)
+    fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)  
 
     two_subplots = type(yvar)==list and type(yvar[0])==list
+
+    if xvar != 'time':
+        # add invisible axis to make the plot the same size as the hexbin plots with colorbars
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="3%", pad=0.1)
+        cax.axis('off')
+        if two_subplots:
+            divider = make_axes_locatable(ax2)
+            cax2 = divider.append_axes("right", size="3%", pad=0.1)
+            cax2.axis('off')
+
     if two_subplots:
         ax2 = ax[0]
         ax = ax[1]
@@ -362,7 +375,7 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
         x = nc[xvar][flag0]
         y = ydata[flag0]
         ax.plot(x,y,linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
-        add_linfit(ax,x,y) # only add the linear fit to the flag=0 data, even when plotting all data
+        add_linfit(ax,x,y) # only add the linear fit to the flag=0 data, even when plotting all data      
         if two_subplots:
             ax2.plot(x,ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
 
@@ -407,11 +420,14 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=None):
     extent = (xmin, xmax, ymin, ymax)
 
     hb = ax.hexbin(xdata,ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap,linewidths=(0,))
-    cb = fig.colorbar(hb,ax=ax)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="3%", pad=0.1)
+    cb = fig.colorbar(hb,cax=cax)
 
     add_linfit(ax,nc[xvar][flag0],nc[yvar][flag0])
+    add_qc_lines(args,nc,ax,xvar,yvar)
     ax.legend()
-    tight_layout()
+    #tight_layout()
 
     return fig
 
@@ -474,6 +490,10 @@ def flag_analysis(code_dir,nc):
 
 def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
     fig_path_list = []
+    if xvar != 'time' and not kind:
+        tight = False
+    else:
+        tight = True
     for yvar in vardata[xvar]:
         if type(yvar)==list and type(yvar[0])==list: # two plots with 1:3 ratio
             check = False
@@ -487,7 +507,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} and {}".format(*yvar[0]))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
         elif type(yvar)==list: # difference plot
             check = False
             for v in yvar:
@@ -500,7 +520,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} minus {}".format(*yvar))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
@@ -512,11 +532,11 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 print(yvar,freq,kind)
             else:
                 print('\t',yvar)
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc')]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
             close('all')
 
             if xvar!='time' and not np.count_nonzero([i in xvar for i in ['median','mean','std']]):
-                fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex')]
+                fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex',tight=tight)]
                 close('all')
     return fig_path_list
 
@@ -742,7 +762,6 @@ def main():
 
     if args.cmap not in colormaps():
         sys.exit('{} is an Invalid --cmap value, must be one of {}'.format(args.cmap,colormaps()))
-
 
     with open(args.json_limits,'r') as f:
         varlimits = json.load(f)
