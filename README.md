@@ -77,7 +77,7 @@ The optional **--cmap** argument can be used to change the colormap used in the 
 
 The optional **--show-all** argument can be used so that plots don't make use of fixed axis ranges, when given all the data points will appear in the plots, even huge outliers.
 
-The optional **--roll-gaps** argument can be used to set the Size of the rolling window in number of spectra, defaults to 500
+The optional **--roll-window** argument can be used to set the Size of the rolling window in number of spectra, defaults to 500
 
 The optional **--roll-gaps** argument can be used to set the minimum time interval for which the data will be split for rolling stats, defaults to "20000 days" () [supports all the pandas timdelta specifiers: https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html]
 
