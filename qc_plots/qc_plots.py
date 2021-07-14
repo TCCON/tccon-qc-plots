@@ -264,7 +264,76 @@ def add_linfit(ax,x,y,yerr=None):
     ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',dashes=(5,20),label=leg,color="C1")
 
 
+def split_by_gaps(df,gap,time):
+    """
+    Split an input dataframe with a datetime variable into a groupby dataframe with each group having data without gaps larger than the "gap" variable
+
+    Inputs:
+        - df: pandas dataframe with a datetime
+        - time: column name of the datetime variable
+        - gaps: minimum gap length, a string compatible with pandas Timedelta https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html
+    Outputs:
+        - df_by_gaps: groupby object with each group having data without gaps larger than the "gap" variable
+    """
+
+    df[1] = df[time].diff() > pd.Timedelta(gap)
+    df[1] = df[1].apply(lambda x: 1 if x else 0).cumsum()
+    df_by_gaps = df.groupby(1)
+
+    return df_by_gaps
+
+
+def make_rolling_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind='',freq='',varlimits=None):
+    """
+    Make a plot of yvar vs xvar with rolling stats and return the figure object
+    """
+    stat_list = xvar.split('_')[1:]
+    xvar = 'time'
+
+    ydata = nc[yvar][:]
+
+    fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)
+    ax.set_xlim(nc_time[0]-timedelta(days=2),nc_time[-1]+timedelta(days=2))
+
+    #if not args.flag0:
+    #    ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
+    ax.plot(nc_time[flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+
+    df = pd.DataFrame().from_dict({'x':nc_time[flag0],'y':ydata[flag0]})
+    df_by_gaps = split_by_gaps(df,args.roll_gaps,'x')
+
+    color = {'mean':'hotpink','median':'black','std':'green'}
+    first = True
+    for N,group in df_by_gaps:
+        for stat in stat_list:           
+            stat_group = getattr(group.rolling(args.roll_window,center=True,min_periods=1),stat)()
+
+            if first:
+                ax.plot(group['x'],stat_group['y'],color=color[stat],label='{} spectra rolling {}'.format(args.roll_window,stat),linewidth=0,marker='o',markersize=1)
+            else:
+                ax.plot(group['x'],stat_group['y'],color=color[stat],linewidth=0,marker='o',markersize=1)
+            
+            if stat == 'mean':
+                stat_group['ystd'] = group.rolling(args.roll_window,center=True).std()['y']
+                if first:
+                    ax.plot(group['x'],stat_group['y']+stat_group['ystd'],color='green',label='Rolling std',linewidth=0,marker='o',markersize=1)
+                else:
+                    ax.plot(group['x'],stat_group['y']+stat_group['ystd'],color='green',linewidth=0,marker='o',markersize=1)
+                ax.plot(group['x'],stat_group['y']-stat_group['ystd'],color='green',linewidth=0,marker='o',markersize=1)
+        first = False
+    ax.legend()
+    add_qc_lines(args,nc,ax,xvar,yvar,kind='')
+
+    return fig
+
 def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
+    """
+    Make a plot of xvar vs yvar and return the figure object
+    """
+    if xvar.startswith('roll'):
+        fig = make_rolling_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,varlimits=varlimits)
+        return fig
+
     if xvar not in nc.variables:
         xvar = 'time'
 
@@ -317,33 +386,24 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
             nc_time = nc_time[flag0]
             if two_subplots:
                 ydata2 = ydata2[flag0]
+        data_dict = {'x':nc_time,'y':ydata}
         if two_subplots:
-            data_dict = {'x':nc_time,'y':ydata,'y2':ydata2}
-        else:
-            data_dict = {'x':nc_time,'y':ydata}
+            data_dict['y2'] = ydata2
+            
+        main_frame = getattr(pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq),kind)()
 
-        if kind=='mean':
-            main_frame = pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq).mean()
-        elif kind=='median':
-            main_frame = pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq).median()
-        elif kind=='std':
-            main_frame = pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq).std(ddof=1)
         ydata = main_frame['y'].values
         nc_time = np.array([pd.Timestamp(x).to_pydatetime() for x in main_frame.index])
         if two_subplots:
             ydata2 = main_frame['y2'].values
 
         if args.ref:
+            ref_data_dict = {'x':ref_time,'y':ref_data}
             if two_subplots:
-                ref_data_dict = {'x':ref_time,'y':ref_data,'y2':ref_data2}
-            else:
-                ref_data_dict = {'x':ref_time,'y':ref_data}            
-            if kind=='mean':
-                ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).mean()
-            elif kind=='median':
-                ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).median()
-            elif kind=='std':
-                ref_frame = pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq).std(ddof=1)
+                ref_data_dict['y2'] = ref_data2                
+            
+            ref_frame = getattr(pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq),kind)()  
+
             ref_time = np.array([pd.Timestamp(x).to_pydatetime() for x in ref_frame.index])
             ref_data = ref_frame['y'].values
             if two_subplots:
@@ -489,8 +549,11 @@ def flag_analysis(code_dir,nc):
 
 
 def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
+    """
+    Make all the plots associated with a given horizontal axis variable, save them, and returns a list of the file paths to the figures.
+    """
     fig_path_list = []
-    if xvar != 'time' and not kind:
+    if xvar != 'time' and not kind and not xvar.startswith('roll'): # tight layout messes with the correlation plots
         tight = False
     else:
         tight = True
@@ -530,6 +593,8 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 continue
             if kind:
                 print(yvar,freq,kind)
+            elif xvar.startswith('roll'):
+                print(yvar,xvar)
             else:
                 print('\t',yvar)
             fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
@@ -750,6 +815,8 @@ def main():
     parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file for variables to plot')
     parser.add_argument('--json-limits',default=os.path.join(code_dir.parent,'inputs','limits.json'),help='full path to the input json file for axis ranges')
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
+    parser.add_argument('--roll-window',type=int,default=500,help='Size of the rolling window in number of spectra')
+    parser.add_argument('--roll-gaps',default='20000 days',help='Minimum time interval for which the data will be split for rolling stats')
     parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender outlook accounts and gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
     args = parser.parse_args()
 
@@ -815,7 +882,10 @@ def main():
 
         fnum = 0
         for xvar in vardata.keys():
-            if xvar.endswith("median"):
+            if xvar.startswith("roll"):
+                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,varlimits=varlimits)      
+                continue
+            elif xvar.endswith("median"):
                 fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='median',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("mean"):

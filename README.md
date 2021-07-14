@@ -31,6 +31,10 @@ The format for this special key is **freq_stat** where **freq** is a pandas [off
 
 and **stat** is one of **mean**, **median**, or **std** for standard deviation. For example to make time series of 3-hourly mean, use **3H_mean**, for daily medians use **D_median**
 
+A special key can also be given as the x-axis variable to plot rolling statistics, the format is **roll_stat** with stat defined like above.
+
+Plots of rolling mean will also have +/- 1 rolling standard deviation.
+
 #### inputs/limits.json ####
 
 It is a json file with the main keys being variable names and values being lists of axis ranges (e.g. **"variable_name":[start,end]**)
@@ -72,6 +76,10 @@ The optional **--json-limits** argument can be used to give the full path to a d
 The optional **--cmap** argument can be used to change the colormap used in the plots, it must be one of the [matplotlib named colormaps](https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html)
 
 The optional **--show-all** argument can be used so that plots don't make use of fixed axis ranges, when given all the data points will appear in the plots, even huge outliers.
+
+The optional **--roll-gaps** argument can be used to set the Size of the rolling window in number of spectra, defaults to 500
+
+The optional **--roll-gaps** argument can be used to set the minimum time interval for which the data will be split for rolling stats, defaults to "20000 days" () [supports all the pandas timdelta specifiers: https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html]
 
 The optional **--email** argument can be used to send the .pdf file of plots by email. The first argument is the sender email and the second argument is the recipient's email (comma separated for multiple recipients). Only tested for sender outlook accounts and gmail accounts that enabled less secured apps access.
 
