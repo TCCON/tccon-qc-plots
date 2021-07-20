@@ -24,7 +24,7 @@ from email.mime.application import MIMEApplication
 from email import encoders
 from getpass import getpass
 
-def send_email(subject,body,send_from,send_to,attachment):
+def send_email(subject,body,send_from,send_to,attachment,use_locahost=True):
     """
     Sends an email with an attachement
 
@@ -49,13 +49,19 @@ def send_email(subject,body,send_from,send_to,attachment):
     message.attach(payload)
 
     # send the message with SMTP
-    if '@gmail' in send_from:
-        smtp_server = 'gmail'
+    if use_localhost:
+        smtp_args = ('localhost',)
+        authenticate = False
+    elif '@gmail' in send_from:
+        smtp_args = ('smtp.gmail.com', 587)
+        authenticate = True
     else:
-        smtp_server = 'outlook'
-    with smtplib.SMTP('smtp.{}.com'.format(smtp_server), 587) as session: #use gmail with port
-        session.starttls() #enable security
-        session.login(send_from, getpass()) #login with mail_id and password
+        smtp_args = ('smtp.outlook.com', 587)
+        authenticate = True
+    with smtplib.SMTP(*smtp_args) as session:
+        if authenticate:
+            session.starttls() #enable security
+            session.login(send_from, getpass()) #login with mail_id and password
         session.sendmail(send_from, send_to, message.as_string())
 
 
@@ -817,7 +823,8 @@ def main():
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
     parser.add_argument('--roll-window',type=int,default=500,help='Size of the rolling window in number of spectra')
     parser.add_argument('--roll-gaps',default='20000 days',help='Minimum time interval for which the data will be split for rolling stats')
-    parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email, only tested with sender outlook accounts and gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
+    parser.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email; by default uses the local email server, but can also work with Outlook accounts and Gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
+    parser.add_argument('--email-not-localhost',action='store_false',dest='email_from_localhost',help='By default, emails will be sent from the localhost email server. Set this flag if you wish to use Gmail or Outlook - in that case, email addresses containing "@gmail" use Gmail and others use Outlook.')
     args = parser.parse_args()
 
     if not os.path.exists(args.nc_in):
@@ -929,7 +936,7 @@ def main():
         print('Sending {} by email from {} to {}'.format(os.path.basename(pdf_path),args.email[0],args.email[1]))
         subject = 'TCCON QC plots: {}'.format(os.path.basename(pdf_path))
         body = "This email was sent from the python program qc_plots"
-        send_email(subject,body,args.email[0],args.email[1],pdf_path)
+        send_email(subject,body,args.email[0],args.email[1],pdf_path,use_localhost=args.email_from_localhost)
 
 
 if __name__=="__main__":
