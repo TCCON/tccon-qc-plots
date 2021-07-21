@@ -814,8 +814,9 @@ def main():
     code_dir = Path(os.path.dirname(__file__)).absolute()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('nc_in',help='full path to the netCDF file from which plots should be made')
+    parser.add_argument('nc_in',help='full path to the netCDF file from which plots should be made, or a path to a directory (plots will be made from all *.nc files in that directory)')
     parser.add_argument('-r','--ref',default='',help='full path to another netCDF file to use as reference')
+    parser.add_argument('-d', '--output-dir', help='Directory to output the .pdf plots to, the default is "outputs" in the code repo')
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
     parser.add_argument('--json',default=os.path.join(code_dir.parent,'inputs','variables.json'),help='full path to the input json file for variables to plot')
@@ -909,7 +910,11 @@ def main():
             # end of "for yvar" loop
         # end of "for xvar" loop
 
-        pdf_path = os.path.join(code_dir.parent,'outputs',pdf_name.replace('.nc','.pdf'))
+        if args.output_dir is not None:
+            pdf_path = os.path.join(args.output_dir, pdf_name.replace('.nc', '.pdf'))
+        else:
+            pdf_path = os.path.join(code_dir.parent,'outputs',pdf_name.replace('.nc','.pdf'))
+
         if args.flag0:
             pdf_path = os.path.join(code_dir.parent,'outputs',pdf_name.replace('.nc','flag0.pdf'))
         # concatenate all .png file into a temporary .pdf file
