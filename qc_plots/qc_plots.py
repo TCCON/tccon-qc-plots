@@ -966,6 +966,8 @@ def main():
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
     parser.add_argument('--roll-window',type=int,default=500,help='Size of the rolling window in number of spectra')
     parser.add_argument('--roll-gaps',default='20000 days',help='Minimum time interval for which the data will be split for rolling stats')
+    parser.add_argument('--size',choices=('small','medium','large'),default='medium',help='Size of the figures, default is %(default)s')
+    parser.add_argument('--quality',choices=('low','medium','high'),default='high',help='Quality of the figures, default is %(default)s')
 
     email_grp = parser.add_mutually_exclusive_group()
     email_grp.add_argument('--email',nargs=2,default=[None,None],help='sender email followed by receiver email; by default uses the local email server, but can also work with Outlook accounts and Gmail accounts that enabled less secured apps access. For multiple recipients the second argument should be comma-separated email addresses')
@@ -1067,10 +1069,13 @@ def main():
 
         if args.flag0:
             pdf_path = os.path.join(code_dir.parent,'outputs',pdf_name.replace('.nc','flag0.pdf'))
+        size_divisor = {'small': 3, 'medium': 2, 'large': 1}[args.size]
+        quality = {'low': 30, 'medium': 60, 'high': 95}[args.quality]
         # concatenate all .png file into a temporary .pdf file
         temp_pdf_path = pdf_path.replace('.pdf','temp.pdf')
         im_list = [stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
-        im_list[0].save(temp_pdf_path, "PDF" ,quality=100, save_all=True, append_images=im_list[1:])
+        im_list = [im.resize((im.width//size_divisor, im.height//size_divisor)) for im in im_list]
+        im_list[0].save(temp_pdf_path, "PDF" ,quality=quality, save_all=True, append_images=im_list[1:])
 
         # add bookmarks to the temporary pdf file and save the final file
         pdf_in = stack.enter_context(open(temp_pdf_path,'rb'))
