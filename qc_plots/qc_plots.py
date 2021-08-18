@@ -168,7 +168,7 @@ def send_email_ext(subject, body, send_from, send_to, attachment, cfg):
         raise NotImplementedError('body_arg == {} not implemented for sending an email by an external program'.format(cfg['body_arg']))
 
 
-def send_email_from_config(cfg_file, site_id, attachment):
+def send_email_from_config(cfg_file, site_id, attachment, nc_file):
     """Send an email using a config dictionary to determine how to send it.
 
     Inputs:
@@ -186,14 +186,14 @@ def send_email_from_config(cfg_file, site_id, attachment):
 
     to_addr = cfg['email']['to']
     from_addr = cfg['email']['from']
-    body = cfg['email'].get('body', _default_body).format(date=pd.Timestamp.now().strftime('%Y-%m-%d %H:%M'))
+    body = cfg['email'].get('body', _default_body).format(date=pd.Timestamp.now().strftime('%Y-%m-%d %H:%M'), basename=os.path.basename(nc_file))
     if cfg['email']['subject_from_site_id']:
         try:
-            subject = cfg['email']['sites'][site_id]
+            subject = '[#{}]'.format(cfg['email']['sites'][site_id])
         except KeyError:
             raise KeyError('Unable to find a subject line for site ID {} in the config file {}'.format(site_id, cfg_file))
     else:
-        cfg['email']['subject']
+        subject = cfg['email']['subject']
 
 
     if cfg['server']['use_external_program']:
@@ -1094,7 +1094,7 @@ def main():
         send_email(subject,body,args.email[0],args.email[1],pdf_path)
     elif args.email_config:
         site_id = os.path.basename(args.nc_in)[:2]
-        send_email_from_config(args.email_config, site_id=site_id, attachment=pdf_path)
+        send_email_from_config(args.email_config, site_id=site_id, attachment=pdf_path, nc_file=args.nc_in)
 
 
 if __name__=="__main__":
