@@ -26,7 +26,7 @@ from email.mime.application import MIMEApplication
 from email import encoders
 from getpass import getpass
 
-
+_default_leg_font_size = 7
 _default_body = "This email was sent from the python program qc_plots"
 _default_email_cfg = """
 [server]
@@ -307,6 +307,16 @@ def get_limits(nc,var,json_limits=None):
     return limits
 
 
+def get_time_xlims(nc_time, context_time):
+    x1 = np.min(nc_time) - timedelta(days=2)
+    x2 = np.max(nc_time) + timedelta(days=2)
+    if context_time is not None:
+        x1 = min(x1, np.min(context_time) - timedelta(days=2))
+        x2 = max(x2, np.max(context_time) + timedelta(days=2))
+
+    return x1, x2
+
+
 def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq='',varlimits=None):
     two_subplots = type(yvar)==list and type(yvar[0])==list
     if two_subplots:
@@ -383,7 +393,7 @@ def lin_model(x,a,b):
     return a*x+b
 
 
-def add_linfit(ax,x,y,yerr=None):
+def add_linfit(ax,x,y,yerr=None,leg='Fit to flag==0 data: {}',color='C1'):
     """
     Add a line with the results of a linear fit to y = a*x + b
     Also shows the squared pearson correlation coefficient
@@ -406,10 +416,11 @@ def add_linfit(ax,x,y,yerr=None):
     # pearson correlation coefficient
     R = pearsonr(x,y)[0]
 
-    leg = 'Fit to flag=0 data: y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(fit[0],np.sqrt(cov[0][0]),fit[1],np.sqrt(cov[1][1]),R**2) 
+    fitstr = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(fit[0],np.sqrt(cov[0][0]),fit[1],np.sqrt(cov[1][1]),R**2)
+    leg = leg.format(fitstr)
 
     # plot line fits
-    ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',dashes=(5,20),label=leg,color="C1")
+    ax.plot(x,lin_model(x,fit[0],fit[1]),linestyle='--',dashes=(5,20),label=leg,color=color)
 
 
 def split_by_gaps(df,gap,time):
@@ -431,7 +442,7 @@ def split_by_gaps(df,gap,time):
     return df_by_gaps
 
 
-def make_rolling_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind='',freq='',varlimits=None):
+def make_rolling_plots(args,nc,context,xvar,yvar,nc_time,context_time,flag0,context_flag0,flagged,kind='',freq='',varlimits=None):
     """
     Make a plot of yvar vs xvar with rolling stats and return the figure object
     """
@@ -441,7 +452,7 @@ def make_rolling_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind='',freq='',v
     ydata = nc[yvar][:]
 
     fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)
-    ax.set_xlim(nc_time[0]-timedelta(days=2),nc_time[-1]+timedelta(days=2))
+    ax.set_xlim(get_time_xlims(nc_time, context_time))
 
     #if not args.flag0:
     #    ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
@@ -469,17 +480,17 @@ def make_rolling_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,kind='',freq='',v
                     ax.plot(group['x'],stat_group['y']+stat_group['ystd'],color='green',linewidth=0,marker='o',markersize=1)
                 ax.plot(group['x'],stat_group['y']-stat_group['ystd'],color='green',linewidth=0,marker='o',markersize=1)
         first = False
-    ax.legend()
+    ax.legend(fontsize=_default_leg_font_size)
     add_qc_lines(args,nc,ax,xvar,yvar,kind='')
 
     return fig
 
-def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
+def make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind='',freq='',varlimits=None):
     """
     Make a plot of xvar vs yvar and return the figure object
     """
     if xvar.startswith('roll'):
-        fig = make_rolling_plots(args,nc,xvar,yvar,nc_time,flag0,flagged,varlimits=varlimits)
+        fig = make_rolling_plots(args,nc,context,xvar,yvar,nc_time,context_time,flag0,context_flag0,flagged,varlimits=varlimits)
         return fig
 
     if xvar not in nc.variables:
@@ -494,9 +505,15 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="3%", pad=0.1)
         cax.axis('off')
+        if args.context:
+            cax = divider.append_axes("right", size="3%", pad=1.0)
+            cax.axis('off')
         if two_subplots:
             divider = make_axes_locatable(ax2)
             cax2 = divider.append_axes("right", size="3%", pad=0.1)
+            cax2.axis('off')
+
+            cax2 = divider.append_axes("right", size="3%", pad=1.0)
             cax2.axis('off')
 
     if two_subplots:
@@ -512,18 +529,31 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
         elif args.ref:
             ref_data = ref[yvar][:]
             ref_data2 = ref[yvar2][:]
+
+        if args.context:
+            # context_flag0 is always set by get_support_file_data, it's just
+            # all indices (outside the time of the main data) if !args.flag0
+            context_data = context[yvar][context_flag0]
+            context_data2 = context[yvar2][context_flag0]
+
     elif type(yvar)==list:
         ydata = nc[yvar[0]][:]-nc[yvar[1]][:] # used for the resampled plots without --flag0
         if args.ref and args.flag0 and 'flag' in ref.variables:
             ref_data = ref[yvar[0]][ref_flag0]-ref[yvar[1]][ref_flag0]
         elif args.ref:
             ref_data = ref[yvar[0]][:]-ref[yvar[1]][:]
+
+        if args.context:
+            context_data = context[yvar[0]][context_flag0] - context[yvar[1]][context_flag0]
     else:
         ydata = nc[yvar][:] # used for the resampled plots without --flag0
         if args.ref and args.flag0 and 'flag' in ref.variables:
             ref_data = ref[yvar][ref_flag0]
         elif args.ref:
             ref_data = ref[yvar][:]
+
+        if args.context:
+            context_data = context[yvar][context_flag0]
 
     if len(set(list(ydata))) in [1,0]:
         ax.text(0.5,0.5,'{} is constant'.format(yvar),transform=ax.transAxes,color='black')
@@ -557,12 +587,27 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
             if two_subplots:
                 ref_data2 = ref_frame['y2'].values
 
+        if args.context:
+            context_data_dict = {'x':context_time,'y':context_data}
+            if two_subplots:
+                context_data_dict['y2'] = context_data2
+            context_frame = getattr(pd.DataFrame().from_dict(context_data_dict).set_index('x').resample(freq),kind)()
+
+            context_time = np.array([pd.Timestamp(x).to_pydatetime() for x in context_frame.index])
+            context_data = context_frame['y'].values
+            if two_subplots:
+                context_data2 = context_frame['y2'].values
+
     if xvar == 'time':
-        ax.set_xlim(nc_time[0]-timedelta(days=2),nc_time[-1]+timedelta(days=2))
+        ax.set_xlim(get_time_xlims(nc_time, context_time))
         if args.ref:
             ax.plot(ref_time,ref_data,linewidth=0,marker='o',markersize=1,color='lightgray',label=ref.long_name)
             if two_subplots:
                 ax2.plot(ref_time,ref_data2,linewidth=0,marker='o',markersize=1,color='lightgray')
+        if args.context:
+            ax.plot(context_time,context_data,linewidth=0,marker='o',markersize=1,color='deepskyblue',label='{} full record'.format(context.long_name))
+            if two_subplots:
+                ax2.plot(context_time, context_data2, linewidth=0, marker='o', markersize=1, color='deepskyblue')
         if kind:
             ax.plot(nc_time,ydata,linewidth=0,marker='o',markersize=1,color='royalblue',label=nc.long_name)
             if two_subplots:
@@ -584,36 +629,55 @@ def make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_
         y = ydata[flag0]
         ax.plot(x,y,linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
         add_linfit(ax,x,y) # only add the linear fit to the flag=0 data, even when plotting all data      
+
+        if args.context:
+            context_x = context[xvar][context_flag0]
+            ax.plot(context_x, context_data, linewidth=0, marker='o', markersize=1, color='deepskyblue', zorder=0.5, label='{} full record'.format(context.long_name))
+
         if two_subplots:
             ax2.plot(x,ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
+            if args.context:
+                ax2.plot(context_x, context_ydata2, linewidth=0, marker='o', markersize=1, color='deepskyblue', zorder=0.5)
 
     # if the variables have a vmin and/or vmax attribute, add lines to the plot
     add_qc_lines(args,nc,ax,xvar,yvar,kind='')
     if two_subplots:
         add_qc_lines(args,nc,ax2,xvar,yvar2,kind='')
 
-    ax.legend()
+    ax.legend(fontsize=_default_leg_font_size)
 
     return fig    
 
 
-def make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=None):
+def make_hexbin_plots(args,nc,context,xvar,yvar,flag0,context_flag0,varlimits=None):
     fig,ax = make_fig(args,nc,xvar,yvar,varlimits=varlimits)
     if type(yvar)==list:
         if not args.flag0:
             ydata = nc[yvar[0]][:]-nc[yvar[1]][:]
         else:
             ydata = nc[yvar[0]][flag0]-nc[yvar[1]][flag0]
+
+        if args.context:
+            # context_flag0 is set by get_support_file_data to be either
+            # the flag == 0 data and the data outside the times of the 
+            # main data, or just the latter. It already accounts for args.flag0
+            context_ydata = context[yvar[0]][context_flag0] - context[yvar[1]][context_flag0]
     else:
         if not args.flag0:
             ydata = nc[yvar][:]
         else:
             ydata = nc[yvar][flag0]
 
+        if args.context:
+            context_ydata = context[yvar][context_flag0]
+
     if args.flag0:
         xdata = nc[xvar][flag0]
     else:
         xdata = nc[xvar][:]
+
+    if args.context:
+        context_xdata = context[xvar][context_flag0]
 
     if type(yvar)==list:
         yvar = yvar[0]
@@ -630,11 +694,20 @@ def make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=None):
     hb = ax.hexbin(xdata,ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap,linewidths=(0,))
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="3%", pad=0.1)
-    cb = fig.colorbar(hb,cax=cax)
+    cb = fig.colorbar(hb,cax=cax,label='{} current data'.format(nc.long_name) if args.context else '')
 
     add_linfit(ax,nc[xvar][flag0],nc[yvar][flag0])
+
+    if args.context:
+        # use zorder to push this behind the main data
+        hb2 = ax.hexbin(context_xdata, context_ydata, bins='log', mincnt=1, extent=extent, cmap='Greys', linewidths=(0,), zorder=0.5)
+        cax2 = divider.append_axes('right', size='3%', pad=1.0)
+        cb2 = fig.colorbar(hb2, cax=cax2, label='{} full record'.format(context.long_name))
+        context_legend = 'Fit to flag==0 context data: {}' if args.flag0 else 'Fit to all context data: {}'
+        add_linfit(ax,context[xvar][context_flag0], context[yvar][context_flag0], color='k', leg=context_legend)
+
     add_qc_lines(args,nc,ax,xvar,yvar)
-    ax.legend()
+    ax.legend(fontsize=_default_leg_font_size-2)
     #tight_layout()
 
     return fig
@@ -682,7 +755,7 @@ def flag_analysis(code_dir,nc):
     for elem in ax:
         elem.axes.get_xaxis().set_visible(False)
         elem.grid()
-    ax[0].legend(prop=dict(size=8))
+    ax[0].legend(fontsize=_default_leg_font_size)#prop=dict(size=8))
 
     prec = ['{:.0f}','{:.2f}']
     for i,curplot in enumerate([barplot,barplot_pcnt]):
@@ -696,7 +769,7 @@ def flag_analysis(code_dir,nc):
     return fig_path
 
 
-def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='',freq='',varlimits=None):
+def simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='',freq='',varlimits=None):
     """
     Make all the plots associated with a given horizontal axis variable, save them, and returns a list of the file paths to the figures.
     """
@@ -718,7 +791,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} and {}".format(*yvar[0]))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
         elif type(yvar)==list: # difference plot
             check = False
             for v in yvar:
@@ -731,7 +804,7 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
             if check:
                 continue
             print("\t {} minus {}".format(*yvar))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
         else:
             if yvar not in nc.variables:
                 print('\t',yvar,'is not in the netCDF file')
@@ -745,11 +818,11 @@ def simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagge
                 print(yvar,xvar)
             else:
                 print('\t',yvar)
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,xvar,yvar,nc_time,ref_time,flag0,flagged,ref_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
             close('all')
 
             if xvar!='time' and not np.count_nonzero([i in xvar for i in ['median','mean','std']]):
-                fig_path_list += [savefig(make_hexbin_plots(args,nc,xvar,yvar,flag0,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex',tight=tight)]
+                fig_path_list += [savefig(make_hexbin_plots(args,nc,context,xvar,yvar,flag0,context_flag0,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex',tight=tight)]
                 close('all')
     return fig_path_list
 
@@ -806,7 +879,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=None):
         df_PM_high_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='red',label='70<=SZA<=80 PM')
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_high_sza_AM_high_sza_PM_vs_time.png')
         ax.grid()
-        ax.legend()
+        ax.legend(fontsize=_default_leg_font_size)
         if not args.flag0:
             add_qc_lines(args,nc,ax,'time','xluft')
         tight_layout()
@@ -825,7 +898,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=None):
         if df_PM_low_sza['y'].size!=0:
             df_PM_low_sza['y'].plot(ax=ax,marker='o',markersize=1,linewidth=0,color='green',label='20<=SZA<=30 PM')
         ax.grid()
-        ax.legend()
+        ax.legend(fontsize=_default_leg_font_size)
         if not args.flag0:
             add_qc_lines(args,nc,ax,'time','xluft')
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_sza_PM_vs_time.png')
@@ -847,7 +920,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=None):
         if not args.flag0:
             add_qc_lines(args,nc,ax,'time','xluft')
         ax.grid()
-        ax.legend()
+        ax.legend(fontsize=_default_leg_font_size)
         fig_path = os.path.join(code_dir.parent,'outputs','xluft_sza_AM_vs_time.png')
         tight_layout()
         fig.savefig(fig_path,dpi=300)
@@ -949,6 +1022,29 @@ def check_mask(x):
     return check
 
 
+def get_support_file_data(filepath, stack, args, main_time=None):
+    if filepath:
+        ref = stack.enter_context(netCDF4.Dataset(filepath,'r')) # input reference netcdf file
+        ref_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(ref['time'][:],units=ref['time'].units,calendar=ref['time'].calendar)])
+        all_ref_ids = np.arange(ref['time'].size)
+        if args.flag0 and 'flag' in ref.variables:
+            ref_flag0 = all_ref_ids[ref['flag'][:]==0]
+            ref_time = ref_time[ref_flag0]
+        else:
+            ref_flag0 = all_ref_ids
+
+        if main_time is not None:
+            tt = (ref_time < np.min(main_time)) | (ref_time > np.max(main_time))
+            ref_time = ref_time[tt]
+            ref_flag0 = ref_flag0[tt]  # we'll let the flag0 indices also subset for times not overlapping with the main data
+    else:
+        ref = None
+        ref_time = None
+        ref_flag0 = None
+
+    return ref, ref_time, ref_flag0
+
+
 def main():
     if 'tccon-qc' not in sys.executable:
         print('Running qc_plots.py with',sys.executable)
@@ -958,6 +1054,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('nc_in',help='full path to the netCDF file from which plots should be made, or a path to a directory (plots will be made from all *.nc files in that directory)')
     parser.add_argument('-r','--ref',default='',help='full path to another netCDF file to use as reference')
+    parser.add_argument('-c', '--context', default='', help='full path to another netCDF file to use as context (i.e. full record for the site being plotted)')
     parser.add_argument('-d', '--output-dir', help='Directory to output the .pdf plots to, the default is "outputs" in the code repo')
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
@@ -981,11 +1078,13 @@ def main():
         sys.exit()
 
     if not os.path.exists(args.nc_in):
-        sys.exit('Invalid path: {}'.format(args.nc_in))
+        sys.exit('Invalid path for nc_in: {}'.format(args.nc_in))
     if args.ref and not os.path.exists(args.ref):
-        sys.exit('Invalid path: {}'.format(args.ref))
+        sys.exit('Invalid path for --ref: {}'.format(args.ref))
+    if args.context and not os.path.exists(args.context):
+        sys.exit('Invalid path for --context: {}'.format(args.context))
     if not os.path.exists(args.json):
-        sys.exit('Invalid path {}'.format(args.json))
+        sys.exit('Invalid path for --json: {}'.format(args.json))
 
     if args.cmap not in colormaps():
         sys.exit('{} is an Invalid --cmap value, must be one of {}'.format(args.cmap,colormaps()))
@@ -1012,19 +1111,12 @@ def main():
             pdf_name = os.path.basename(args.nc_in)
             nc = stack.enter_context(netCDF4.Dataset(args.nc_in,'r')) # input netcdf file
         nc_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(nc['time'][:],units=nc['time'].units,calendar=nc['time'].calendar)])
-        if args.ref:
-            ref = stack.enter_context(netCDF4.Dataset(args.ref,'r')) # input reference netcdf file
-            ref_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(ref['time'][:],units=ref['time'].units,calendar=ref['time'].calendar)])
-            all_ref_ids = np.arange(ref['time'].size)
-            if args.flag0 and 'flag' in ref.variables:
-                ref_flag0 = all_ref_ids[ref['flag'][:]==0]
-                ref_time = ref_time[ref_flag0]
-            else:
-                ref_flag0 = all_ref_ids
-        else:
-            ref = None
-            ref_time = None
-            ref_flag0 = None
+
+        # Get the netCDF handle, time coordinate, and flag data for the reference and context files,
+        # if given
+        ref, ref_time, ref_flag0 = get_support_file_data(args.ref, stack, args)
+        context, context_time, context_flag0 = get_support_file_data(args.context, stack, args, nc_time)
+
 
         all_ids = np.arange(nc['time'].size)
         if 'flag' in nc.variables:
@@ -1043,22 +1135,22 @@ def main():
         fnum = 0
         for xvar in vardata.keys():
             if xvar.startswith("roll"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,varlimits=varlimits)      
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,varlimits=varlimits)      
                 continue
             elif xvar.endswith("median"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='median',freq=xvar.split('_')[0],varlimits=varlimits)
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='median',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("mean"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='mean',freq=xvar.split('_')[0],varlimits=varlimits)
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='mean',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("std"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,kind='std',freq=xvar.split('_')[0],varlimits=varlimits)
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='std',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar not in [v for v in nc.variables]:
                 print(xvar,'is not in the netCDF file')
                 continue
             print('Making plots vs',xvar)
-            fig_path_list += simple_plots(args,code_dir,nc,ref,nc_time,ref_time,vardata,xvar,flag0,flagged,ref_flag0,varlimits=varlimits)
+            fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,varlimits=varlimits)
             # end of "for yvar" loop
         # end of "for xvar" loop
 
