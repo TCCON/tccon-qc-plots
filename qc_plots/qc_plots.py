@@ -207,6 +207,42 @@ def send_email_from_config(cfg_file, site_id, attachment, nc_file):
         send_email(subject=subject, body=body, send_from=from_addr, send_to=to_addr, attachment=attachment, 
                    smtp_args=smtp_args, authenticate=req_auth)
 
+
+class TcconData:
+    def __init__(self, nc_dset, exclude_times=None, force_flag0=False):
+        self.dset = nc_dset
+        if nc_dset is None:
+            self.time = None
+            self.all_ids = None
+            self.flag0_ids = None
+            self.flagged_ids = None
+        else:
+            self.time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(nc_dset['time'][:],units=nc_dset['time'].units,calendar=nc_dset['time'].calendar)])
+            
+            ids = np.ones(nc_dset['time'].size, dtype=np.bool_)
+            flag0_ids = nc_dset['flag'][:] == 0
+            flagged_ids = nc_dset['flag'][:] != 0
+            if force_flag0 and 'flag' in nc_dset.variables:
+                ids &= flag0_ids
+            if exclude_times is not None:
+                is_outside = (self.time < np.min(exclude_times)) | (self.time > np.max(exclude_times))
+                ids &= is_outside
+                flag0_ids &= is_outside
+                flagged_ids &= is_outside
+
+            self.all_ids = np.flatnonzero(ids)
+            self.flag0_ids = np.flatnonzero(flag0_ids)
+            self.flagged_ids = np.flatnonzero(flagged_ids)
+
+    @classmethod
+    def create(cls, filepath, stack, force_flag0, exclude_times=None):
+        if filepath:
+            dset = stack.enter_context(netCDF4.Dataset(filepath,'r')) # input reference netcdf file
+            return cls(dset, exclude_times=exclude_times, force_flag0=force_flag0)
+        else:
+            return cls(None)
+
+
 def cm2inch(*tupl):
     """
     Converts reasonable units (cm) into terrible units (inches).
@@ -301,8 +337,8 @@ def get_limits(nc,var,json_limits=None):
         limits = [0,0.06]
     elif var == 'fvsi':
         limits = [0.0,20]
-    elif 'vmin' in nc[var].__dict__:
-        limits = [nc[var].vmin,nc[var].vmax]  
+    elif 'vmin' in nc.dset[var].__dict__:
+        limits = [nc.dset[var].vmin,nc.dset[var].vmax]  
 
     return limits
 
@@ -326,8 +362,8 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq='',varlimits=None
         yvar2 = yvar[0][1] # for the top plot
         yvar = yvar[0][0] # for the bottom plot
         ax = axes[1] # the bottom plot
-        if 'units' in nc[yvar2].__dict__:
-            axes[0].set_ylabel('{} ({})'.format(yvar2,nc[yvar2].units))
+        if 'units' in nc.dset[yvar2].__dict__:
+            axes[0].set_ylabel('{} ({})'.format(yvar2,nc.dset[yvar2].units))
         else:
             axes[0].set_ylabel(yvar2)
     else:
@@ -352,13 +388,13 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq='',varlimits=None
     else:
         ylab = yvar
 
-    if 'units' in nc[yvar].__dict__:
-        ax.set_ylabel('{} ({})'.format(ylab,nc[yvar].units))
+    if 'units' in nc.dset[yvar].__dict__:
+        ax.set_ylabel('{} ({})'.format(ylab,nc.dset[yvar].units))
     else:
         ax.set_ylabel(ylab)
 
-    if xvar!='time' and 'units' in nc[xvar].__dict__:
-        ax.set_xlabel('{} ({})'.format(xvar,nc[xvar].units))
+    if xvar!='time' and 'units' in nc.dset[xvar].__dict__:
+        ax.set_xlabel('{} ({})'.format(xvar,nc.dset[xvar].units))
     else:
         ax.set_xlabel(xvar)
 
@@ -369,10 +405,10 @@ def make_fig(args,nc,xvar,yvar,width=20,height=10,kind='',freq='',varlimits=None
 
 def add_qc_lines(args,nc,ax,xvar,yvar,kind=''):
     for elem in ['vmin','vmax']:
-        if type(yvar)!=list and kind!='std' and (elem in nc[yvar].__dict__): # don't add the line for difference plots and standard deviation plots
-            ax.axhline(y=nc[yvar].__dict__[elem],linestyle='dashed',color='black')
-        if elem in nc[xvar].__dict__:
-            ax.axvline(x=nc[xvar].__dict__[elem],linestyle='dashed',color='black')
+        if type(yvar)!=list and kind!='std' and (elem in nc.dset[yvar].__dict__): # don't add the line for difference plots and standard deviation plots
+            ax.axhline(y=nc.dset[yvar].__dict__[elem],linestyle='dashed',color='black')
+        if elem in nc.dset[xvar].__dict__:
+            ax.axvline(x=nc.dset[xvar].__dict__[elem],linestyle='dashed',color='black')
 
 
 def savefig(fig,code_dir,xvar,yvar,plot_type='sc',tight=True):
@@ -442,23 +478,23 @@ def split_by_gaps(df,gap,time):
     return df_by_gaps
 
 
-def make_rolling_plots(args,nc,context,xvar,yvar,nc_time,context_time,flag0,context_flag0,flagged,kind='',freq='',varlimits=None):
+def make_rolling_plots(args,nc,context,xvar,yvar,kind='',freq='',varlimits=None):
     """
     Make a plot of yvar vs xvar with rolling stats and return the figure object
     """
     stat_list = xvar.split('_')[1:]
     xvar = 'time'
 
-    ydata = nc[yvar][:]
+    ydata = nc.dset[yvar][:]
 
     fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)
-    ax.set_xlim(get_time_xlims(nc_time, context_time))
+    ax.set_xlim(get_time_xlims(nc.time, context.time))
 
     #if not args.flag0:
     #    ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
-    ax.plot(nc_time[flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+    ax.plot(nc.time[nc.flag0_ids],ydata[nc.flag0_ids],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.dset.long_name))
 
-    df = pd.DataFrame().from_dict({'x':nc_time[flag0],'y':ydata[flag0]})
+    df = pd.DataFrame().from_dict({'x':nc.time[nc.flag0_ids],'y':ydata[nc.flag0_ids]})
     df_by_gaps = split_by_gaps(df,args.roll_gaps,'x')
 
     color = {'mean':'hotpink','median':'black','std':'green'}
@@ -485,15 +521,16 @@ def make_rolling_plots(args,nc,context,xvar,yvar,nc_time,context_time,flag0,cont
 
     return fig
 
-def make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind='',freq='',varlimits=None):
+def make_scatter_plots(args,nc,ref,context,xvar,yvar,kind='',freq='',varlimits=None):
     """
     Make a plot of xvar vs yvar and return the figure object
     """
+
     if xvar.startswith('roll'):
-        fig = make_rolling_plots(args,nc,context,xvar,yvar,nc_time,context_time,flag0,context_flag0,flagged,varlimits=varlimits)
+        fig = make_rolling_plots(args,nc,context,xvar,yvar,varlimits=varlimits)
         return fig
 
-    if xvar not in nc.variables:
+    if xvar not in nc.dset.variables:
         xvar = 'time'
 
     fig,ax = make_fig(args,nc,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits)  
@@ -508,136 +545,137 @@ def make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_ti
         if args.context:
             cax = divider.append_axes("right", size="3%", pad=1.0)
             cax.axis('off')
-        if two_subplots:
-            divider = make_axes_locatable(ax2)
-            cax2 = divider.append_axes("right", size="3%", pad=0.1)
-            cax2.axis('off')
 
-            cax2 = divider.append_axes("right", size="3%", pad=1.0)
-            cax2.axis('off')
+            
 
     if two_subplots:
         ax2 = ax[0]
         ax = ax[1]
         yvar2 = yvar[0][1]
         yvar = yvar[0][0]
-        ydata = nc[yvar][:]
-        ydata2 = nc[yvar2][:]
-        if args.ref and args.flag0 and 'flag' in ref.variables:
-            ref_data = ref[yvar][ref_flag0]
-            ref_data2 = ref[yvar2][ref_flag0]            
+        ydata = nc.dset[yvar][:]
+        ydata2 = nc.dset[yvar2][:]
+        if args.ref and args.flag0 and 'flag' in ref.dset.variables:
+            ref_data = ref.dset[yvar][ref.flag0_ids]
+            ref_data2 = ref.dset[yvar2][ref.flag0_ids]            
         elif args.ref:
-            ref_data = ref[yvar][:]
-            ref_data2 = ref[yvar2][:]
+            ref_data = ref.dset[yvar][:]
+            ref_data2 = ref.dset[yvar2][:]
+
+        divider = make_axes_locatable(ax2)
+        cax2 = divider.append_axes("right", size="3%", pad=0.1)
+        cax2.axis('off')
 
         if args.context:
+            # add invisible axis to make the plot the same size as the hexbin plots with colorbars
+
             # context_flag0 is always set by get_support_file_data, it's just
             # all indices (outside the time of the main data) if !args.flag0
-            context_data = context[yvar][context_flag0]
-            context_data2 = context[yvar2][context_flag0]
+            context_data = context.dset[yvar][context.flag0_ids]
+            context_data2 = context.dset[yvar2][context.flag0_ids]
+            cax2 = divider.append_axes("right", size="3%", pad=1.0)
+            cax2.axis('off')
 
     elif type(yvar)==list:
-        ydata = nc[yvar[0]][:]-nc[yvar[1]][:] # used for the resampled plots without --flag0
-        if args.ref and args.flag0 and 'flag' in ref.variables:
-            ref_data = ref[yvar[0]][ref_flag0]-ref[yvar[1]][ref_flag0]
+        ydata = nc.dset[yvar[0]][:]-nc.dset[yvar[1]][:] # used for the resampled plots without --flag0
+        if args.ref and args.flag0 and 'flag' in ref.dset.variables:
+            ref_data = ref.dset[yvar[0]][ref.flag0_ids]-ref.dset[yvar[1]][ref.flag0_ids]
         elif args.ref:
-            ref_data = ref[yvar[0]][:]-ref[yvar[1]][:]
+            ref_data = ref.dset[yvar[0]][:]-ref.dset[yvar[1]][:]
 
         if args.context:
-            context_data = context[yvar[0]][context_flag0] - context[yvar[1]][context_flag0]
+            context_data = context.dset[yvar[0]][context.flag0_ids] - context.dset[yvar[1]][context.flag0_ids]
     else:
-        ydata = nc[yvar][:] # used for the resampled plots without --flag0
-        if args.ref and args.flag0 and 'flag' in ref.variables:
-            ref_data = ref[yvar][ref_flag0]
+        ydata = nc.dset[yvar][:] # used for the resampled plots without --flag0
+        if args.ref and args.flag0 and 'flag' in ref.dset.variables:
+            ref_data = ref.dset[yvar][ref.flag0_ids]
         elif args.ref:
-            ref_data = ref[yvar][:]
+            ref_data = ref.dset[yvar][:]
 
         if args.context:
-            context_data = context[yvar][context_flag0]
+            context_data = context.dset[yvar][context.flag0_ids]
 
     if len(set(list(ydata))) in [1,0]:
         ax.text(0.5,0.5,'{} is constant'.format(yvar),transform=ax.transAxes,color='black')
 
     if kind:
         if args.flag0:
-            ydata = ydata[flag0]
-            nc_time = nc_time[flag0]
+            ydata = ydata[nc.flag0_ids]
             if two_subplots:
-                ydata2 = ydata2[flag0]
-        data_dict = {'x':nc_time,'y':ydata}
+                ydata2 = ydata2[nc.flag0_ids]
+        data_dict = {'x':nc.time,'y':ydata}
         if two_subplots:
             data_dict['y2'] = ydata2
             
         main_frame = getattr(pd.DataFrame().from_dict(data_dict).set_index('x').resample(freq),kind)()
 
         ydata = main_frame['y'].values
-        nc_time = np.array([pd.Timestamp(x).to_pydatetime() for x in main_frame.index])
+        nc_reduced_times = np.array([pd.Timestamp(x).to_pydatetime() for x in main_frame.index])
         if two_subplots:
             ydata2 = main_frame['y2'].values
 
         if args.ref:
-            ref_data_dict = {'x':ref_time,'y':ref_data}
+            ref_data_dict = {'x':ref.time,'y':ref_data}
             if two_subplots:
                 ref_data_dict['y2'] = ref_data2                
             
             ref_frame = getattr(pd.DataFrame().from_dict(ref_data_dict).set_index('x').resample(freq),kind)()  
 
-            ref_time = np.array([pd.Timestamp(x).to_pydatetime() for x in ref_frame.index])
             ref_data = ref_frame['y'].values
+            ref_time = np.array([pd.Timestamp(x).to_pydatetime() for x in ref_frame.index])
             if two_subplots:
                 ref_data2 = ref_frame['y2'].values
 
         if args.context:
-            context_data_dict = {'x':context_time,'y':context_data}
+            context_data_dict = {'x':context.time,'y':context_data}
             if two_subplots:
                 context_data_dict['y2'] = context_data2
             context_frame = getattr(pd.DataFrame().from_dict(context_data_dict).set_index('x').resample(freq),kind)()
 
-            context_time = np.array([pd.Timestamp(x).to_pydatetime() for x in context_frame.index])
             context_data = context_frame['y'].values
             if two_subplots:
                 context_data2 = context_frame['y2'].values
 
     if xvar == 'time':
-        ax.set_xlim(get_time_xlims(nc_time, context_time))
+        ax.set_xlim(get_time_xlims(nc.time, context.time))
         if args.ref:
-            ax.plot(ref_time,ref_data,linewidth=0,marker='o',markersize=1,color='lightgray',label=ref.long_name)
+            ax.plot(ref.time,ref_data,linewidth=0,marker='o',markersize=1,color='lightgray',label=ref.dset.long_name)
             if two_subplots:
-                ax2.plot(ref_time,ref_data2,linewidth=0,marker='o',markersize=1,color='lightgray')
+                ax2.plot(ref.time,ref_data2,linewidth=0,marker='o',markersize=1,color='lightgray')
         if args.context:
-            ax.plot(context_time,context_data,linewidth=0,marker='o',markersize=1,color='deepskyblue',label='{} full record'.format(context.long_name))
+            ax.plot(context.time,context_data,linewidth=0,marker='o',markersize=1,color='deepskyblue',label='{} full record'.format(context.dset.long_name))
             if two_subplots:
-                ax2.plot(context_time, context_data2, linewidth=0, marker='o', markersize=1, color='deepskyblue')
+                ax2.plot(context.time, context_data2, linewidth=0, marker='o', markersize=1, color='deepskyblue')
         if kind:
-            ax.plot(nc_time,ydata,linewidth=0,marker='o',markersize=1,color='royalblue',label=nc.long_name)
+            ax.plot(nc_reduced_times,ydata,linewidth=0,marker='o',markersize=1,color='royalblue',label=nc.dset.long_name)
             if two_subplots:
-               ax2.plot(nc_time,ydata2,linewidth=0,marker='o',markersize=1,color='royalblue') 
+               ax2.plot(nc_reduced_times,ydata2,linewidth=0,marker='o',markersize=1,color='royalblue') 
         else:
             if not args.flag0:
-                ax.plot(nc_time[flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
+                ax.plot(nc.time[nc.flagged_ids],ydata[nc.flagged_ids],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.dset.long_name))
                 if two_subplots:
-                    ax2.plot(nc_time[flagged],ydata2[flagged],linewidth=0,marker='o',markersize=1,color='red')
-            ax.plot(nc_time[flag0],ydata[flag0],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+                    ax2.plot(nc.time[nc.flagged_ids],ydata2[nc.flagged_ids],linewidth=0,marker='o',markersize=1,color='red')
+            ax.plot(nc.time[nc.flag0_ids],ydata[nc.flag0_ids],linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.dset.long_name))
             if two_subplots:
-                ax2.plot(nc_time[flag0],ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
+                ax2.plot(nc.time[nc.flag0_ids],ydata2[nc.flag0_ids],linewidth=0,marker='o',markersize=1,color='royalblue')
     else:
         if not args.flag0:
-            ax.plot(nc[xvar][flagged],ydata[flagged],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.long_name))
+            ax.plot(nc.dset[xvar][nc.flagged_ids],ydata[nc.flagged_ids],linewidth=0,marker='o',markersize=1,color='red',label='{} flagged'.format(nc.dset.long_name))
             if two_subplots:
-                ax2.plot(nc[xvar][flagged],ydata2[flagged],linewidth=0,marker='o',markersize=1,color='red')
-        x = nc[xvar][flag0]
-        y = ydata[flag0]
-        ax.plot(x,y,linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.long_name))
+                ax2.plot(nc.dset[xvar][nc.flagged_ids],ydata2[nc.flagged_ids],linewidth=0,marker='o',markersize=1,color='red')
+        x = nc.dset[xvar][nc.flag0_ids]
+        y = ydata[nc.flag0_ids]
+        ax.plot(x,y,linewidth=0,marker='o',markersize=1,color='royalblue',label='{} flag=0'.format(nc.dset.long_name))
         add_linfit(ax,x,y) # only add the linear fit to the flag=0 data, even when plotting all data      
 
         if args.context:
-            context_x = context[xvar][context_flag0]
-            ax.plot(context_x, context_data, linewidth=0, marker='o', markersize=1, color='deepskyblue', zorder=0.5, label='{} full record'.format(context.long_name))
+            context_x = context.dset[xvar][context.flag0_ids]
+            ax.plot(context_x, context_data, linewidth=0, marker='o', markersize=1, color='deepskyblue', zorder=0.5, label='{} full record'.format(context.dset.long_name))
 
         if two_subplots:
-            ax2.plot(x,ydata2[flag0],linewidth=0,marker='o',markersize=1,color='royalblue')
+            ax2.plot(x,ydata2[nc.flag0_ids],linewidth=0,marker='o',markersize=1,color='royalblue')
             if args.context:
-                ax2.plot(context_x, context_ydata2, linewidth=0, marker='o', markersize=1, color='deepskyblue', zorder=0.5)
+                ax2.plot(context_x, context_data2, linewidth=0, marker='o', markersize=1, color='deepskyblue', zorder=0.5)
 
     # if the variables have a vmin and/or vmax attribute, add lines to the plot
     add_qc_lines(args,nc,ax,xvar,yvar,kind='')
@@ -649,35 +687,35 @@ def make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_ti
     return fig    
 
 
-def make_hexbin_plots(args,nc,context,xvar,yvar,flag0,context_flag0,varlimits=None):
+def make_hexbin_plots(args,nc,context,xvar,yvar,varlimits=None):
     fig,ax = make_fig(args,nc,xvar,yvar,varlimits=varlimits)
     if type(yvar)==list:
         if not args.flag0:
-            ydata = nc[yvar[0]][:]-nc[yvar[1]][:]
+            ydata = nc.dset[yvar[0]][:]-nc.dset[yvar[1]][:]
         else:
-            ydata = nc[yvar[0]][flag0]-nc[yvar[1]][flag0]
+            ydata = nc.dset[yvar[0]][nc.flag0_ids]-nc.dset[yvar[1]][nc.flag0_ids]
 
         if args.context:
             # context_flag0 is set by get_support_file_data to be either
             # the flag == 0 data and the data outside the times of the 
             # main data, or just the latter. It already accounts for args.flag0
-            context_ydata = context[yvar[0]][context_flag0] - context[yvar[1]][context_flag0]
+            context_ydata = context[yvar[0]][context.flag0_ids] - context[yvar[1]][context.flag0_ids]
     else:
         if not args.flag0:
-            ydata = nc[yvar][:]
+            ydata = nc.dset[yvar][:]
         else:
-            ydata = nc[yvar][flag0]
+            ydata = nc.dset[yvar][nc.flag0_ids]
 
         if args.context:
-            context_ydata = context[yvar][context_flag0]
+            context_ydata = context[yvar][context.flag0_ids]
 
     if args.flag0:
-        xdata = nc[xvar][flag0]
+        xdata = nc.dset[xvar][nc.flag0_ids]
     else:
-        xdata = nc[xvar][:]
+        xdata = nc.dset[xvar][:]
 
     if args.context:
-        context_xdata = context[xvar][context_flag0]
+        context_xdata = context[xvar][context.flag0_ids]
 
     if type(yvar)==list:
         yvar = yvar[0]
@@ -694,9 +732,9 @@ def make_hexbin_plots(args,nc,context,xvar,yvar,flag0,context_flag0,varlimits=No
     hb = ax.hexbin(xdata,ydata,bins='log',mincnt=1,extent=extent,cmap=args.cmap,linewidths=(0,))
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="3%", pad=0.1)
-    cb = fig.colorbar(hb,cax=cax,label='{} current data'.format(nc.long_name) if args.context else '')
+    cb = fig.colorbar(hb,cax=cax,label='{} current data'.format(nc.dset.long_name) if args.context else '')
 
-    add_linfit(ax,nc[xvar][flag0],nc[yvar][flag0])
+    add_linfit(ax,nc.dset[xvar][nc.flag0_ids],nc.dset[yvar][nc.flag0_ids])
 
     if args.context:
         # use zorder to push this behind the main data
@@ -704,7 +742,7 @@ def make_hexbin_plots(args,nc,context,xvar,yvar,flag0,context_flag0,varlimits=No
         cax2 = divider.append_axes('right', size='3%', pad=1.0)
         cb2 = fig.colorbar(hb2, cax=cax2, label='{} full record'.format(context.long_name))
         context_legend = 'Fit to flag==0 context data: {}' if args.flag0 else 'Fit to all context data: {}'
-        add_linfit(ax,context[xvar][context_flag0], context[yvar][context_flag0], color='k', leg=context_legend)
+        add_linfit(ax,context[xvar][context.flag0_ids], context[yvar][context.flag0_ids], color='k', leg=context_legend)
 
     add_qc_lines(args,nc,ax,xvar,yvar)
     ax.legend(fontsize=_default_leg_font_size-2)
@@ -719,19 +757,19 @@ def flag_analysis(code_dir,nc):
     """
     flag_df = pd.DataFrame()
     flag_df_pcnt = pd.DataFrame()
-    flag_set = list(set(nc['flag'][:]))
-    N = nc['time'].size
+    flag_set = list(set(nc.dset['flag'][:]))
+    N = nc.dset['time'].size
     print('Summary of flags:')
     print('  #  Parameter              N_flag      %')
     nflag_tot = 0
     for flag in sorted(flag_set):
         if flag==0:
             continue
-        where_flagged = nc['flag'][:]==flag
+        where_flagged = nc.dset['flag'][:]==flag
         nflag = np.count_nonzero(where_flagged)
         nflag_pcnt = 100*nflag/N
         nflag_tot += nflag
-        flagged_var_name = list(nc['flagged_var_name'][where_flagged])[0]
+        flagged_var_name = list(nc.dset['flagged_var_name'][where_flagged])[0]
         print('{:>3}  {:<20} {:>6}   {:>8.3f}'.format(flag,flagged_var_name,nflag,nflag_pcnt))
         flag_df[flagged_var_name] = pd.Series([nflag])
         flag_df_pcnt[flagged_var_name] = pd.Series([nflag_pcnt])
@@ -748,7 +786,7 @@ def flag_analysis(code_dir,nc):
     fig.set_size_inches(cm2inch(20,10))
     ax[0].set_ylabel('Count')
     ax[1].set_ylabel('Count (%)')
-    ax[0].set_title('{} total spectra from {}'.format(N,nc.long_name))
+    ax[0].set_title('{} total spectra from {}'.format(N,nc.dset.long_name))
     fig.suptitle('Summary of flags with count>1%')
     barplot = flag_df.plot(kind='bar',ax=ax[0])
     barplot_pcnt = flag_df_pcnt.plot(kind='bar',ax=ax[1],legend=False)
@@ -769,7 +807,7 @@ def flag_analysis(code_dir,nc):
     return fig_path
 
 
-def simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='',freq='',varlimits=None):
+def simple_plots(args,code_dir,nc,ref,context,vardata,xvar,kind='',freq='',varlimits=None):
     """
     Make all the plots associated with a given horizontal axis variable, save them, and returns a list of the file paths to the figures.
     """
@@ -782,34 +820,34 @@ def simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vard
         if type(yvar)==list and type(yvar[0])==list: # two plots with 1:3 ratio
             check = False
             for v in yvar[0]:
-                if v not in nc.variables:
+                if v not in nc.dset.variables:
                     print('\t',v,'is not in the netCDF file')
                     check = True
-                elif check_mask(nc[v]):
+                elif check_mask(nc.dset[v]):
                     print('\t',v,'has only masked values')
                     check = True
             if check:
                 continue
             print("\t {} and {}".format(*yvar[0]))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
         elif type(yvar)==list: # difference plot
             check = False
             for v in yvar:
-                if v not in nc.variables:
+                if v not in nc.dset.variables:
                     print('\t',v,'is not in the netCDF file')
                     check = True
-                elif check_mask(nc[v]):
+                elif check_mask(nc.dset[v]):
                     print('\t',v,'has only masked values')
                     check = True
             if check:
                 continue
             print("\t {} minus {}".format(*yvar))
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
         else:
-            if yvar not in nc.variables:
+            if yvar not in nc.dset.variables:
                 print('\t',yvar,'is not in the netCDF file')
                 continue
-            elif check_mask(nc[yvar]):
+            elif check_mask(nc.dset[yvar]):
                 print('\t',yvar,'has only masked values')
                 continue
             if kind:
@@ -818,30 +856,31 @@ def simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vard
                 print(yvar,xvar)
             else:
                 print('\t',yvar)
-            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,nc_time,ref_time,context_time,flag0,flagged,ref_flag0,context_flag0,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
+            fig_path_list += [savefig(make_scatter_plots(args,nc,ref,context,xvar,yvar,kind=kind,freq=freq,varlimits=varlimits),code_dir,xvar,yvar,plot_type='sc',tight=tight)]
             close('all')
 
             if xvar!='time' and not np.count_nonzero([i in xvar for i in ['median','mean','std']]):
-                fig_path_list += [savefig(make_hexbin_plots(args,nc,context,xvar,yvar,flag0,context_flag0,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex',tight=tight)]
+                fig_path_list += [savefig(make_hexbin_plots(args,nc,context,xvar,yvar,varlimits=varlimits),code_dir,xvar,yvar,plot_type='hex',tight=tight)]
                 close('all')
     return fig_path_list
 
 
-def default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=None):
+def default_plots(args,code_dir,nc,varlimits=None):
     """
     Make (70-80 SZA AM - 70-80 SZA PM) and (70-80 SZA PM - 40-50 SZA PM) plots for xluft
     """
+
     fig_path_list = []
-    if 'xluft' not in nc.variables:
+    if 'xluft' not in nc.dset.variables:
         return fig_path_list
 
-    xluft = nc['xluft'][:]
-    solzen = nc['solzen'][:]
-    azim = nc['azim'][:]
+    xluft = nc.dset['xluft'][:]
+    solzen = nc.dset['solzen'][:]
+    azim = nc.dset['azim'][:]
 
-    df = pd.DataFrame().from_dict({'x':nc_time,'y':xluft})
+    df = pd.DataFrame().from_dict({'x':nc.time,'y':xluft})
 
-    all_ids = np.arange(nc['xluft'].size)
+    all_ids = np.arange(nc.dset['xluft'].size)
 
     AM = all_ids[azim<=180]
     PM = all_ids[azim>180]
@@ -851,7 +890,7 @@ def default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=None):
     low_sza = all_ids[(20<=solzen) & (solzen<=30)]
 
     if args.flag0:
-        all_ids = flag0
+        all_ids = nc.flag0_ids
 
     AM_high_sza = np.array(set(all_ids).intersection(set(AM),set(high_sza)))
     PM_high_sza = np.array(set(all_ids).intersection(set(PM),set(high_sza)))
@@ -1034,15 +1073,19 @@ def get_support_file_data(filepath, stack, args, main_time=None):
             ref_flag0 = all_ref_ids
 
         if main_time is not None:
-            tt = (ref_time < np.min(main_time)) | (ref_time > np.max(main_time))
-            ref_time = ref_time[tt]
-            ref_flag0 = ref_flag0[tt]  # we'll let the flag0 indices also subset for times not overlapping with the main data
+            ref_outside = (ref_time < np.min(main_time)) | (ref_time > np.max(main_time))
+            ref_time = ref_time[ref_outside]
+            ref_flag0 = ref_flag0[ref_outside]  # we'll let the flag0 indices also subset for times not overlapping with the main data
     else:
         ref = None
         ref_time = None
         ref_flag0 = None
+        ref_outside = None
 
-    return ref, ref_time, ref_flag0
+    if main_time is None:
+        return ref, ref_time, ref_flag0
+    else:
+        return ref, ref_time, ref_flag0, ref_outside
 
 
 def main():
@@ -1109,48 +1152,38 @@ def main():
             nc = merge_nc_files(ncin_list,var_list)
         else:
             pdf_name = os.path.basename(args.nc_in)
-            nc = stack.enter_context(netCDF4.Dataset(args.nc_in,'r')) # input netcdf file
-        nc_time = np.array([datetime(*cftime.timetuple()[:6]) for cftime in netCDF4.num2date(nc['time'][:],units=nc['time'].units,calendar=nc['time'].calendar)])
+            nc = TcconData.create(args.nc_in, stack, force_flag0=False)
 
         # Get the netCDF handle, time coordinate, and flag data for the reference and context files,
         # if given
-        ref, ref_time, ref_flag0 = get_support_file_data(args.ref, stack, args)
-        context, context_time, context_flag0 = get_support_file_data(args.context, stack, args, nc_time)
-
-
-        all_ids = np.arange(nc['time'].size)
-        if 'flag' in nc.variables:
-            flag0 = all_ids[nc['flag'][:]==0]
-            flagged = all_ids[nc['flag'][:]!=0]
-        else:
-            flag0 = all_ids
-            flagged = []
+        ref = TcconData.create(args.ref, stack, force_flag0=args.flag0)
+        context = TcconData.create(args.context, stack, force_flag0=False, exclude_times=nc.time)
 
         if not args.flag0:
             fig_path_list += [flag_analysis(code_dir,nc)]
 
         print('Making default plots')
-        fig_path_list += default_plots(args,code_dir,nc,nc_time,flag0,flagged,varlimits=varlimits)
+        fig_path_list += default_plots(args,code_dir,nc,varlimits=varlimits)
 
         fnum = 0
         for xvar in vardata.keys():
             if xvar.startswith("roll"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,varlimits=varlimits)      
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,vardata,xvar,varlimits=varlimits)      
                 continue
             elif xvar.endswith("median"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='median',freq=xvar.split('_')[0],varlimits=varlimits)
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,vardata,xvar,kind='median',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("mean"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='mean',freq=xvar.split('_')[0],varlimits=varlimits)
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,vardata,xvar,kind='mean',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
             elif xvar.endswith("std"):
-                fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,kind='std',freq=xvar.split('_')[0],varlimits=varlimits)
+                fig_path_list += simple_plots(args,code_dir,nc,ref,context,vardata,xvar,kind='std',freq=xvar.split('_')[0],varlimits=varlimits)
                 continue
-            elif xvar not in [v for v in nc.variables]:
+            elif xvar not in [v for v in nc.dset.variables]:
                 print(xvar,'is not in the netCDF file')
                 continue
             print('Making plots vs',xvar)
-            fig_path_list += simple_plots(args,code_dir,nc,ref,context,nc_time,ref_time,context_time,vardata,xvar,flag0,flagged,ref_flag0,context_flag0,varlimits=varlimits)
+            fig_path_list += simple_plots(args,code_dir,nc,ref,context,vardata,xvar,varlimits=varlimits)
             # end of "for yvar" loop
         # end of "for xvar" loop
 
