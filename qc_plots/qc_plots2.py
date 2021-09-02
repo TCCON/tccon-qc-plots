@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import timedelta, datetime
 from enum import Enum
 from fnmatch import fnmatch
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import netCDF4 as ncdf
 import numpy as np
@@ -434,6 +435,12 @@ class TimeseriesPlot(ScatterPlot):
 
         # Also override the x-axis label
         ax.set_xlabel('Time')
+
+        # And fix the ticks to look halfway decent
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
         return fig, ax
 
     def get_save_name(self):
