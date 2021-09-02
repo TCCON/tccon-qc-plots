@@ -28,15 +28,21 @@ def driver(nc_in, config, flag0=False, show_all=False, **kwargs):
     with open(config) as f:
         config = tomli.load(f)
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     primary_styles = config.get('style', dict()).get('main', dict())
-    primary_data = qc_plots2.TcconData(nc_in, styles=primary_styles)
+    data = [qc_plots2.TcconData(qc_plots2.DataCategory.PRIMARY, nc_in, styles=primary_styles)]
     plots = qc_plots2.setup_plots(config)
     fig_paths = []
     n = len(plots)
     for i, plot in enumerate(plots, start=1):
-        print(f'  - Plot {i}/{n}: {plot.get_save_name()}')
-        fig_paths.append( plot.make_plot(primary_data, flag0_only=flag0, show_all=show_all) )
+        print(f'  - Plot {i}/{n}: {plot.get_save_name()}', end='')
+        try:
+            this_path = plot.make_plot(data, flag0_only=flag0, show_all=show_all)
+        except IndexError as err:
+            print(f' SKIPPED ({err})')
+        else:
+            print(' DONE')
+            fig_paths.append(this_path)
 
 
 def main():

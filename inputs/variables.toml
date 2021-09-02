@@ -21,6 +21,18 @@ flag0 = {color = "royalblue"}
 flagged = {color = "tomato"}
 
 
+[style.default.timeseries]
+clone = 'scatter'
+
+[style.main.timeseries]
+clone = 'scatter'
+
+[style.ref.timeseries]
+clone = 'scatter'
+
+[style.context.timeseries]
+clone = 'scatter'
+
 # ------------- #
 # List of plots #
 # ------------- #
@@ -31,42 +43,42 @@ yvar = "xluft"
 op = "median"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xluft"
 yvar_error = "xluft_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xco2"
 yvar_error = "xco2_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xch4"
 yvar_error = "xch4_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xco"
 yvar_error = "xco_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xh2o"
 yvar_error = "xh2o_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xhdo"
 yvar_error = "xhdo_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xhf"
 yvar_error = "xhf_error"
 
 [[plots]]
-kind = "timeseries"
+kind = "timeseries-2panel"
 yvar = "xn2o"
 yvar_error = "xn2o_error"
 

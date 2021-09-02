@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from datetime import timedelta, datetime
 from enum import Enum
 from fnmatch import fnmatch
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ import netCDF4 as ncdf
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple, Union
 
 import tomli
 
@@ -21,6 +22,12 @@ class FlagCategory(Enum):
     FLAGGED = 'flagged'
 
 
+class DataCategory(Enum):
+    PRIMARY = 'primary'
+    REFERENCE = 'reference'
+    CONTEXT = 'context'
+
+
 class DataError(Exception):
     pass
 
@@ -31,10 +38,12 @@ class PlotClassError(Exception):
 
 class TcconData:
     def __init__(self,
+                 data_category: DataCategory,
                  nc_file,
-                 styles,
+                 styles: dict,
                  exclude_times=None,
                  allowed_flag_categories=None):
+        self.data_category = data_category
         self.nc_dset = ncdf.Dataset(nc_file)
         self.styles = styles
         self.times = self.nctime_to_pytime(self.nc_dset['time'])
@@ -67,7 +76,7 @@ class TcconData:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.nc_dset.close()
 
-    def has_data_category(self, flag_category: FlagCategory) -> bool:
+    def has_flag_category(self, flag_category: FlagCategory) -> bool:
         return flag_category in self._allowed_flag_categories
 
     def get_data(self, varname, flag_category: FlagCategory) -> np.ma.masked_array:
@@ -81,6 +90,15 @@ class TcconData:
         elif flag_category == FlagCategory.FLAGGED:
             return self._get_flagged_data(varname)
 
+    @property
+    def default_category(self):
+        if FlagCategory.FLAG0 in self._allowed_flag_categories:
+            return FlagCategory.FLAG0
+        elif FlagCategory.ALL_DATA in self._allowed_flag_categories:
+            return FlagCategory.ALL_DATA
+        else:
+            raise DataError('This TcconData instance provides neither flag0 nor all data')
+
     def get_flag0_or_all_data(self, varname) -> np.ma.masked_array:
         if FlagCategory.FLAG0 in self._allowed_flag_categories:
             return self._get_flag0_data(varname)
@@ -89,21 +107,27 @@ class TcconData:
         else:
             raise DataError('This TcconData instance provides neither flag0 nor all data')
 
+    def _get_variable(self, varname) -> Union[np.ndarray, np.ma.masked_array]:
+        if varname == 'time':
+            return self.times
+        else:
+            return self.nc_dset[varname][tuple()]
+
     def _get_all_data(self, varname) -> np.ma.masked_array:
-        data = self.times if varname == 'time' else self.nc_dset[varname][:]
+        data = self._get_variable(varname)
         return data[self.all_idx]
 
     def _get_flag0_data(self, varname) -> np.ma.masked_array:
         if self.flag0_idx is None:
             raise DataError('This TcconData instance wraps a dataset that does not include flags - data cannot be subset to flag0')
-        data = self.times if varname == 'time' else self.nc_dset[varname][:]
+        data = self._get_variable(varname)
         return data[self.flag0_idx]
 
     def _get_flagged_data(self, varname) -> np.ma.masked_array:
         if self.flagged_idx is None:
             raise DataError('This TcconData instance wraps a dataset that does not include flags - data cannot be subset to flagged')
 
-        data = self.times if varname == 'time' else self.nc_dset[varname][:]
+        data = self._get_variable(varname)
         return data[self.flagged_idx]
 
     def get_label(self, flag_category: FlagCategory) -> str:
@@ -139,7 +163,8 @@ class TcconData:
 
     @staticmethod
     def nctime_to_pytime(nc_time_var: ncdf.Variable):
-        return ncdf.num2date(nc_time_var[:], units=nc_time_var.units, calendar=nc_time_var.calendar)
+        cftimes = ncdf.num2date(nc_time_var[:], units=nc_time_var.units, calendar=nc_time_var.calendar)
+        return np.array([datetime(*t.timetuple()[:6]) for t in cftimes])
 
 
 class Limits:
@@ -147,7 +172,10 @@ class Limits:
         with open(limits_file) as f:
             self.limits = tomli.load(f)
 
-    def get_limit(self, varname: str, data: TcconData, plot_kind: Optional[str] = None) -> Tuple[float, float]:
+    def get_limit(self, varname: str, data: Union[TcconData, Sequence[TcconData]], plot_kind: Optional[str] = None) -> Tuple[float, float]:
+        if isinstance(data, TcconData):
+            data = [data]
+
         # Prefer to get the limit from the limits file, and in the file, prefer plot-specific sections
         plot_section = self.limits.get(plot_kind, dict())
         plot_limits = self._get_var_from_section(varname, plot_section)
@@ -161,9 +189,13 @@ class Limits:
 
         # Finally try getting limits from the variable in the netCDF dataset
         # If those attributes aren't present, default to None (i.e. do not set limits)
-        vmin = getattr(data.nc_dset[varname], 'vmin', None)
-        vmax = getattr(data.nc_dset[varname], 'vmax', None)
-        return (vmin, vmax)
+        vmins = [getattr(d.nc_dset[varname], 'vmin', None) for d in data]
+        vmins = [v for v in vmins if vmins is not None]
+        vmaxes = [getattr(d.nc_dset[varname], 'vmax', None) for d in data]
+        vmaxes = [v for v in vmaxes if vmaxes is not None]
+        vmin = min(vmins) if len(vmins) > 0 else None
+        vmax = max(vmaxes) if len(vmaxes) > 0 else None
+        return vmin, vmax
 
     @staticmethod
     def _get_var_from_section(varname: str, section: dict):
@@ -189,7 +221,7 @@ class AbstractPlot(ABC):
         klass = cls._dispatch_plot_kind(kind)
         default_styles = full_config.get('style', dict()).get('default', dict())
         limits = Limits(limits_file)
-        return klass(default_style=default_styles.get(kind, dict()), limits=limits, **section)
+        return klass(default_style=default_styles, limits=limits, **section)
 
     @classmethod
     def _get_subclasses(cls):
@@ -248,7 +280,7 @@ class AbstractPlot(ABC):
 
         # Whether there is more data to plot depends on whether the user specified that we should only plot
         # flag0 data and whether this particular data cares
-        if not flag0_only and data.has_data_category(FlagCategory.FLAGGED):
+        if not flag0_only and data.has_flag_category(FlagCategory.FLAGGED):
             plot_args.append({
                 'data': self.get_plot_data(data, FlagCategory.FLAGGED),
                 'kws': self.get_plot_kws(data, FlagCategory.FLAGGED)
@@ -257,13 +289,11 @@ class AbstractPlot(ABC):
         return plot_args
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
-        fc_str = flag_category.value
-
         # Get the default style: style dictionaries are organized plot_kind -> flag category,
-        # but the default style already has been selected for the plot kind
         # Allow both to be missing, and just provide an empty dictionary as the default
-        default = self._default_style.get(fc_str, dict())
-        specific = data.styles.get(self.plot_kind, dict()).get(fc_str, dict())
+        style_fc = data.default_category if flag_category is None else flag_category
+        default = self._get_style(self._default_style, self.plot_kind, style_fc)
+        specific = self._get_style(data.styles, self.plot_kind, style_fc)
 
         # Override options in default with values in the data type-specific keywords
         kws = deepcopy(default)
@@ -273,18 +303,26 @@ class AbstractPlot(ABC):
         kws['label'] = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
         return kws
 
-    def make_plot(self, data: TcconData, flag0_only: bool = False, show_all: bool = False,
+    def _get_style(self, styles, plot_kind, flag_category: FlagCategory):
+        plot_styles = styles.get(plot_kind, dict())
+        if 'clone' in plot_styles:
+            return self._get_style(styles, plot_styles['clone'], flag_category)
+        else:
+            return plot_styles.get(flag_category.value, dict())
+
+    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
         fig, axs = self.setup_figure(data, show_all=show_all)
-        self._plot(data, axs=axs, flag0_only=flag0_only)
+        for d in data:
+            self._plot(d, axs=axs, flag0_only=flag0_only)
         fig_path = img_path / self.get_save_name()
         if tight:
             fig.tight_layout()
         fig.savefig(fig_path, dpi=300)
+        plt.close(fig)
         return fig_path
 
     def add_qc_lines(self, ax, axis: str, nc_var: ncdf.Variable):
-        #import pdb;pdb.set_trace()
         axline_fxn = ax.axvline if axis == 'x' else ax.axhline
         vmin = getattr(nc_var, 'vmin', None)
         if vmin:
@@ -294,7 +332,7 @@ class AbstractPlot(ABC):
             axline_fxn(vmax, linestyle='--', color='black')
 
     @abstractmethod
-    def setup_figure(self, data: TcconData, show_all: bool = False):
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False):
         pass
 
     @abstractmethod
@@ -337,26 +375,35 @@ class ScatterPlot(AbstractPlot):
     def get_save_name(self):
         return f'{self.yvar}_VS_{self.xvar}_scatter.png'
 
-    def setup_figure(self, data: TcconData, show_all=False):
+    def setup_figure(self, data: Sequence[TcconData], show_all=False):
+        # Find the main data to use for most things; if not present, default to the first data
+        main_data = [d for d in data if d.data_category == DataCategory.PRIMARY]
+        if len(main_data) > 0:
+            main_data = main_data[0]
+        else:
+            main_data = data[0]
+
         size = utils.cm2inch(self._width, self._height)
         fig, ax = plt.subplots(figsize=size)
         ax.grid(True)
 
-        xunits = getattr(data.nc_dset[self.xvar], 'units', None)
+        xunits = getattr(main_data.nc_dset[self.xvar], 'units', None)
         if xunits:
             ax.set_xlabel(f'{self.xvar} ({xunits})')
         else:
             ax.set_xlabel(f'{self.xvar}')
 
-        yunits = getattr(data.nc_dset[self.yvar], 'units', None)
+        yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
         if yunits:
             ax.set_ylabel(f'{self.yvar} ({yunits})')
         else:
             ax.set_ylabel(f'{self.yvar}')
 
         if not show_all:
-            ax.set_xlim(self._limits.get_limit(self.xvar, data, self.plot_kind))
-            ax.set_ylim(self._limits.get_limit(self.yvar, data, self.plot_kind))
+            # Reference data should not affect the limits
+            data_for_limits = [d for d in data if d.data_category != DataCategory.REFERENCE]
+            ax.set_xlim(self._limits.get_limit(self.xvar, data_for_limits, self.plot_kind))
+            ax.set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
 
         return fig, ax
 
@@ -365,6 +412,37 @@ class ScatterPlot(AbstractPlot):
         for args in plot_args:
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
+        self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
+        axs.legend()
+
+
+class TimeseriesPlot(ScatterPlot):
+    plot_kind = 'timeseries'
+
+    def __init__(self, yvar, default_style, limits: Limits, width=20, height=10, time_buffer_days=2):
+        super().__init__(xvar='time', yvar=yvar, default_style=default_style, limits=limits, width=width, height=height)
+        self._time_buffer_days = time_buffer_days
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False):
+        fig, ax = super(TimeseriesPlot, self).setup_figure(data=data, show_all=show_all)
+        # Override the default x axis limits to add some buffer
+        if not show_all:
+            data_for_limits = [d for d in data if d.data_category != DataCategory.REFERENCE]
+            xmin = min(np.min(d.get_data(self.xvar, FlagCategory.ALL_DATA)) for d in data_for_limits) - timedelta(days=self._time_buffer_days)
+            xmax = max(np.max(d.get_data(self.xvar, FlagCategory.ALL_DATA)) for d in data_for_limits) + timedelta(days=self._time_buffer_days)
+            ax.set_xlim(xmin, xmax)
+
+        # Also override the x-axis label
+        ax.set_xlabel('Time')
+        return fig, ax
+
+    def get_save_name(self):
+        return f'{self.yvar}_timeseries.png'
+
+    def _plot(self, data: TcconData, axs=None, flag0_only: bool = False):
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        for args in plot_args:
+            axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend()
 
