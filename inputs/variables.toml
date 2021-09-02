@@ -1,0 +1,250 @@
+# --------------- #
+# Plotting styles #
+# --------------- #
+[style.default.flag0]
+scatter = {color = "black", marker = "o", markersize = 1}
+
+[style.default.flagged]
+scatter = {color = "red", marker = "o", markersize = 1}
+
+[style.main.flag0]
+scatter = {color = "royalblue"}
+
+[style.main.flagged]
+scatter = {color = "red"}
+
+[style.ref.flag0]
+scatter = {color = "lightgray"}
+
+[style.context.flag0]
+scatter = {color = "royalblue"}
+
+[style.context.flagged]
+scatter = {color = "tomato"}
+
+# ------------- #
+# List of plots #
+# ------------- #
+
+[[plots]]
+kind = "rolling-timeseries"
+yvar = "xluft"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xluft"
+yvar_error = "xluft_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xco2"
+yvar_error = "xco2_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xch4"
+yvar_error = "xch4_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xco"
+yvar_error = "xco_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xh2o"
+yvar_error = "xh2o_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xhdo"
+yvar_error = "xhdo_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xhf"
+yvar_error = "xhf_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "xn2o"
+yvar_error = "xn2o_error"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_co2"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_lco2"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_wco2"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_hcl"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_o2"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_n2o"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_hf"
+
+[[plots]]
+kind = "timeseries"
+yvar = "vsf_h2o"
+
+[[plots]]
+kind = "timeseries"
+yvar = "fvsi"
+
+[[plots]]
+kind = "timeseries"
+yvar = "lse"
+
+[[plots]]
+kind = "timeseries"
+yvar = "lsu"
+
+[[plots]]
+kind = "timeseries"
+yvar = "solzen"
+
+[[plots]]
+kind = "timeseries"
+yvar = "o2_7885_fs"
+
+[[plots]]
+kind = "timeseries"
+yvar = "o2_7885_sg"
+
+[[plots]]
+kind = "timeseries"
+yvar = "zco2_4852a_zo"
+
+[[plots]]
+kind = "timeseries"
+yvar = "fco2_6154_cfampocl"
+
+[[plots]]
+kind = "timeseries"
+yvar = "fco2_6154_cfperiod"
+
+[[plots]]
+kind = "timeseries"
+yvar = "fco2_6154_cfphase"
+
+[[plots]]
+kind = "timeseries"
+yvar = "dip"
+
+[[plots]]
+kind = "timeseries"
+yvar = "mvd"
+
+[[plots]]
+kind = "timeseries"
+yvar = "o2_7885_cl"
+
+[[plots]]
+kind = "timeseries"
+yvar = "lco2_4852_cl"
+
+[[plots]]
+kind = "timeseries"
+yvar = "hout"
+
+[[plots]]
+kind = "timeseries"
+yvar = "tout"
+
+[[plots]]
+kind = "timeseries"
+yvar = "tmod"
+
+[[plots]]
+kind = "delta-timeseries"
+yvar1 = "tout"
+yvar2 = "tmod"
+
+[[plots]]
+kind = "timeseries"
+yvar = "h2o_dmf_out"
+
+[[plots]]
+kind = "timeseries"
+yvar = "h2o_dmf_mod"
+
+[[plots]]
+kind = "delta-timeseries"
+yvar1 = "h2o_dmf_out"
+yvar2 = "h2o_dmf_mod"
+
+[[plots]]
+kind = "timeseries"
+yvar = "pout"
+
+[[plots]]
+kind = "timeseries"
+yvar = "pmod"
+
+[[plots]]
+kind = "delta-timeseries"
+yvar1 = "pout"
+yvar2 = "pmod"
+
+[[plots]]
+kind = "timeseries"
+yvar = "wdir"
+
+[[plots]]
+kind = "timeseries"
+yvar = "wspd"
+
+[[plots]]
+kind = "scatter"
+xvar = "roll_median"
+yvar = "xluft"
+
+[[plots]]
+kind = "scatter"
+xvar = "solzen"
+yvar = "xco2"
+
+[[plots]]
+kind = "scatter"
+xvar = "solzen"
+yvar = "xluft"
+
+[[plots]]
+kind = "resampled-timeseries"
+freq = "D"
+op = "median"
+yvar = "xluft"
+
+[[plots]]
+kind = "resampled-timeseries"
+freq = "D"
+op = "median"
+yvar = "o2_7885_vsf_o2"
+
+[[plots]]
+kind = "resampled-timeseries"
+freq = "W"
+op = "median"
+yvar = "xluft"
+
+[[plots]]
+kind = "resampled-timeseries"
+freq = "W"
+op = "median"
+yvar = "o2_7885_vsf_o2"
+
