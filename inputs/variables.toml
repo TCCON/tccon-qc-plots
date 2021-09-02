@@ -1,26 +1,25 @@
 # --------------- #
 # Plotting styles #
 # --------------- #
-[style.default.flag0]
-scatter = {color = "black", marker = "o", markersize = 1}
+[style.default.scatter]
+all = {color = "black", marker = "o", markersize = 1}
+flag0 = {color = "black", marker = "o", markersize = 1}
+flagged = {color = "red", marker = "o", markersize = 1}
 
-[style.default.flagged]
-scatter = {color = "red", marker = "o", markersize = 1}
+[style.main.scatter]
+all = {color = "royalblue"}
+flag0 = {color = "royalblue"}
+flagged = {color = "red"}
 
-[style.main.flag0]
-scatter = {color = "royalblue"}
+[style.ref.scatter]
+all = {color = "lightgray"}
+flag0 = {color = "lightgray"}
 
-[style.main.flagged]
-scatter = {color = "red"}
+[style.context.scatter]
+all = {color = "royalblue"}
+flag0 = {color = "royalblue"}
+flagged = {color = "tomato"}
 
-[style.ref.flag0]
-scatter = {color = "lightgray"}
-
-[style.context.flag0]
-scatter = {color = "royalblue"}
-
-[style.context.flagged]
-scatter = {color = "tomato"}
 
 # ------------- #
 # List of plots #
@@ -29,6 +28,7 @@ scatter = {color = "tomato"}
 [[plots]]
 kind = "rolling-timeseries"
 yvar = "xluft"
+op = "median"
 
 [[plots]]
 kind = "timeseries"
@@ -208,11 +208,6 @@ yvar = "wdir"
 [[plots]]
 kind = "timeseries"
 yvar = "wspd"
-
-[[plots]]
-kind = "scatter"
-xvar = "roll_median"
-yvar = "xluft"
 
 [[plots]]
 kind = "scatter"
