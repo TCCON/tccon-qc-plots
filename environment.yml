@@ -9,6 +9,7 @@ dependencies:
   - numpy
   - pandas
   - pillow
+  - pip=21
   - pypdf2
   - python=3.7
   - scipy=1.6.1
