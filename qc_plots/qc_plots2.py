@@ -332,6 +332,18 @@ class AbstractPlot(ABC):
         if vmax:
             axline_fxn(vmax, linestyle='--', color='black')
 
+    @staticmethod
+    def _get_data_for_limits(data: Sequence[TcconData]) -> Sequence[TcconData]:
+        return [d for d in data if d.data_category != DataCategory.REFERENCE]
+
+    @staticmethod
+    def _get_main_data(data: Sequence[TcconData]) -> TcconData:
+        main_data = [d for d in data if d.data_category == DataCategory.PRIMARY]
+        if len(main_data) > 0:
+            return main_data[0]
+        else:
+            return data[0]
+
     @abstractmethod
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False):
         pass
@@ -378,11 +390,7 @@ class ScatterPlot(AbstractPlot):
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False):
         # Find the main data to use for most things; if not present, default to the first data
-        main_data = [d for d in data if d.data_category == DataCategory.PRIMARY]
-        if len(main_data) > 0:
-            main_data = main_data[0]
-        else:
-            main_data = data[0]
+        main_data = self._get_main_data(data)
 
         size = utils.cm2inch(self._width, self._height)
         fig, ax = plt.subplots(figsize=size)
@@ -402,7 +410,7 @@ class ScatterPlot(AbstractPlot):
 
         if not show_all:
             # Reference data should not affect the limits
-            data_for_limits = [d for d in data if d.data_category != DataCategory.REFERENCE]
+            data_for_limits = self._get_data_for_limits(data)
             ax.set_xlim(self._limits.get_limit(self.xvar, data_for_limits, self.plot_kind))
             ax.set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
 
@@ -426,9 +434,13 @@ class TimeseriesPlot(ScatterPlot):
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False):
         fig, ax = super(TimeseriesPlot, self).setup_figure(data=data, show_all=show_all)
+        self._format_time_axis(ax, data, show_all=show_all)
+        return fig, ax
+
+    def _format_time_axis(self, ax, data: Sequence[TcconData], show_all: bool = False):
         # Override the default x axis limits to add some buffer
         if not show_all:
-            data_for_limits = [d for d in data if d.data_category != DataCategory.REFERENCE]
+            data_for_limits = self._get_data_for_limits(data)
             xmin = min(np.min(d.get_data(self.xvar, FlagCategory.ALL_DATA)) for d in data_for_limits) - timedelta(days=self._time_buffer_days)
             xmax = max(np.max(d.get_data(self.xvar, FlagCategory.ALL_DATA)) for d in data_for_limits) + timedelta(days=self._time_buffer_days)
             ax.set_xlim(xmin, xmax)
@@ -441,7 +453,6 @@ class TimeseriesPlot(ScatterPlot):
         formatter = mdates.ConciseDateFormatter(locator)
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(formatter)
-        return fig, ax
 
     def get_save_name(self):
         return f'{self.yvar}_timeseries.png'
@@ -452,6 +463,81 @@ class TimeseriesPlot(ScatterPlot):
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend()
+
+
+class Timeseries2PanelPlot(TimeseriesPlot):
+    plot_kind = 'timeseries-2panel'
+
+    def __init__(self, yvar, yerror_var, default_style, limits: Limits, width=20, height=10, time_buffer_days=2):
+        super().__init__(yvar=yvar, default_style=default_style, limits=limits, width=width, height=height,
+                         time_buffer_days=time_buffer_days)
+        self.yerror_var = yerror_var
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False):
+        main_data = self._get_main_data(data)
+
+        size = utils.cm2inch(self._width, self._height)
+        fig, axs = plt.subplots(2, 1, figsize=size, sharex='all', gridspec_kw={'height_ratios': [1, 3]})
+        axs = {'main': axs[1], 'error': axs[0]}
+        for ax in axs.values():
+            ax.grid(True)
+
+        xunits = getattr(main_data.nc_dset[self.xvar], 'units', None)
+        if xunits:
+            axs['main'].set_xlabel(f'{self.xvar} ({xunits})')
+        else:
+            axs['main'].set_xlabel(f'{self.xvar}')
+
+        yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
+        if yunits:
+            axs['main'].set_ylabel(f'{self.yvar} ({yunits})')
+        else:
+            axs['main'].set_ylabel(f'{self.yvar}')
+
+        yerr_units = getattr(main_data.nc_dset[self.yerror_var], 'units', None)
+        if yerr_units:
+            axs['error'].set_ylabel(f'{self.yerror_var} ({yerr_units})')
+        else:
+            axs['error'].set_ylabel(f'{self.yerror_var}')
+
+        if not show_all:
+            # Reference data should not affect the limits
+            data_for_limits = self._get_data_for_limits(data)
+            axs['main'].set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
+            axs['error'].set_ylim(self._limits.get_limit(self.yerror_var, data_for_limits, self.plot_kind))
+
+        # For whatever reason, both axes need their format set for the ticks to behave properly
+        for ax in axs.values():
+            self._format_time_axis(ax, data, show_all=show_all)
+
+        # Remove the x-axis label from the top axes
+        axs['error'].set_xlabel('')
+
+        return fig, axs
+
+    def get_save_name(self):
+        return f'{self.yvar}_timeseries_two_panel.png'
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        if flag_category is None:
+            x = data.get_flag0_or_all_data(self.xvar)
+            y = data.get_flag0_or_all_data(self.yvar)
+            yerr = data.get_flag0_or_all_data(self.yerror_var)
+        else:
+            x = data.get_data(self.xvar, flag_category)
+            y = data.get_data(self.yvar, flag_category)
+            yerr = data.get_data(self.yerror_var, flag_category)
+        return {'x': x, 'y': y, 'yerr': yerr}
+
+    def _plot(self, data: TcconData, axs=None, flag0_only: bool = False):
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        for args in plot_args:
+            axs['main'].plot(args['data']['x'], args['data']['y'], **args['kws'])
+            axs['error'].plot(args['data']['x'], args['data']['yerr'], **args['kws'])
+
+        self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
+        self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
+        axs['main'].legend()
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=True):

@@ -33,6 +33,19 @@ clone = 'scatter'
 [style.context.timeseries]
 clone = 'scatter'
 
+
+[style.default.timeseries-2panel]
+clone = 'scatter'
+
+[style.main.timeseries-2panel]
+clone = 'scatter'
+
+[style.ref.timeseries-2panel]
+clone = 'scatter'
+
+[style.context.timeseries-2panel]
+clone = 'scatter'
+
 # ------------- #
 # List of plots #
 # ------------- #
@@ -45,42 +58,42 @@ op = "median"
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xluft"
-yvar_error = "xluft_error"
+yerror_var = "xluft_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xco2"
-yvar_error = "xco2_error"
+yerror_var = "xco2_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xch4"
-yvar_error = "xch4_error"
+yerror_var = "xch4_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xco"
-yvar_error = "xco_error"
+yerror_var = "xco_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xh2o"
-yvar_error = "xh2o_error"
+yerror_var = "xh2o_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xhdo"
-yvar_error = "xhdo_error"
+yerror_var = "xhdo_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xhf"
-yvar_error = "xhf_error"
+yerror_var = "xhf_error"
 
 [[plots]]
 kind = "timeseries-2panel"
 yvar = "xn2o"
-yvar_error = "xn2o_error"
+yerror_var = "xn2o_error"
 
 [[plots]]
 kind = "timeseries"
@@ -225,9 +238,21 @@ yvar = "wspd"
 kind = "scatter"
 xvar = "solzen"
 yvar = "xco2"
+resize_to_hexbin = true
+
+[[plots]]
+kind = "hexbin"
+xvar = "solzen"
+yvar = "xco2"
 
 [[plots]]
 kind = "scatter"
+xvar = "solzen"
+yvar = "xluft"
+resize_to_hexbin = true
+
+[[plots]]
+kind = "hexbin"
 xvar = "solzen"
 yvar = "xluft"
 
