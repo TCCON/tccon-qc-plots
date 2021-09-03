@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from contextlib import ExitStack
 import tomli
 
 from . import qc_plots2
@@ -24,11 +25,10 @@ def parse_args():
     return vars(parser.parse_args())
 
 
-def driver(nc_in, config, flag0=False, show_all=False, **kwargs):
+def driver(nc_in, config, flag0=False, show_all=False, output_dir=None, size='medium', quality='high', **kwargs):
     with open(config) as f:
         config = tomli.load(f)
 
-    #import pdb; pdb.set_trace()
     primary_styles = config.get('style', dict()).get('main', dict())
     data = [qc_plots2.TcconData(qc_plots2.DataCategory.PRIMARY, nc_in, styles=primary_styles)]
     plots = qc_plots2.setup_plots(config)
@@ -43,6 +43,8 @@ def driver(nc_in, config, flag0=False, show_all=False, **kwargs):
         else:
             print(' DONE')
             fig_paths.append(this_path)
+
+
 
 
 def main():

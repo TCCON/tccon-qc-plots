@@ -21,6 +21,15 @@ flag0 = {color = "royalblue"}
 flagged = {color = "tomato"}
 
 
+[style.main.hexbin]
+all = {cmap = "PuBu"}
+flag0 = {cmap = "PuBu"}
+
+[style.context.hexbin]
+all = {cmap = "Grays", fit_style = {color = "black"}}
+flag0 = {cmap = "Grays", fit_style = {color = "black"}}
+
+
 [style.default.timeseries]
 clone = 'scatter'
 
@@ -238,7 +247,6 @@ yvar = "wspd"
 kind = "scatter"
 xvar = "solzen"
 yvar = "xco2"
-resize_to_hexbin = true
 
 [[plots]]
 kind = "hexbin"
@@ -249,7 +257,6 @@ yvar = "xco2"
 kind = "scatter"
 xvar = "solzen"
 yvar = "xluft"
-resize_to_hexbin = true
 
 [[plots]]
 kind = "hexbin"

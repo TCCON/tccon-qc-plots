@@ -300,7 +300,7 @@ class AbstractPlot(ABC):
         kws = deepcopy(default)
         kws.update(specific)
 
-        # Since labels need some extra logic to format, add
+        # Since labels need some extra logic to format, add it separately here
         kws['label'] = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
         return kws
 
@@ -314,8 +314,8 @@ class AbstractPlot(ABC):
     def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
         fig, axs = self.setup_figure(data, show_all=show_all)
-        for d in data:
-            self._plot(d, axs=axs, flag0_only=flag0_only)
+        for i, d in enumerate(data):
+            self._plot(d, i, axs=axs, flag0_only=flag0_only)
         fig_path = img_path / self.get_save_name()
         if tight:
             fig.tight_layout()
@@ -345,7 +345,7 @@ class AbstractPlot(ABC):
             return data[0]
 
     @abstractmethod
-    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False):
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
         pass
 
     @abstractmethod
@@ -357,7 +357,7 @@ class AbstractPlot(ABC):
         pass
 
     @abstractmethod
-    def _plot(self, data: TcconData, axs=None, flag0_only: bool = False):
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         pass
 
 
@@ -388,12 +388,17 @@ class ScatterPlot(AbstractPlot):
     def get_save_name(self):
         return f'{self.yvar}_VS_{self.xvar}_scatter.png'
 
-    def setup_figure(self, data: Sequence[TcconData], show_all=False):
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
         # Find the main data to use for most things; if not present, default to the first data
         main_data = self._get_main_data(data)
 
-        size = utils.cm2inch(self._width, self._height)
-        fig, ax = plt.subplots(figsize=size)
+        if fig is None != axs is None:
+            raise TypeError('Must give both or neither of fig and axs')
+        elif fig is None and axs is None:
+            size = utils.cm2inch(self._width, self._height)
+            fig, ax = plt.subplots(figsize=size)
+        else:
+            ax = axs
         ax.grid(True)
 
         xunits = getattr(main_data.nc_dset[self.xvar], 'units', None)
@@ -416,13 +421,117 @@ class ScatterPlot(AbstractPlot):
 
         return fig, ax
 
-    def _plot(self, data: TcconData, axs=None, flag0_only: bool = False):
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         for args in plot_args:
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend()
+
+
+class HexbinPlot(ScatterPlot):
+    plot_kind = 'hexbin'
+
+    def __init__(self, xvar, yvar, default_style, limits: Limits, width=20, height=10,
+                 show_reference=False, show_context=True):
+        super().__init__(xvar=xvar, yvar=yvar, default_style=default_style, limits=limits, width=width, height=height)
+        self._show_ref = show_reference
+        self._show_context = show_context
+        self._caxes = []
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        size = utils.cm2inch(self._width, self._height)
+        # Figure out how many colorbars we need.  This depends on what data is present and whether
+        # the user told us to show it.
+        n_cb = len(data)
+        gridspec_kws = utils.colorbar_gridspec_kws(n_cb)
+        fig, axs = plt.subplots(1, 1 + n_cb, gridspec_kw=gridspec_kws, figsize=size)
+        self._caxes = axs[1:]
+        return super().setup_figure(data, show_all=show_all, fig=fig, axs=axs[0])
+
+    def get_save_name(self):
+        return f'{self.yvar}_VS_{self.xvar}_hexbin.png'
+
+    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+                  img_path: Path = DEFAULT_IMG_DIR, tight=True):
+        data_to_plot = self._get_data_to_plot(data)
+        return super().make_plot(data=data_to_plot, flag0_only=flag0_only, show_all=show_all, img_path=img_path,
+                                 tight=tight)
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        clabel = f'{data.nc_dset.long_name} ({data.data_category.value})'
+
+        if flag0_only:
+            fit_label = utils.preformat_string('Fit to flag==0 {cat} data\n{}', cat=data.data_category.value)
+        else:
+            fit_label = utils.preformat_string('Fit to all {cat} data\n{}', cat=data.data_category.value)
+
+        for args in plot_args:  # should only ever be 1 for hexbin, but will keep for loop for consistency
+            # Best to compute extent now, when we have the actual data to plot
+            args['kws'].setdefault('extent', self._compute_extent(data=data, **args['data']))
+
+            # Also need to extract the "fit_style" if present, because that isn't passed to hexbin
+            # Same for "legend_fontsize"
+            fit_style = args['kws'].pop('fit_style', dict())
+            legend_fontsize = args['kws'].pop('legend_fontsize', 7)  # use a small default so the text fits on the plot
+
+            h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
+            plt.colorbar(h, cax=self._caxes[idata], label=clabel)
+
+            # Will set defaults for the fit
+            fit_style.setdefault('linestyle', ':')
+            fit_style.setdefault('color', 'C1')
+            fit_style.setdefault('label', fit_label)
+            utils.add_linfit(axs, args['data']['x'], args['data']['y'], **fit_style)
+        self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
+        self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
+        axs.legend(fontsize=legend_fontsize)
+
+    def get_plot_args(self, data: TcconData, flag0_only: bool = False):
+        # For hexbin, this needs overridden. We only ever have one set of plot arguments,
+        # which either plots flag0 data or all data, depending on the user flags.
+        flag_category = FlagCategory.FLAG0 if flag0_only else FlagCategory.ALL_DATA
+        plot_args = [{
+            'data': self.get_plot_data(data, flag_category),
+            'kws': self.get_plot_kws(data, flag_category)
+        }]
+
+        return plot_args
+
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        kws = super().get_plot_kws(data, flag_category)
+        # Remove linestyle (from ScatterPlot) and label (from AbstractPlot). Neither are used for hexbin plots.
+        kws.pop('linestyle')
+        kws.pop('label')
+
+        return kws
+
+    def _get_data_to_plot(self, data: Sequence[TcconData]):
+        data_to_plot = []
+        for d in data:
+            if d.data_category == DataCategory.REFERENCE and self._show_ref:
+                data_to_plot.append(d)
+            elif d.data_category == DataCategory.CONTEXT and self._show_ref:
+                data_to_plot.append(d)
+            else:
+                data_to_plot.append(d)
+
+        return data_to_plot
+
+    def _compute_extent(self, x, y, data):
+        def get_limits_inner(varname, xy):
+            lims = self._limits.get_limit(varname, data)
+            if None in lims:
+                if isinstance(xy, np.ma.masked_array):
+                    xy = xy.filled(np.nan)
+                lims = [np.nanmin(xy), np.nanmax(xy)]
+            return lims
+
+        xmin, xmax = get_limits_inner(self.xvar, x)
+        ymin, ymax = get_limits_inner(self.yvar, y)
+        return xmin, xmax, ymin, ymax
 
 
 class TimeseriesPlot(ScatterPlot):
@@ -432,8 +541,8 @@ class TimeseriesPlot(ScatterPlot):
         super().__init__(xvar='time', yvar=yvar, default_style=default_style, limits=limits, width=width, height=height)
         self._time_buffer_days = time_buffer_days
 
-    def setup_figure(self, data: Sequence[TcconData], show_all=False):
-        fig, ax = super(TimeseriesPlot, self).setup_figure(data=data, show_all=show_all)
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, ax = super(TimeseriesPlot, self).setup_figure(data=data, show_all=show_all, fig=fig, axs=axs)
         self._format_time_axis(ax, data, show_all=show_all)
         return fig, ax
 
@@ -457,7 +566,7 @@ class TimeseriesPlot(ScatterPlot):
     def get_save_name(self):
         return f'{self.yvar}_timeseries.png'
 
-    def _plot(self, data: TcconData, axs=None, flag0_only: bool = False):
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         for args in plot_args:
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
@@ -529,7 +638,7 @@ class Timeseries2PanelPlot(TimeseriesPlot):
             yerr = data.get_data(self.yerror_var, flag_category)
         return {'x': x, 'y': y, 'yerr': yerr}
 
-    def _plot(self, data: TcconData, axs=None, flag0_only: bool = False):
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         for args in plot_args:
             axs['main'].plot(args['data']['x'], args['data']['y'], **args['kws'])
