@@ -247,9 +247,11 @@ yvar = "wspd"
 kind = "scatter"
 xvar = "solzen"
 yvar = "xco2"
+match_axes_size = "xco2-vs-sza-hexbin"
 
 [[plots]]
 kind = "hexbin"
+key = "xco2-vs-sza-hexbin"
 xvar = "solzen"
 yvar = "xco2"
 
@@ -257,9 +259,11 @@ yvar = "xco2"
 kind = "scatter"
 xvar = "solzen"
 yvar = "xluft"
+match_axes_size = "xluft-vs-sza-hexbin"
 
 [[plots]]
 kind = "hexbin"
+key = "xluft-vs-sza-hexbin"
 xvar = "solzen"
 yvar = "xluft"
 

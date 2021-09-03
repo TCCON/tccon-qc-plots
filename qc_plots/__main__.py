@@ -58,7 +58,6 @@ def driver(nc_in, config, flag0=False, show_all=False, output_dir='.', size='med
     with open(config) as f:
         config = tomli.load(f)
 
-    import pdb; pdb.set_trace()
     with ExitStack() as stack:
         primary_styles = config.get('style', dict()).get('main', dict())
         data = [stack.enter_context(qc_plots2.TcconData(qc_plots2.DataCategory.PRIMARY, nc_in, styles=primary_styles))]

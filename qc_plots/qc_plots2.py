@@ -17,6 +17,14 @@ from . import utils
 from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
 
+# TODO:
+#   - Default plots (flag bar graph, AM/PM plots)
+#   - Resampled timeseries
+#   - Rolling timeseries
+#   - Test reference file
+#   - Test context file
+#   - Document configuration options
+
 class FlagCategory(Enum):
     ALL_DATA = 'all'
     FLAG0 = 'flag0'
@@ -210,19 +218,23 @@ class Limits:
 class AbstractPlot(ABC):
     plot_kind = ''
 
-    def __init__(self, default_style, limits: Limits, width=20, height=10):
+    def __init__(self, other_plots, default_style, limits: Limits, key=None, width=20, height=10):
+        self.key = key
+        self._other_plots = other_plots
         self._default_style = default_style
         self._limits = limits
         self._width = width
         self._height = height
 
     @classmethod
-    def from_config_section(cls, section, full_config, limits_file):
+    def from_config_section(cls, section, other_plots, full_config, limits_file):
         kind = section.pop('kind')
         klass = cls._dispatch_plot_kind(kind)
         default_styles = full_config.get('style', dict()).get('default', dict())
         limits = Limits(limits_file)
-        return klass(default_style=default_styles, limits=limits, **section)
+        # other_plots must be a reference to the list of plots so that all plots know about each other,
+        # as a reference, it updates so that the first plots know about the last plots
+        return klass(other_plots=other_plots, default_style=default_styles, limits=limits, **section)
 
     @classmethod
     def _get_subclasses(cls):
@@ -271,6 +283,14 @@ class AbstractPlot(ABC):
             return available_classes[kind]
         except KeyError:
             raise PlotClassError(f'Plot kind "{kind}" not implemented') from None
+
+    def get_plot_by_key(self, key):
+        for plot in self._other_plots:
+            if plot.key is not None and plot.key == key:
+                return plot
+
+        raise KeyError(f'No plot with key {key} found')
+
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         # There will always be at least one thing to plot, whether it is all data or just flag0 data
@@ -364,10 +384,12 @@ class AbstractPlot(ABC):
 class ScatterPlot(AbstractPlot):
     plot_kind = 'scatter'
 
-    def __init__(self, xvar, yvar, default_style, limits: Limits, width=20, height=10):
-        super().__init__(default_style=default_style, limits=limits, width=width, height=height)
+    def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
+                 match_axes_size=None):
+        super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits, width=width, height=height)
         self.xvar = xvar
         self.yvar = yvar
+        self._match_axes_size = match_axes_size
 
     def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
         if flag_category is None:
@@ -392,11 +414,20 @@ class ScatterPlot(AbstractPlot):
         # Find the main data to use for most things; if not present, default to the first data
         main_data = self._get_main_data(data)
 
-        if fig is None != axs is None:
+        if (fig is None) != (axs is None):
             raise TypeError('Must give both or neither of fig and axs')
         elif fig is None and axs is None:
             size = utils.cm2inch(self._width, self._height)
-            fig, ax = plt.subplots(figsize=size)
+            if self._match_axes_size is not None:
+                plot_to_match = self.get_plot_by_key(self._match_axes_size)
+                gs_kws = plot_to_match.get_gridspec_kws(data)
+                ncol = len(gs_kws['width_ratios'])
+                fig, axs = plt.subplots(1, ncol, figsize=size, gridspec_kw=gs_kws)
+                for ax in axs[1:]:
+                    ax.axis('off')
+                ax = axs[0]
+            else:
+                fig, ax = plt.subplots(figsize=size)
         else:
             ax = axs
         ax.grid(True)
@@ -433,9 +464,10 @@ class ScatterPlot(AbstractPlot):
 class HexbinPlot(ScatterPlot):
     plot_kind = 'hexbin'
 
-    def __init__(self, xvar, yvar, default_style, limits: Limits, width=20, height=10,
+    def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
                  show_reference=False, show_context=True):
-        super().__init__(xvar=xvar, yvar=yvar, default_style=default_style, limits=limits, width=width, height=height)
+        super().__init__(other_plots=other_plots, xvar=xvar, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, width=width, height=height)
         self._show_ref = show_reference
         self._show_context = show_context
         self._caxes = []
@@ -445,7 +477,7 @@ class HexbinPlot(ScatterPlot):
         # Figure out how many colorbars we need.  This depends on what data is present and whether
         # the user told us to show it.
         n_cb = len(data)
-        gridspec_kws = utils.colorbar_gridspec_kws(n_cb)
+        gridspec_kws = self.get_gridspec_kws(data, data_prelimited=True)
         fig, axs = plt.subplots(1, 1 + n_cb, gridspec_kw=gridspec_kws, figsize=size)
         self._caxes = axs[1:]
         return super().setup_figure(data, show_all=show_all, fig=fig, axs=axs[0])
@@ -508,12 +540,19 @@ class HexbinPlot(ScatterPlot):
 
         return kws
 
+    def get_gridspec_kws(self, data, data_prelimited=False):
+        if data_prelimited:
+            n_cb = len(data)
+        else:
+            n_cb = len(self._get_data_to_plot(data))
+        return utils.colorbar_gridspec_kws(n_cb)
+
     def _get_data_to_plot(self, data: Sequence[TcconData]):
         data_to_plot = []
         for d in data:
             if d.data_category == DataCategory.REFERENCE and self._show_ref:
                 data_to_plot.append(d)
-            elif d.data_category == DataCategory.CONTEXT and self._show_ref:
+            elif d.data_category == DataCategory.CONTEXT and self._show_context:
                 data_to_plot.append(d)
             else:
                 data_to_plot.append(d)
@@ -537,8 +576,10 @@ class HexbinPlot(ScatterPlot):
 class TimeseriesPlot(ScatterPlot):
     plot_kind = 'timeseries'
 
-    def __init__(self, yvar, default_style, limits: Limits, width=20, height=10, time_buffer_days=2):
-        super().__init__(xvar='time', yvar=yvar, default_style=default_style, limits=limits, width=width, height=height)
+    def __init__(self, other_plots, yvar, default_style, limits: Limits, width=20, height=10, key=None,
+                 time_buffer_days=2):
+        super().__init__(other_plots=other_plots, xvar='time', yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, width=width, height=height)
         self._time_buffer_days = time_buffer_days
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -577,9 +618,10 @@ class TimeseriesPlot(ScatterPlot):
 class Timeseries2PanelPlot(TimeseriesPlot):
     plot_kind = 'timeseries-2panel'
 
-    def __init__(self, yvar, yerror_var, default_style, limits: Limits, width=20, height=10, time_buffer_days=2):
-        super().__init__(yvar=yvar, default_style=default_style, limits=limits, width=width, height=height,
-                         time_buffer_days=time_buffer_days)
+    def __init__(self, other_plots, yvar, yerror_var, default_style, limits: Limits, key=None, width=20, height=10,
+                 time_buffer_days=2):
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, width=width, height=height, time_buffer_days=time_buffer_days)
         self.yerror_var = yerror_var
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False):
@@ -654,7 +696,7 @@ def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=True):
     plots = []
     for section in plots_config:
         try:
-            plots.append( AbstractPlot.from_config_section(section, full_config=config, limits_file=limits_file) )
+            plots.append( AbstractPlot.from_config_section(section, plots, full_config=config, limits_file=limits_file) )
         except PlotClassError:
             if not allow_missing:
                 raise
