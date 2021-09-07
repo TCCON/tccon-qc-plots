@@ -5,6 +5,7 @@ from enum import Enum
 from fnmatch import fnmatch
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+from math import ceil
 import netCDF4 as ncdf
 import numpy as np
 import pandas as pd
@@ -18,7 +19,6 @@ from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
 
 # TODO:
-#   - Default plots (flag bar graph, AM/PM plots)
 #   - Resampled timeseries
 #   - Rolling timeseries
 #   - Test reference file
@@ -216,7 +216,7 @@ class Limits:
 
 
 class AbstractPlot(ABC):
-    plot_kind = ''
+    plot_kind = None
 
     def __init__(self, other_plots, default_style, limits: Limits, key=None, width=20, height=10):
         self.key = key
@@ -266,7 +266,9 @@ class AbstractPlot(ABC):
 
         def add_class(klass):
             key = klass.plot_kind
-            if key in available_classes:
+            if key is None:
+                return
+            elif key in available_classes:
                 conflicting_class = available_classes[key]
                 raise TypeError(
                     f'{klass.__name__} has a plot kind ("{key}") already in use by {conflicting_class.__name__}. '
@@ -323,12 +325,13 @@ class AbstractPlot(ABC):
         kws['label'] = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
         return kws
 
-    def _get_style(self, styles, plot_kind, flag_category: FlagCategory):
+    def _get_style(self, styles, plot_kind, sub_category: Union[FlagCategory, str]):
         plot_styles = styles.get(plot_kind, dict())
         if 'clone' in plot_styles:
-            return self._get_style(styles, plot_styles['clone'], flag_category)
+            return self._get_style(styles, plot_styles['clone'], sub_category)
         else:
-            return plot_styles.get(flag_category.value, dict())
+            sc = sub_category if isinstance(sub_category, str) else sub_category.value
+            return plot_styles.get(sc, dict())
 
     def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
@@ -341,6 +344,21 @@ class AbstractPlot(ABC):
         fig.savefig(fig_path, dpi=300)
         plt.close(fig)
         return fig_path
+    
+    def _make_or_check_fig_ax_args(self, fig, axs, nrow=1, ncol=1, ax_ndim=None, ax_size=None, ax_shape=None):
+        if (fig is None) != (axs is None):
+            raise TypeError('Must give both or neither of fig and axs')
+        elif fig is None and axs is None:
+            size = utils.cm2inch(self._width, self._height)
+            fig, axs = plt.subplots(nrow, ncol, figsize=size)
+        elif ax_ndim is not None and np.ndim(axs) != ax_ndim:
+            raise TypeError('axs must be a {} dimensional array'.format(ax_ndim))
+        elif ax_size is not None and np.size(axs) != ax_size:
+            raise TypeError('axs must be an array with {} elements'.format(ax_size))
+        elif ax_shape is not None and np.shape(axs) != ax_shape:
+            raise TypeError('axs must be an array with shape {}'.format(ax_shape))
+        
+        return fig, axs
 
     def add_qc_lines(self, ax, axis: str, nc_var: ncdf.Variable):
         axline_fxn = ax.axvline if axis == 'x' else ax.axhline
@@ -387,6 +405,28 @@ class AbstractPlot(ABC):
         pass
 
 
+class TimeseriesMixin:
+    def format_time_axis(self, ax, data: Sequence[TcconData], xvar='time', buffer_days=2, show_all: bool = False):
+        first_time = min(np.min(d.get_data(xvar, FlagCategory.ALL_DATA)) for d in data)
+        last_time = max(np.max(d.get_data(xvar, FlagCategory.ALL_DATA)) for d in data)
+        self.format_time_axis_custom_times(ax, first_time, last_time, buffer_days=buffer_days, show_all=show_all)
+
+    def format_time_axis_custom_times(self, ax, first_time, last_time, buffer_days=2, show_all: bool = False):
+        if not show_all:
+            xmin = first_time - timedelta(days=buffer_days)
+            xmax = last_time + timedelta(days=buffer_days)
+            ax.set_xlim(xmin, xmax)
+
+        # Also override the x-axis label
+        ax.set_xlabel('Time')
+
+        # And fix the ticks to look halfway decent
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+
+
 class FlagAnalysisPlot(AbstractPlot):
     plot_kind = 'flag-analysis'
 
@@ -396,13 +436,7 @@ class FlagAnalysisPlot(AbstractPlot):
         self.min_percent = min_percent
 
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
-        if (fig is None) != (axs is None):
-            raise TypeError('Must give both or neither of fig and axs')
-        elif fig is None and axs is None:
-            size = utils.cm2inch(self._width, self._height)
-            fig, axs = plt.subplots(2, 1, figsize=size)
-        elif np.size(axs) != 2 or np.ndim(axs) > 1:
-            raise TypeError('axs must be a two-element, one-dimensional array')
+        fig, axs = self._make_or_check_fig_ax_args(fig, axs, nrow=2, ncol=1, ax_ndim=1, ax_size=2)
 
         main_data = self._get_main_data(data)
         nspec = main_data.nc_dset['time'].size
@@ -498,6 +532,253 @@ class FlagAnalysisPlot(AbstractPlot):
         axs[0].legend(fontsize=legend_fontsize)
         # Plotting with Pandas automatically adds a legend, so we need to remove it from the second axes
         axs[1].get_legend().remove()
+        
+        
+class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
+    plot_kind = None
+    _title_prefix = ''
+    _freq_full_names = {'W': 'weekly', 'D': 'daily'}
+
+    def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
+                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
+        # NB: time_buffer works differently than in time series, because the plots are weirdplt
+        if any(len(r) != 2 for r in sza_ranges):
+            raise TypeError('Each SZA range must be a two-element sequence')
+        if any(r[1] < r[0] for r in sza_ranges):
+            raise TypeError('Each SZA range must have the smaller value first')
+        super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key, 
+                         width=width, height=height)
+        self.sza_ranges = sza_ranges
+        self.yvar = yvar
+        self.freq = freq
+        self.op = op
+        self._time_buffer_days = time_buffer_days
+        
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
+        fig, ax = self._make_or_check_fig_ax_args(fig, axs)
+
+        if self.freq in self._freq_full_names:
+            freq_name = self._freq_full_names[self.freq]
+            ax.set_title('{} ({} {}s)'.format(self._title_prefix, freq_name, self.op))
+        else:
+            ax.set_title('{} ({}s, frequency={})'.format(self._title_prefix, self.op, self.freq))
+
+        main_data = self._get_main_data(data)
+        yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
+        if yunits:
+            ax.set_ylabel(f'{self.yvar} ({yunits})')
+        else:
+            ax.set_ylabel(f'{self.yvar}')
+
+        data_for_limits = self._get_data_for_limits(data)
+        # We will override the x limits in the plotting function, since that knows the resampled frequency
+        self.format_time_axis(ax, data_for_limits, show_all=show_all)
+        if not show_all:
+            ax.set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
+        ax.grid(True)
+
+        return fig, ax
+
+    def get_plot_args(self, data: TcconData, flag0_only: bool = False):
+        if flag0_only:
+            return [{
+                'data': self.get_plot_data(data, FlagCategory.FLAG0),
+                'kws': self.get_plot_kws(data, FlagCategory.FLAG0),
+            }]
+        else:
+            return [{
+                'data': self.get_plot_data(data, FlagCategory.ALL_DATA),
+                'kws': self.get_plot_kws(data, FlagCategory.ALL_DATA)
+            }]
+
+    def get_plot_data(self, data: TcconData, flag_category: FlagCategory):
+        if flag_category is None:
+            data = {
+                'time': data.get_flag0_or_all_data('time'),
+                'solzen': data.get_flag0_or_all_data('solzen'),
+                'azim': data.get_flag0_or_all_data('azim'),
+                'y': data.get_flag0_or_all_data(self.yvar),
+            }
+        else:
+            data = {
+                'time': data.get_data('time', flag_category),
+                'solzen': data.get_data('solzen', flag_category),
+                'azim': data.get_data('azim', flag_category),
+                'y': data.get_data(self.yvar, flag_category)
+            }
+
+        return pd.DataFrame(data)
+
+
+class TimingErrorAMvsPM(TimingErrorAbstractPlot):
+    plot_kind = 'timing-error-am-pm'
+    _title_prefix = 'Timing check AM vs. PM'
+
+    def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
+                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
+        if len(sza_ranges) != 1:
+            raise TypeError('Exactly 1 SZA range must be provided')
+
+        super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
+                         width=width, height=height, sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op,
+                         time_buffer_days=time_buffer_days)
+
+    def get_save_name(self):
+        return 'timing_error_check_{y}_{freq}_{op}_AM_PM_sza_{ll}_to_{ul}_VS_time.png'.format(
+            y=self.yvar, freq=self.freq, op=self.op, ll=self.sza_ranges[0][0], ul=self.sza_ranges[0][1]
+        )
+
+    def _resample_data(self, df):
+        # Before we plot, we need to subset the data to the SZA range requested and to morning/evening
+        sza_min, sza_max = self.sza_ranges[0]
+        xx_sza = (df['solzen'] >= sza_min) & (df['solzen'] <= sza_max)
+        xx_am = df['azim'] <= 180
+        xx_pm = df['azim'] > 180
+
+        df_am = df.loc[xx_sza & xx_am, :].set_index('time').resample(self.freq)
+        df_am = getattr(df_am, self.op)()  # this gets the method named `self.op` and calls it
+        df_am.index.freq = None  # not sure if this needed, was added to try to deal with issues setting xlimits
+
+        df_pm = df.loc[xx_sza & xx_pm, :].set_index('time').resample(self.freq)
+        df_pm = getattr(df_pm, self.op)()
+        df_pm.index.freq = None
+
+        return df_am, df_pm
+
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        # AM/PM plots have their styles organized differently since they plot either flag0 or all data but not both
+        # The default style may be specified for "both" (AM and PM), or just AM/PM. The more specific styles override
+        # the less specific ones
+        default_both = self._get_style(self._default_style, self.plot_kind, 'both')
+        style_am = deepcopy(default_both)
+        style_am.update(self._get_style(self._default_style, self.plot_kind, 'am'))
+        style_pm = deepcopy(default_both)
+        style_pm.update(self._get_style(self._default_style, self.plot_kind, 'pm'))
+
+        specific_both = self._get_style(data.styles, self.plot_kind, 'both')
+
+        style_am.update(specific_both)
+        style_am.update(self._get_style(data.styles, self.plot_kind, 'am'))
+
+        style_pm.update(specific_both)
+        style_pm.update(self._get_style(data.styles, self.plot_kind, 'pm'))
+
+        # Since labels need some extra logic to format, add it separately here
+        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+        sza_min, sza_max = self.sza_ranges[0]
+        style_am.setdefault('label', r'{} AM SZA $\in [{}, {}]$'.format(data_label, sza_min, sza_max))
+        style_pm.setdefault('label', r'{} PM SZA $\in [{}, {}]$'.format(data_label, sza_min, sza_max))
+
+        return {'am': style_am, 'pm': style_pm}
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        assert len(plot_args) == 1
+        plot_args = plot_args[0]
+
+        df = plot_args['data']
+        morning_kws = plot_args['kws']['am']
+        afternoon_kws = plot_args['kws']['pm']
+
+        df_am, df_pm = self._resample_data(df)
+        xmin = min(df_am.index.min(), df_pm.index.min()) - pd.Timedelta(days=self._time_buffer_days)
+        xmax = max(df_am.index.max(), df_pm.index.max()) + pd.Timedelta(days=self._time_buffer_days)
+        axs.set_xlim(xmin, xmax)
+
+        # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
+        # Calling the matplotlib plotting methods seems to avoid that behavior
+        if df_am.shape[0] > 0:
+            axs.plot(df_am.index, df_am['y'], **morning_kws)
+        if df_pm.shape[0] > 0:
+            axs.plot(df_pm.index, df_pm['y'], **afternoon_kws)
+
+        axs.legend()
+
+
+class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
+    plot_kind = 'timing-error-szas'
+    _title_prefix = 'Timing check multiple SZAs'
+
+    def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
+                 am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
+
+        if am_or_pm.lower() not in {'am', 'pm'}:
+            raise TypeError('Allows values for am_or_pm are "am" or "pm" only')
+
+        super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
+                         width=width, height=height, sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op,
+                         time_buffer_days=time_buffer_days)
+        self.am_or_pm = am_or_pm
+
+    def get_save_name(self):
+        szas = '_'.join('{}to{}'.format(*r) for r in self.sza_ranges)
+        return 'timing_error_check_{y}_{freq}_{op}_AM_PM_sza_{szas}_VS_time.png'.format(
+            y=self.yvar, freq=self.freq, op=self.op, szas=szas
+        )
+
+    def _resample_data(self, df):
+        dfs_out = []
+        for sza_min, sza_max in self.sza_ranges:
+            # Before we plot, we need to subset the data to the SZA range requested and to morning/evening
+            xx_sza = (df['solzen'] >= sza_min) & (df['solzen'] <= sza_max)
+            xx_tod = df['azim'] <= 180 if self.am_or_pm == 'am' else df['azim'] > 180
+            sub_df = df.loc[xx_sza & xx_tod].set_index('time').resample(self.freq)
+            sub_df = getattr(sub_df, self.op)()   # this gets the method named `self.op` and calls it
+            dfs_out.append(sub_df)
+
+        return dfs_out
+
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> list:
+        # This
+        style = deepcopy(self._default_style.get(self.plot_kind, dict()))
+        style.update(data.styles.get(self.plot_kind, dict()))
+
+        # Now check that every style option is either a scalar value (which should be used for
+        # every SZA range) or a list/tuple with sufficient length. If it is too short, repeat it
+        nranges = len(self.sza_ranges)
+        for k, v in style.items():
+            if isinstance(v, (list, tuple)):
+                nrepeats = ceil(len(v) / nranges)
+                style[k] *= nrepeats
+            else:
+                style[k] = nranges * [v]
+
+        # Next set up the labels, using the data's label plus the SZA range
+        # If there was a label in the user specified options, it has already been
+        # duplicated
+        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+        label_spec = style.get('label', [r'{data} SZA $\in [{ll}, {ul}]$'] * nranges)
+        labels = [ls.format(data=data_label, ll=r[0], ul=r[1]) for ls, r in zip(label_spec, self.sza_ranges)]
+        style.setdefault('label', labels)
+
+        # Finally reorganize from a dict of lists to a list of dicts
+        styles_out = []
+        for i in range(len(self.sza_ranges)):
+            styles_out.append({k: v[i] for k, v in style.items()})
+
+        return styles_out
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        import pdb; pdb.set_trace()
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        assert len(plot_args) == 1
+        plot_args = plot_args[0]
+
+        dfs = self._resample_data(plot_args['data'])
+        kws = plot_args['kws']
+
+        xmin = min(df.index.min() for df in dfs) - pd.Timedelta(days=self._time_buffer_days)
+        xmax = max(df.index.max() for df in dfs) + pd.Timedelta(days=self._time_buffer_days)
+        axs.set_xlim(xmin, xmax)
+
+        # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
+        # Calling the matplotlib plotting methods seems to avoid that behavior
+        for df, kw in zip(dfs, kws):
+            if df.shape[0] == 0:
+                continue
+            axs.plot(df.index, df['y'], **kw)
+
+        axs.legend()
 
 
 class ScatterPlot(AbstractPlot):
@@ -692,7 +973,7 @@ class HexbinPlot(ScatterPlot):
         return xmin, xmax, ymin, ymax
 
 
-class TimeseriesPlot(ScatterPlot):
+class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
     plot_kind = 'timeseries'
 
     def __init__(self, other_plots, yvar, default_style, limits: Limits, width=20, height=10, key=None,
@@ -703,25 +984,10 @@ class TimeseriesPlot(ScatterPlot):
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
         fig, ax = super(TimeseriesPlot, self).setup_figure(data=data, show_all=show_all, fig=fig, axs=axs)
-        self._format_time_axis(ax, data, show_all=show_all)
+        # self._format_time_axis(ax, data, show_all=show_all)
+        self.format_time_axis(ax, self._get_data_for_limits(data), xvar=self.xvar, buffer_days=self._time_buffer_days,
+                              show_all=show_all)
         return fig, ax
-
-    def _format_time_axis(self, ax, data: Sequence[TcconData], show_all: bool = False):
-        # Override the default x axis limits to add some buffer
-        if not show_all:
-            data_for_limits = self._get_data_for_limits(data)
-            xmin = min(np.min(d.get_data(self.xvar, FlagCategory.ALL_DATA)) for d in data_for_limits) - timedelta(days=self._time_buffer_days)
-            xmax = max(np.max(d.get_data(self.xvar, FlagCategory.ALL_DATA)) for d in data_for_limits) + timedelta(days=self._time_buffer_days)
-            ax.set_xlim(xmin, xmax)
-
-        # Also override the x-axis label
-        ax.set_xlabel('Time')
-
-        # And fix the ticks to look halfway decent
-        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
-        formatter = mdates.ConciseDateFormatter(locator)
-        ax.xaxis.set_major_locator(locator)
-        ax.xaxis.set_major_formatter(formatter)
 
     def get_save_name(self):
         return f'{self.yvar}_timeseries.png'
@@ -778,7 +1044,8 @@ class Timeseries2PanelPlot(TimeseriesPlot):
 
         # For whatever reason, both axes need their format set for the ticks to behave properly
         for ax in axs.values():
-            self._format_time_axis(ax, data, show_all=show_all)
+            self.format_time_axis(ax, self._get_data_for_limits(data), xvar=self.xvar,
+                                  buffer_days=self._time_buffer_days, show_all=show_all)
 
         # Remove the x-axis label from the top axes
         axs['error'].set_xlabel('')
@@ -813,11 +1080,25 @@ class Timeseries2PanelPlot(TimeseriesPlot):
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=True):
     plots_config = config['plots']
     plots = []
-    for section in plots_config:
+    for iplot, section in enumerate(plots_config, start=1):
+        # the plot kind is popped from the section dictionary to allow it to be passed as keyword args
+        # so copy the kind here if needed for the error message
+        kind = section.get('kind', '?')
+
         try:
             plots.append( AbstractPlot.from_config_section(section, plots, full_config=config, limits_file=limits_file) )
         except PlotClassError:
             if not allow_missing:
                 raise
+        except TypeError as err:
+            msg = \
+"""Error setting up plot #{i} (kind = "{kind}"):
+
+    {err} 
+
+Check the section for this plot in the variables TOML file for missing required settings or other errors.""".format(
+    i=iplot, kind=kind, err=err
+)
+            raise TypeError(msg)
 
     return plots

@@ -55,12 +55,42 @@ clone = 'scatter'
 [style.context.timeseries-2panel]
 clone = 'scatter'
 
+
+[style.default.timing-error-am-pm]
+both = {marker = "o", markersize = 1, linestyle="none"}
+am = {color = "black"}
+pm = {color = "gray"}
+
+[style.main.timing-error-am-pm]
+am = {color = "royalblue"}
+pm = {color = "red"}
+
+
+[style.default.timing-error-szas]
+marker = "o"
+markersize = 1
+linestyle = "none"
+color = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive"]
+
+[style.main.timing-error-szas]
+color = ["royalblue", "red", "green"]
+
+
 # ------------- #
 # List of plots #
 # ------------- #
 
 [[plots]]
 kind = "flag-analysis"
+
+[[plots]]
+kind = "timing-error-am-pm"
+sza_ranges = [[70, 80]]
+
+[[plots]]
+kind = "timing-error-szas"
+am_or_pm = "pm"
+sza_ranges = [[70, 80], [40, 50], [20, 30]]
 
 [[plots]]
 kind = "rolling-timeseries"
