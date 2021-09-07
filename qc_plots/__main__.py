@@ -16,7 +16,13 @@ def images_to_pdf(fig_path_list, pdf_path: Path, size='medium', quality='high'):
     temp_pdf_path = pdf_path.with_suffix('.tmp.pdf')
 
     with ExitStack() as img_stack:
-        im_list = [img_stack.enter_context(Image.open(fig_path).convert('RGB')) for fig_path in fig_path_list]
+        im_list = []
+        for fig_path in fig_path_list:
+            try:
+                im_list.append(img_stack.enter_context(Image.open(fig_path).convert('RGB')))
+            except AttributeError:
+                # We get an attribute error if opening a file produces a None, since it can't seek
+                raise IOError('Error opening plot file "{}" for concatenation into the PDF'.format(fig_path))
         im_list = [im.resize((im.width // size_divisor, im.height // size_divisor)) for im in im_list]
         im_list[0].save(temp_pdf_path, "PDF", quality=quality, save_all=True, append_images=im_list[1:])
 

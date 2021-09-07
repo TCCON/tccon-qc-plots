@@ -23,7 +23,7 @@ from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 #   - Rolling timeseries
 #   - Test reference file
 #   - Test context file
-#   - Document configuration options
+#   - Write documentation for the configuration options
 
 class FlagCategory(Enum):
     ALL_DATA = 'all'
@@ -291,7 +291,6 @@ class AbstractPlot(ABC):
 
         raise KeyError(f'No plot with key {key} found')
 
-
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         # There will always be at least one thing to plot, whether it is all data or just flag0 data
         plot_args = [{
@@ -354,10 +353,17 @@ class AbstractPlot(ABC):
 
     @staticmethod
     def _get_data_for_limits(data: Sequence[TcconData]) -> Sequence[TcconData]:
+        """Get the subset of data instances to use when determining limits"""
+        # Omit the reference data - we usually want the limits to focus on the
+        # main data (+ context, if give)
         return [d for d in data if d.data_category != DataCategory.REFERENCE]
 
     @staticmethod
     def _get_main_data(data: Sequence[TcconData]) -> TcconData:
+        """Get the data instance that represents the main focus of this plot"""
+
+        # Try to find the PRIMARY data type; if that's missing, assume that the first
+        # data in the list is the one to use
         main_data = [d for d in data if d.data_category == DataCategory.PRIMARY]
         if len(main_data) > 0:
             return main_data[0]
@@ -379,6 +385,119 @@ class AbstractPlot(ABC):
     @abstractmethod
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         pass
+
+
+class FlagAnalysisPlot(AbstractPlot):
+    plot_kind = 'flag-analysis'
+
+    def __init__(self, other_plots, default_style, limits: Limits, key=None, min_percent=1.0, width=20, height=10):
+        super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
+                         width=width, height=height)
+        self.min_percent = min_percent
+
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
+        if (fig is None) != (axs is None):
+            raise TypeError('Must give both or neither of fig and axs')
+        elif fig is None and axs is None:
+            size = utils.cm2inch(self._width, self._height)
+            fig, axs = plt.subplots(2, 1, figsize=size)
+        elif np.size(axs) != 2 or np.ndim(axs) > 1:
+            raise TypeError('axs must be a two-element, one-dimensional array')
+
+        main_data = self._get_main_data(data)
+        nspec = main_data.nc_dset['time'].size
+        site_name = main_data.nc_dset.long_name
+        axs[0].set_title('{} total spectra from {}'.format(nspec, site_name))
+        axs[0].set_ylabel('Count')
+        axs[1].set_ylabel('Count (%)')
+
+        for elem in axs:
+            elem.axes.get_xaxis().set_visible(False)
+            elem.grid()
+
+        fig.suptitle('Summary of flags with count>1%')
+        return fig, axs
+
+    def get_plot_args(self, data: TcconData, flag0_only: bool = False):
+        # The flag summary plot always uses all data
+        plot_args = [{
+            'data': self.get_plot_data(data, FlagCategory.ALL_DATA),
+            'kws': self.get_plot_kws(data, FlagCategory.ALL_DATA)
+        }]
+
+        return plot_args
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        flag_df = pd.DataFrame()
+        flag_df_pcnt = pd.DataFrame()
+        flag_set = sorted(set(data.nc_dset['flag'][:]))
+        nspec = data.nc_dset['time'].size
+        nflag_tot = 0
+
+        print('Summary of flags:')
+        print('  #  Parameter              N_flag      %')
+
+        # For each unique flag, count the number and percent of spectra flagged by that variable
+        # Print all of them to the screen
+        for flag in sorted(flag_set):
+            if flag == 0:
+                continue
+            where_flagged = data.nc_dset['flag'][:] == flag
+            nflag = np.count_nonzero(where_flagged)
+            nflag_pcnt = 100 * nflag / nspec
+            nflag_tot += nflag
+            flagged_var_name = list(data.nc_dset['flagged_var_name'][where_flagged])[0]
+            print('{:>3}  {:<20} {:>6}   {:>8.3f}'.format(flag, flagged_var_name, nflag, nflag_pcnt))
+            flag_df[flagged_var_name] = pd.Series([nflag])
+            flag_df_pcnt[flagged_var_name] = pd.Series([nflag_pcnt])
+
+        print('     {:<20} {:>6}   {:>8.3f}'.format('TOTAL', nflag_tot, 100 * nflag_tot / nspec))
+        flag_df['Total'] = nflag_tot
+        flag_df_pcnt['Total'] = 100 * nflag_tot / nspec
+
+        # For the plot data, we only want to show flags that remove a significant percentage of
+        # data. The exact percentage is configurable.
+        drop_list = [var for var in flag_df_pcnt if flag_df_pcnt[var][0] < self.min_percent]
+        flag_df = flag_df.drop(columns=drop_list)
+        flag_df_pcnt = flag_df_pcnt.drop(columns=drop_list)
+
+        return {'counts': flag_df, 'percentages': flag_df_pcnt}
+
+    def get_save_name(self):
+        return 'flags_summary.png'
+
+    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+                  img_path: Path = DEFAULT_IMG_DIR, tight=True):
+        # The flag plot is only configured to show the current data
+        data = [self._get_main_data(data)]
+        return super().make_plot(data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        # There should only ever be one set of plot arguments, since we overrode the get_plot_args
+        # method to ensure that
+        plot_args = self.get_plot_args(data, flag0_only=False)
+        assert len(plot_args) == 1
+        plot_args = plot_args[0]
+
+        # The counts for the number of spectra flagged go on top, the percent flagged below
+        flag_df = plot_args['data']['counts']
+        flag_df_pcnt = plot_args['data']['percentages']
+        legend_fontsize = plot_args['kws'].pop('legend_fontsize', 7)
+        barplot = flag_df.plot(kind='bar', ax=axs[0], **plot_args['kws'])
+        barplot_pcnt = flag_df_pcnt.plot(kind='bar', ax=axs[1], **plot_args['kws'])
+
+        # Annotate the bars with the exact counts/percentages
+        formats = ['{:.0f}', '{:.2f}']
+        for i, curplot in enumerate([barplot, barplot_pcnt]):
+            for p in curplot.patches:
+                label = formats[i].format(p.get_height())
+                x = p.get_x() * 1.005
+                y = p.get_height() * 1.005
+                curplot.annotate(label, (x, y))
+
+        axs[0].legend(fontsize=legend_fontsize)
+        # Plotting with Pandas automatically adds a legend, so we need to remove it from the second axes
+        axs[1].get_legend().remove()
 
 
 class ScatterPlot(AbstractPlot):

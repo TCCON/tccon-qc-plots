@@ -60,6 +60,9 @@ clone = 'scatter'
 # ------------- #
 
 [[plots]]
+kind = "flag-analysis"
+
+[[plots]]
 kind = "rolling-timeseries"
 yvar = "xluft"
 op = "median"
