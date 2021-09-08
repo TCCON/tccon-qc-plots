@@ -85,7 +85,7 @@ kind = "flag-analysis"
 
 [[plots]]
 kind = "timing-error-am-pm"
-sza_ranges = [[70, 80]]
+sza_range = [70, 80]
 
 [[plots]]
 kind = "timing-error-szas"

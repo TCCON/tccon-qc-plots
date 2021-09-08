@@ -19,10 +19,12 @@ from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
 
 # TODO:
-#   - Resampled timeseries
+#   - Resampled timeseries (added functions to the TimeseriesMixin class, still needs implemented)
 #   - Rolling timeseries
+#       + Test that gap splitting works
 #   - Test reference file
 #   - Test context file
+#   - Test limits file works
 #   - Write documentation for the configuration options
 
 class FlagCategory(Enum):
@@ -322,7 +324,9 @@ class AbstractPlot(ABC):
         kws.update(specific)
 
         # Since labels need some extra logic to format, add it separately here
-        kws['label'] = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+        label_spec = kws.get('label', '{data}')
+        kws['label'] = label_spec.format(data=data_label)
         return kws
 
     def _get_style(self, styles, plot_kind, sub_category: Union[FlagCategory, str]):
@@ -411,7 +415,8 @@ class TimeseriesMixin:
         last_time = max(np.max(d.get_data(xvar, FlagCategory.ALL_DATA)) for d in data)
         self.format_time_axis_custom_times(ax, first_time, last_time, buffer_days=buffer_days, show_all=show_all)
 
-    def format_time_axis_custom_times(self, ax, first_time, last_time, buffer_days=2, show_all: bool = False):
+    @staticmethod
+    def format_time_axis_custom_times(ax, first_time, last_time, buffer_days=2, show_all: bool = False):
         if not show_all:
             xmin = first_time - timedelta(days=buffer_days)
             xmax = last_time + timedelta(days=buffer_days)
@@ -425,6 +430,76 @@ class TimeseriesMixin:
         formatter = mdates.ConciseDateFormatter(locator)
         ax.xaxis.set_major_locator(locator)
         ax.xaxis.set_major_formatter(formatter)
+
+    @staticmethod
+    def resample_data(times, yvals, freq, op):
+        df = pd.DataFrame({'y': yvals}, index=times)
+        df = getattr(df.resample(freq), op)()  # this retrieves the method named `op` and calls it
+        return df['y']
+
+    @classmethod
+    def roll_data(cls, xvals, yvals, npts, ops, gap, times=None):
+        """
+        Compute rolling statistics on data
+
+        Inputs:
+            - xvals: array of x values
+            - yvals: array of y values
+            - npts: number of points to use in the rolling window
+            - ops: name of an operation to do on the rolling windows, or a list of such names
+            - gap: a Pandas Timedelta string (https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html)
+              specifying the longest time difference between adjacent points that a rolling window can operate over.
+              That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+              gap will have the rolling operation applied to each separately.
+            - times: if `xvals` is not a time variable, then this input must be the times corresponding to the `xvals`
+              and `yvals`. It is used to split on gaps.
+
+        Outputs:
+            - outputs: If `ops` was a single string (e.g. "median"), then a single dataframe with "x", "y", and (if
+            `times` was given) "time" columns that has the result of the rolling operation. If `ops` was a list, then
+            the output is a list of dataframes, each one with the result of the corresponding operation.
+        """
+        if isinstance(ops, str):
+            ops = [ops]
+            return_single = True
+        else:
+            return_single = False
+
+        df = pd.DataFrame({'x': xvals, 'y': yvals})
+        if times is not None:
+            df['time'] = times
+        grouped_df = cls.split_by_gaps(df, gap, 'x' if times is None else 'time')
+        outputs = []
+        for op in ops:
+            results = []
+            for n, group in grouped_df:
+                result = getattr(group.rolling(npts, center=True, min_periods=1), op)()
+                results.append(result)
+            outputs.append(pd.concat(results))
+
+        if return_single:
+            return outputs[0]
+        else:
+            return outputs
+
+    @staticmethod
+    def split_by_gaps(df, gap, time):
+        """
+        Split an input dataframe with a datetime variable into a groupby dataframe with each group having data without gaps larger than the "gap" variable
+
+        Inputs:
+            - df: pandas dataframe with a datetime
+            - time: column name of the datetime variable
+            - gap: minimum gap length, a string compatible with pandas Timedelta https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html
+        Outputs:
+            - df_by_gaps: groupby object with each group having data without gaps larger than the "gap" variable
+        """
+
+        df['isgap'] = df[time].diff() > pd.Timedelta(gap)
+        df['isgap'] = df['isgap'].apply(lambda x: 1 if x else 0).cumsum()
+        df_by_gaps = df.groupby('isgap')
+
+        return df_by_gaps
 
 
 class FlagAnalysisPlot(AbstractPlot):
@@ -614,13 +689,13 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
     plot_kind = 'timing-error-am-pm'
     _title_prefix = 'Timing check AM vs. PM'
 
-    def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
+    def __init__(self, other_plots, default_style, sza_range: Sequence[float], limits: Limits,
                  yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
-        if len(sza_ranges) != 1:
-            raise TypeError('Exactly 1 SZA range must be provided')
+        if len(sza_range) != 2:
+            raise TypeError('SZA range must have two elements (min, max)')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
-                         width=width, height=height, sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op,
+                         width=width, height=height, sza_ranges=[sza_range], yvar=yvar, freq=freq, op=op,
                          time_buffer_days=time_buffer_days)
 
     def get_save_name(self):
@@ -666,8 +741,10 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         # Since labels need some extra logic to format, add it separately here
         data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
         sza_min, sza_max = self.sza_ranges[0]
-        style_am.setdefault('label', r'{} AM SZA $\in [{}, {}]$'.format(data_label, sza_min, sza_max))
-        style_pm.setdefault('label', r'{} PM SZA $\in [{}, {}]$'.format(data_label, sza_min, sza_max))
+        am_label_spec = style_am.get('label', r'{data} AM SZA $\in [{ll}, {ul}]$')
+        style_am['label'] = am_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
+        pm_label_spec = style_pm.get('label', r'{data} PM SZA $\in [{ll}, {ul}]$')
+        style_pm['label'] = pm_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
 
         return {'am': style_am, 'pm': style_pm}
 
@@ -749,7 +826,7 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
         data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
         label_spec = style.get('label', [r'{data} SZA $\in [{ll}, {ul}]$'] * nranges)
         labels = [ls.format(data=data_label, ll=r[0], ul=r[1]) for ls, r in zip(label_spec, self.sza_ranges)]
-        style.setdefault('label', labels)
+        style['label'] = labels
 
         # Finally reorganize from a dict of lists to a list of dicts
         styles_out = []
@@ -759,7 +836,6 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
         return styles_out
 
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
-        import pdb; pdb.set_trace()
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         assert len(plot_args) == 1
         plot_args = plot_args[0]

@@ -50,7 +50,7 @@ def parse_args():
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
     parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
     parser.add_argument('--config', default=DEFAULT_CONFIG, help='full path to the input .toml file for variables to plot')
-    parser.add_argument('--json-limits', default=DEFAULT_LIMITS, help='full path to the input json file for axis ranges')
+    parser.add_argument('--limits', default=DEFAULT_LIMITS, help='full path to the input .toml file for axis ranges')
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
     parser.add_argument('--roll-window',type=int,default=500,help='Size of the rolling window in number of spectra')
     parser.add_argument('--roll-gaps',default='20000 days',help='Minimum time interval for which the data will be split for rolling stats')
