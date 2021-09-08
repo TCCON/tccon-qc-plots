@@ -19,13 +19,15 @@ from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
 
 # TODO:
-#   - Resampled timeseries (added functions to the TimeseriesMixin class, still needs implemented)
 #   - Rolling timeseries
 #       + Test that gap splitting works
 #   - Test reference file
 #   - Test context file
 #   - Test limits file works
+#       + It did for the o2_7885_vsf_o2 resampled plots
+#   - Test uncertainty and multiple ops for the rolling plots
 #   - Write documentation for the configuration options
+#       + Need to add the resampled and rolling plots
 
 class FlagCategory(Enum):
     ALL_DATA = 'all'
@@ -473,7 +475,18 @@ class TimeseriesMixin:
         for op in ops:
             results = []
             for n, group in grouped_df:
-                result = getattr(group.rolling(npts, center=True, min_periods=1), op)()
+                if 'quantile' in op:
+                    q = float(op.replace('quantile', ''))
+                    result = group.rolling(npts, center=True, min_periods=1).quantile(q)
+                else:
+                    result = getattr(group.rolling(npts, center=True, min_periods=1), op)()
+
+                # Times cannot be computed with rolling operations, therefore we need to copy the
+                # time column back over
+                if times is not None and 'time' not in result.columns:
+                    result['time'] = group['time']
+                elif 'x' not in result.columns:
+                    result['x'] = group['x']
                 results.append(result)
             outputs.append(pd.concat(results))
 
@@ -1151,6 +1164,130 @@ class Timeseries2PanelPlot(TimeseriesPlot):
         self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
         self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
         axs['main'].legend()
+
+
+class ResampledTimeseriesPlot(TimeseriesPlot):
+    plot_kind = 'resampled-timeseries'
+
+    def __init__(self, other_plots, yvar, freq, op, default_style, limits: Limits, key=None, width=20, height=10,
+                 time_buffer_days=2):
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, width=width, height=height, time_buffer_days=time_buffer_days)
+        self.freq = freq
+        self.op = op
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        if flag_category is None:
+            x = data.get_flag0_or_all_data(self.xvar)
+            y = data.get_flag0_or_all_data(self.yvar)
+        else:
+            x = data.get_data(self.xvar, flag_category)
+            y = data.get_data(self.yvar, flag_category)
+
+        # Now we need to resample the data to the specified frequency before returning it
+        y_series = self.resample_data(x, y, self.freq, self.op)
+        return {'x': y_series.index, 'y': y_series.to_numpy()}
+
+    def get_save_name(self):
+        return f'{self.yvar}_{self.freq}_{self.op}_timeseries.png'
+
+
+class RollingTimeseriesPlot(TimeseriesPlot):
+    plot_kind = 'rolling-timeseries'
+
+    def __init__(self, other_plots, yvar, ops, default_style, limits: Limits, key=None, width=20, height=10,
+                 gap='20000 days', rolling_window=500, uncertainty=False, data_category=None, time_buffer_days=2):
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, width=width, height=height, time_buffer_days=time_buffer_days)
+        self.ops = [ops] if isinstance(ops, str) else ops
+        self.gap = gap
+        self.rolling_window = rolling_window
+        self.uncertainty = uncertainty
+        self.data_category = None if data_category is None else FlagCategory(data_category)
+
+    def make_plot(self, *args, **kwargs):
+        return super().make_plot(*args, **kwargs)
+
+    def get_plot_args(self, data: TcconData, flag0_only: bool = False):
+        def roll(x, y, o):
+            tmp = self.roll_data(x, y, npts=self.rolling_window, ops=o, gap=self.gap)
+            return {'x': tmp['x'].to_numpy(), 'y': tmp['y'].to_numpy()}
+
+        flag_category = self._get_flag_category(flag0_only)
+        raw_data_vals = self.get_plot_data(data, flag_category)
+        raw_data_kws = self.get_plot_kws(data, flag_category)
+
+        args = [{'data': raw_data_vals, 'kws': raw_data_kws}]
+        for op in self.ops:
+            op_vals = roll(raw_data_vals['x'], raw_data_vals['y'], op)
+            op_kws = self.get_plot_kws(data, flag_category, op=op)
+            args.append({'data': op_vals, 'kws': op_kws})
+
+            if self.uncertainty and op == 'mean':
+                dy = roll(raw_data_vals['x'], raw_data_vals['y'], 'std')['y']
+                unc_kws = self.get_plot_kws(data, flag_category, op='std')
+                unc_kws['label'] = 'Uncertainty on mean'
+                args.append({'data': {'x': op_vals['x'], 'y': op_vals['y'] + dy}, 'kws': deepcopy(unc_kws)})
+                unc_kws['label'] = ''  # don't show the label for the second series
+                args.append({'data': {'x': op_vals['x'], 'y': op_vals['y'] - dy}, 'kws': unc_kws})
+            elif self.uncertainty and op == 'median':
+                uq = roll(raw_data_vals['x'], raw_data_vals['y'], 'quantile0.75')
+                lq = roll(raw_data_vals['x'], raw_data_vals['y'], 'quantile0.25')
+                unc_kws = self.get_plot_kws(data, flag_category, 'quantile')
+                unc_kws['label'] = 'Uncertainty on median (interquartile range)'
+                args.append({'data': uq, 'kws': deepcopy(unc_kws)})
+                unc_kws['label'] = ''
+                args.append({'data': lq, 'kws': deepcopy(unc_kws)})
+
+        return args
+
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], op=None) -> dict:
+        # Get the default style: style dictionaries are organized plot_kind -> flag category,
+        # Allow both to be missing, and just provide an empty dictionary as the default
+        if op is not None:
+            style_fc = op
+        elif flag_category is None:
+            style_fc = data.default_category
+        else:
+            style_fc = flag_category
+
+        default = self._get_style(self._default_style, self.plot_kind, style_fc)
+        specific = self._get_style(data.styles, self.plot_kind, style_fc)
+        if 'quantile' in style_fc:
+            # Quantile operations need to include what quantile to calculate, e.g. "quantile0.75",
+            # but the user may have just specified a generic "quantile" style, so if we didn't
+            # find styles for the specific quantile to be calculated, try for the generic one.
+            default = default if len(default) > 0 else self._get_style(self._default_style, self.plot_kind, 'quantile')
+            specific = specific if len(specific) > 0 else self._get_style(data.styles, self.plot_kind, 'quantile')
+
+        # Override options in default with values in the data type-specific keywords
+        kws = deepcopy(default)
+        kws.update(specific)
+
+        # No connecting lines by default
+        kws.setdefault('linestyle', 'none')
+
+        # Since labels need some extra logic to format, add it separately here
+        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+        label_spec = kws.get('label', '{data}' if op is None else '{op} {data}')
+        kws['label'] = label_spec.format(data=data_label, op=op)
+        return kws
+
+    def _get_flag_category(self, flag0_only: bool = False):
+        # Which subset of data to use depends on several things:
+        #   * If the plot options included one, then use that
+        #   * If the plot options did not include one, but --flag0 was set, only use flag0 data
+        #   * Otherwise, use the default for this data type
+        if self.data_category is None and not flag0_only:
+            return None
+        elif self.data_category is None and flag0_only:
+            return FlagCategory.FLAG0
+        else:
+            return self.data_category
+
+    def get_save_name(self):
+        ops = '+'.join(self.ops)
+        return f'{self.yvar}_rolling{self.rolling_window}_{ops}_timeseries.png'
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=True):

@@ -56,6 +56,41 @@ clone = 'scatter'
 clone = 'scatter'
 
 
+[style.default.resampled-timeseries]
+clone = 'scatter'
+
+[style.main.resampled-timeseries]
+clone = 'scatter'
+
+[style.ref.resampled-timeseries]
+clone = 'scatter'
+
+[style.context.resampled-timeseries]
+clone = 'scatter'
+
+
+[style.default.rolling-timeseries]
+all = {marker = "o", markersize = 1, color="gray"}
+flag0 = {marker = "o", markersize = 1, color="gray"}
+flagged = {marker = "o", markersize = 1, color="red"}
+median = {marker = "o", markersize = 1, color="black"}
+mean = {marker = "o", markersize = 1, color="hotpink"}
+std = {marker = "o", markersize = 1, color="green"}
+quantile = {marker = "o", markersize = 1, color="green"}
+
+[style.main.rolling-timeseries]
+all = {color = "royalblue"}
+flag0 = {color = "royalblue"}
+
+[style.ref.rolling-timeseries]
+all = {color = "lightgray"}
+flag0 = {color = "lightgray"}
+
+[style.context.rolling-timeseries]
+all = {color = "deepskyblue"}
+flag0 = {color = "deepskyblue"}
+
+
 [style.default.timing-error-am-pm]
 both = {marker = "o", markersize = 1, linestyle="none"}
 am = {color = "black"}
@@ -95,7 +130,7 @@ sza_ranges = [[70, 80], [40, 50], [20, 30]]
 [[plots]]
 kind = "rolling-timeseries"
 yvar = "xluft"
-op = "median"
+ops = "median"
 
 [[plots]]
 kind = "timeseries-2panel"

@@ -6,3 +6,5 @@ scatter,"xvar, yvar","match_axes_size","MPL ``plot`` kws",Yes
 hexbin,"xvar, yvar", "show_reference, show_context", "MPL ``hexbin`` kws", Yes
 timeseries,"yvar","time_buffer_days","MPL ``plot`` kws",Yes
 timeseries-2panel,"yvar, yerror_var", "time_buffer_days", "MPL ``plot`` kws", Yes
+resampled-timeseries,"yvar, freq, op", "time_buffer_days", "MPL ``plot`` kws", Yes
+rolling-timeseries,"yvar, ops","gap, rolling_window, uncertainty, data_category, time_buffer_days", "MPL ``plot`` kws", Yes

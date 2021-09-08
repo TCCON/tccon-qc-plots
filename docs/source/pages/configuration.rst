@@ -300,7 +300,7 @@ A plot of one variable versus another.
 
 A scatter plot's style subsection may have the keys ``all``, ``flag0``, or ``flagged``. These provide the style
 keyword arguments for plotting all data, ``flag == 0`` data, and ``flag > 0`` data, respectively. Allowed keywords
-are those for :func:`matplotlib.pyplot.plot`. If ``linestyle`` is not provided, is defaults to "none".
+are those for :func:`matplotlib.pyplot.plot`. If ``linestyle`` is not provided, it defaults to "none".
 
 .. note::
    Do not use the ``ls`` shorthand for ``linestyle``, since ``linestyle`` is always set.
@@ -380,6 +380,86 @@ and its error.
 
 Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`. Both panels will use the same style for
 the same data subset.
+
+resampled-timeseries
+~~~~~~~~~~~~~~~~~~~~
+
+Similar to "timeseries" plots, except that the data is broken down into chunks of a specified length of time and
+summarized as a mean/median/etc.
+
+**Required keys**
+
+* ``yvar``: the variable from the netCDF file(s) to plot on the y-axis
+* ``freq``: the temporal frequency to bin the data to. Any `Pandas frequency interval <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_ is supported
+* ``op``: what operation to use in the binning, usually "median" or "mean", but any operation supported on a Pandas resampled data frame is supported.
+
+**Optional keys**
+
+* ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+
+**Style**
+
+Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`.
+
+rolling-timeseries
+~~~~~~~~~~~~~~~~~~
+
+Similar to "timeseries" plots, but in addition to plotting the raw data, running mean/median/etc. series are
+overplotted.
+
+**Required keys**
+
+* ``yvar``: the variable from the netCDF file(s) to plot on the y-axis
+* ``ops``: what operation(s) to use for the rolling, usually "median" or "mean", but any operation supported on a Pandas
+  rolling data frame is supported. This can be either a string for a single operation, or a list of strings to plot
+  multiple rolled series. A special case is the "quantile" operation, this must include the quantile value to calculate,
+  e.g. "quantile0.75" to compute the quantile with ``q = 0.75``.
+
+**Optional keys**
+
+* ``gap`` (default = ``"20000 days"``): this specified a gap in time that the rolling operation will not cross. This can
+  be any string recognized by `Pandas timedelta <https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html>`_.
+  If there is a gap in the data longer than this duration, the data on either side will have the rolling operation
+  applied separately. The default of "20000 days" (~50 years) is set to effectively disable this behavior by default.
+* ``rolling_window`` (default = ``500``): the number of points to use in the rolling window.
+* ``uncertainty`` (default = ``false``): set this to ``true`` to plot uncertainty ranges for mean or median operations;
+  means will use 1-sigma standard deviation and medians the upper and lower quartiles.
+* ``data_category`` (default = ``None``): which subset of the ``yvar`` data to use, both when plotting the raw data and
+  when computing the rolling operation(s). The default behavior is to use the normal subset for a given data type, or
+  ``flag == 0`` data if the ``--flag0`` command line argument is set. Passing one of the strings "all", "flag0", or
+  "flagged" will force the use of that subset (this may result in errors if one of the data files does not have the
+  "flag" variable, which is required to figure out the latter two subsets).
+
+**Style**
+
+Style configuration is similar to that for :ref:`scatter plots <PT_scatter>`, in that the keys within a
+``[style.<data type>.rolling-timeseries]`` section can be the data subsets (``all``, ``flag0``, ``flagged``),
+each of which has a dictionary of style arguments as its value. However, the rolling operations can each
+have their own style, as additional subsection keys (e.g. ``mean``, ``median``, etc.). Quantile operations
+will prefer to use a style for the specific quantile being calculated (if one is available) but will fall
+back on a provided generic ``quantile`` style if not.
+
+.. note::
+   The fallback to a generic ``quantile`` style is done on a per-data type basis. That is, if your "main"
+   data type section has both a ``quantile`` and ``quantile0.75`` style and your "default" section has only
+   a ``quantile`` section, then when using the "quantile0.75" operation, the final style will use the
+   "main" section's ``quantile0.75`` style plus the default section's ``quantile`` style. The "main" section's
+   ``quantile`` style is entirely ignored.
+
+Like scatter plots, if you provide a ``label`` as one of the style keywords, it will be passed through a
+``format`` call. The ``{data}`` substring will still be replaced by the description of the data (site name
++ data subset). In addition, the ``{op}`` substring will be replaced with the rolling operation.
+
+.. note::
+   If you use ``{op}`` in a label for regular data (e.g. ``all``, ``flag0``, ``flagged``),
+   it will get replaced by the string "None".
+
+If you provide styles for ``std`` and ``quantile``, those styles will be used if plotting uncertainty
+ranges for mean and median operations, respectively.
+
+If the final style (composed from data-specific + default styles) does not include a linestyle, then
+the linestyle value is set to "none", as for scatter plots. Avoid using the "ls" shorthand for "linestyle"
+since "linestyle" will always be set if absent.
 
 Limits file
 -----------
