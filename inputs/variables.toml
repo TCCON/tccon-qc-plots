@@ -4,7 +4,9 @@
 [style.default.scatter]
 all = {color = "black", marker = "o", markersize = 1}
 flag0 = {color = "black", marker = "o", markersize = 1}
-flagged = {color = "red", marker = "o", markersize = 1}
+# zorder moves certain points in front/behind others. The default zorder for line series is 2, so setting
+# it to < 2 for the flagged data ensures that flagged values are behind the flag0 values.
+flagged = {color = "red", marker = "o", markersize = 1, zorder = 1.9}
 
 [style.main.scatter]
 all = {color = "royalblue"}
@@ -22,12 +24,12 @@ flagged = {color = "tomato"}
 
 
 [style.main.hexbin]
-all = {cmap = "PuBu"}
-flag0 = {cmap = "PuBu"}
+all = {cmap = "PuBu", bins = "log", mincnt = 1}
+flag0 = {cmap = "PuBu", bins = "log", mincnt = 1}
 
 [style.context.hexbin]
-all = {cmap = "Grays", fit_style = {color = "black"}}
-flag0 = {cmap = "Grays", fit_style = {color = "black"}}
+all = {cmap = "Grays", bins = "log", mincnt = 1, fit_style = {color = "black"}}
+flag0 = {cmap = "Grays", bins = "log", mincnt = 1, fit_style = {color = "black"}}
 
 
 [style.default.timeseries]
@@ -322,6 +324,8 @@ kind = "hexbin"
 key = "xco2-vs-sza-hexbin"
 xvar = "solzen"
 yvar = "xco2"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
 
 [[plots]]
 kind = "scatter"
@@ -334,6 +338,8 @@ kind = "hexbin"
 key = "xluft-vs-sza-hexbin"
 xvar = "solzen"
 yvar = "xluft"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
 
 [[plots]]
 kind = "resampled-timeseries"

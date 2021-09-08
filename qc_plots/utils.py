@@ -32,7 +32,7 @@ def preformat_string(s, **frozen_kwargs):
     return PreformattedString(s)
 
 
-def add_linfit(ax, x, y, yerr=None, label='{}', **style):
+def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
     """
     Add a line with the results of a linear fit to y = a*x + b
     Also shows the squared pearson correlation coefficient
@@ -62,7 +62,7 @@ def add_linfit(ax, x, y, yerr=None, label='{}', **style):
     fitstr = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(
         fit[0], np.sqrt(cov[0][0]), fit[1], np.sqrt(cov[1][1]), R ** 2
     )
-    label = label.format(fitstr)
+    label = label.format(fit=fitstr)
 
     # plot line fits
     ax.plot(x, lin_model(x, fit[0], fit[1]), label=label, **style)

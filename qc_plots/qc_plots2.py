@@ -19,15 +19,14 @@ from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
 
 # TODO:
-#   - Rolling timeseries
+#   - [x] Rolling timeseries
 #       + Test that gap splitting works
+#   - Do a 1:1 comparison with the old code
 #   - Test reference file
 #   - Test context file
 #   - Test limits file works
 #       + It did for the o2_7885_vsf_o2 resampled plots
 #   - Test uncertainty and multiple ops for the rolling plots
-#   - Write documentation for the configuration options
-#       + Need to add the resampled and rolling plots
 
 class FlagCategory(Enum):
     ALL_DATA = 'all'
@@ -369,10 +368,10 @@ class AbstractPlot(ABC):
     def add_qc_lines(self, ax, axis: str, nc_var: ncdf.Variable):
         axline_fxn = ax.axvline if axis == 'x' else ax.axhline
         vmin = getattr(nc_var, 'vmin', None)
-        if vmin:
+        if vmin is not None:
             axline_fxn(vmin, linestyle='--', color='black')
         vmax = getattr(nc_var, 'vmax', None)
-        if vmax:
+        if vmax is not None:
             axline_fxn(vmax, linestyle='--', color='black')
 
     @staticmethod
@@ -393,6 +392,27 @@ class AbstractPlot(ABC):
             return main_data[0]
         else:
             return data[0]
+
+    @staticmethod
+    def _get_flag_category(flag_category, flag0_only: bool = False):
+        # Which subset of data to use depends on several things:
+        #   * If the plot options included one, then use that
+        #   * If the plot options did not include one, but --flag0 was set, only use flag0 data
+        #   * Otherwise, use the default for this data type
+        if flag_category is None and not flag0_only:
+            return None
+        elif flag_category is None and flag0_only:
+            return FlagCategory.FLAG0
+        else:
+            return flag_category
+
+    def _get_plot_args_mono(self, data: TcconData, flag_category: Optional[FlagCategory], flag0_only: bool = False):
+        flag_category = self._get_flag_category(flag_category, flag0_only)
+        plot_args = [{
+            'data': self.get_plot_data(data, flag_category),
+            'kws': self.get_plot_kws(data, flag_category)
+        }]
+        return plot_args
 
     @abstractmethod
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
@@ -556,7 +576,9 @@ class FlagAnalysisPlot(AbstractPlot):
         nspec = data.nc_dset['time'].size
         nflag_tot = 0
 
-        print('Summary of flags:')
+        # Need the leading newline because the plot progress message omits its trailing newline to
+        # allow printing "DONE"
+        print('\nSummary of flags:')
         print('  #  Parameter              N_flag      %')
 
         # For each unique flag, count the number and percent of spectra flagged by that variable
@@ -874,10 +896,11 @@ class ScatterPlot(AbstractPlot):
     plot_kind = 'scatter'
 
     def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
-                 match_axes_size=None):
+                 fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits, width=width, height=height)
         self.xvar = xvar
         self.yvar = yvar
+        self._fit_flag_category = None if fit_flag_category is None else FlagCategory(fit_flag_category)
         self._match_axes_size = match_axes_size
 
     def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
@@ -954,9 +977,10 @@ class HexbinPlot(ScatterPlot):
     plot_kind = 'hexbin'
 
     def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
-                 show_reference=False, show_context=True):
+                 hexbin_flag_category=None, fit_flag_category=None, show_reference=False, show_context=True):
         super().__init__(other_plots=other_plots, xvar=xvar, yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height)
+                         fit_flag_category=fit_flag_category, key=key, width=width, height=height)
+        self._hexbin_flag_category = None if hexbin_flag_category is None else FlagCategory(hexbin_flag_category)
         self._show_ref = show_reference
         self._show_context = show_context
         self._caxes = []
@@ -982,44 +1006,47 @@ class HexbinPlot(ScatterPlot):
 
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
-        clabel = f'{data.nc_dset.long_name} ({data.data_category.value})'
+        flag_cat = self._get_flag_category(self._hexbin_flag_category, flag0_only)
+        clabel = f'{data.nc_dset.long_name} ({flag_cat.value} {data.data_category.value})'
 
-        if flag0_only:
-            fit_label = utils.preformat_string('Fit to flag==0 {cat} data\n{}', cat=data.data_category.value)
-        else:
-            fit_label = utils.preformat_string('Fit to all {cat} data\n{}', cat=data.data_category.value)
+        assert len(plot_args) == 1
+        args = plot_args[0]
 
-        for args in plot_args:  # should only ever be 1 for hexbin, but will keep for loop for consistency
-            # Best to compute extent now, when we have the actual data to plot
-            args['kws'].setdefault('extent', self._compute_extent(data=data, **args['data']))
+        # Best to compute extent now, when we have the actual data to plot
+        args['kws'].setdefault('extent', self._compute_extent(data=data, **args['data']))
 
-            # Also need to extract the "fit_style" if present, because that isn't passed to hexbin
-            # Same for "legend_fontsize"
-            fit_style = args['kws'].pop('fit_style', dict())
-            legend_fontsize = args['kws'].pop('legend_fontsize', 7)  # use a small default so the text fits on the plot
+        # Also need to extract the "fit_style" if present, because that isn't passed to hexbin
+        # Same for "legend_fontsize"
+        fit_style = args['kws'].pop('fit_style', dict())
+        legend_fontsize = args['kws'].pop('legend_fontsize', 7)  # use a small default so the text fits on the plot
 
-            h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
-            plt.colorbar(h, cax=self._caxes[idata], label=clabel)
+        h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
+        plt.colorbar(h, cax=self._caxes[idata], label=clabel)
 
-            # Will set defaults for the fit
-            fit_style.setdefault('linestyle', ':')
-            fit_style.setdefault('color', 'C1')
-            fit_style.setdefault('label', fit_label)
-            utils.add_linfit(axs, args['data']['x'], args['data']['y'], **fit_style)
+        self._add_linfit(axs, data, fit_style, flag0_only)
+
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend(fontsize=legend_fontsize)
 
+    def _add_linfit(self, ax, data: TcconData, fit_style: dict, flag0_only: bool = False):
+        fit_flag_category = self._get_flag_category(self._fit_flag_category, flag0_only)
+        fit_data = self.get_plot_data(data, fit_flag_category)
+
+        fit_label = fit_style.get('label', 'Fit to {data} data\n{fit}')
+        data_label = data.get_flag0_or_all_label() if fit_flag_category is None else data.get_label(fit_flag_category)
+        fit_label = utils.preformat_string(fit_label, data=data_label)
+        fit_style['label'] = fit_label
+
+        fit_style.setdefault('linestyle', ':')
+        fit_style.setdefault('color', 'C1')
+
+        utils.add_linfit(ax, fit_data['x'], fit_data['y'], **fit_style)
+
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         # For hexbin, this needs overridden. We only ever have one set of plot arguments,
         # which either plots flag0 data or all data, depending on the user flags.
-        flag_category = FlagCategory.FLAG0 if flag0_only else FlagCategory.ALL_DATA
-        plot_args = [{
-            'data': self.get_plot_data(data, flag_category),
-            'kws': self.get_plot_kws(data, flag_category)
-        }]
-
-        return plot_args
+        return self._get_plot_args_mono(data, self._hexbin_flag_category, flag0_only=flag0_only)
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
         kws = super().get_plot_kws(data, flag_category)
@@ -1196,14 +1223,14 @@ class RollingTimeseriesPlot(TimeseriesPlot):
     plot_kind = 'rolling-timeseries'
 
     def __init__(self, other_plots, yvar, ops, default_style, limits: Limits, key=None, width=20, height=10,
-                 gap='20000 days', rolling_window=500, uncertainty=False, data_category=None, time_buffer_days=2):
+                 gap='20000 days', rolling_window=500, uncertainty=False, flag_category=None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, time_buffer_days=time_buffer_days)
         self.ops = [ops] if isinstance(ops, str) else ops
         self.gap = gap
         self.rolling_window = rolling_window
         self.uncertainty = uncertainty
-        self.data_category = None if data_category is None else FlagCategory(data_category)
+        self.flag_category = None if flag_category is None else FlagCategory(flag_category)
 
     def make_plot(self, *args, **kwargs):
         return super().make_plot(*args, **kwargs)
@@ -1213,7 +1240,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
             tmp = self.roll_data(x, y, npts=self.rolling_window, ops=o, gap=self.gap)
             return {'x': tmp['x'].to_numpy(), 'y': tmp['y'].to_numpy()}
 
-        flag_category = self._get_flag_category(flag0_only)
+        flag_category = self._get_flag_category(self.flag_category, flag0_only)
         raw_data_vals = self.get_plot_data(data, flag_category)
         raw_data_kws = self.get_plot_kws(data, flag_category)
 
@@ -1253,7 +1280,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
         default = self._get_style(self._default_style, self.plot_kind, style_fc)
         specific = self._get_style(data.styles, self.plot_kind, style_fc)
-        if 'quantile' in style_fc:
+        if isinstance(style_fc, str) and 'quantile' in style_fc:
             # Quantile operations need to include what quantile to calculate, e.g. "quantile0.75",
             # but the user may have just specified a generic "quantile" style, so if we didn't
             # find styles for the specific quantile to be calculated, try for the generic one.
@@ -1269,21 +1296,9 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
         # Since labels need some extra logic to format, add it separately here
         data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
-        label_spec = kws.get('label', '{data}' if op is None else '{op} {data}')
-        kws['label'] = label_spec.format(data=data_label, op=op)
+        label_spec = kws.get('label', '{data}' if op is None else '{n} spectra {op} {data}')
+        kws['label'] = label_spec.format(data=data_label, op=op, n=self.rolling_window)
         return kws
-
-    def _get_flag_category(self, flag0_only: bool = False):
-        # Which subset of data to use depends on several things:
-        #   * If the plot options included one, then use that
-        #   * If the plot options did not include one, but --flag0 was set, only use flag0 data
-        #   * Otherwise, use the default for this data type
-        if self.data_category is None and not flag0_only:
-            return None
-        elif self.data_category is None and flag0_only:
-            return FlagCategory.FLAG0
-        else:
-            return self.data_category
 
     def get_save_name(self):
         ops = '+'.join(self.ops)
