@@ -647,11 +647,9 @@ class FlagAnalysisPlot(AbstractPlot):
 class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
     plot_kind = None
     _title_prefix = ''
-    _freq_full_names = {'W': 'weekly', 'D': 'daily'}
 
     def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
                  yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
-        # NB: time_buffer works differently than in time series, because the plots are weirdplt
         if any(len(r) != 2 for r in sza_ranges):
             raise TypeError('Each SZA range must be a two-element sequence')
         if any(r[1] < r[0] for r in sza_ranges):
@@ -666,12 +664,8 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
         fig, ax = self._make_or_check_fig_ax_args(fig, axs)
-
-        if self.freq in self._freq_full_names:
-            freq_name = self._freq_full_names[self.freq]
-            ax.set_title('{} ({} {}s)'.format(self._title_prefix, freq_name, self.op))
-        else:
-            ax.set_title('{} ({}s, frequency={})'.format(self._title_prefix, self.op, self.freq))
+        freq_op_str = utils.freq_op_str(self.freq, self.op)
+        ax.set_title(f'{self._title_prefix} ({freq_op_str})')
 
         main_data = self._get_main_data(data)
         yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
@@ -964,6 +958,8 @@ class ScatterPlot(AbstractPlot):
             ax.set_xlim(self._limits.get_limit(self.xvar, data_for_limits, self.plot_kind))
             ax.set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
 
+        ax.set_title(f'{self.yvar} vs. {self.xvar}')
+
         return fig, ax
 
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
@@ -1117,6 +1113,7 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
         # self._format_time_axis(ax, data, show_all=show_all)
         self.format_time_axis(ax, self._get_data_for_limits(data), xvar=self.xvar, buffer_days=self._time_buffer_days,
                               show_all=show_all)
+        ax.set_title(f'{self.yvar} time series')
         return fig, ax
 
     def get_save_name(self):
@@ -1180,6 +1177,7 @@ class Timeseries2PanelPlot(TimeseriesPlot):
         # Remove the x-axis label from the top axes
         axs['error'].set_xlabel('')
 
+        fig.suptitle(f'{self.yvar} and {self.yerror_var} time series')
         return fig, axs
 
     def get_save_name(self):
@@ -1217,6 +1215,12 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
         self.freq = freq
         self.op = op
 
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, axs = super().setup_figure(data, show_all, fig, axs)
+        freq_op_str = utils.freq_op_str(self.freq, self.op)
+        axs.set_title(f'{self.yvar} {freq_op_str} time series')
+        return fig, axs
+
     def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
         if flag_category is None:
             x = data.get_flag0_or_all_data(self.xvar)
@@ -1246,8 +1250,11 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         self.uncertainty = uncertainty
         self.flag_category = None if flag_category is None else FlagCategory(flag_category)
 
-    def make_plot(self, *args, **kwargs):
-        return super().make_plot(*args, **kwargs)
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, axs = super().setup_figure(data, show_all, fig, axs)
+        ops = ', '.join(self.ops)
+        axs.set_title(f'{self.yvar} rolling {ops} timeseries')
+        return fig, axs
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         def roll(x, y, o):

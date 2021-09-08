@@ -2,6 +2,8 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
 
+from .constants import _FREQ_FULL_NAMES
+
 
 def cm2inch(*tupl):
     """
@@ -66,3 +68,11 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
 
     # plot line fits
     ax.plot(x, lin_model(x, fit[0], fit[1]), label=label, **style)
+
+
+def freq_op_str(freq, op):
+    if freq in _FREQ_FULL_NAMES:
+        freq_name = _FREQ_FULL_NAMES[freq]
+        return f'{freq_name} {op}s'
+    else:
+        return f'{op}s, frequency={freq}'
