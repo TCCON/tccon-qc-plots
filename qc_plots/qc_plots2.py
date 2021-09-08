@@ -896,10 +896,12 @@ class ScatterPlot(AbstractPlot):
     plot_kind = 'scatter'
 
     def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
-                 fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
-        super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits, width=width, height=height)
+                 add_fit: bool = True, fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
+        super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
+                         width=width, height=height)
         self.xvar = xvar
         self.yvar = yvar
+        self._do_add_fit = add_fit
         self._fit_flag_category = None if fit_flag_category is None else FlagCategory(fit_flag_category)
         self._match_axes_size = match_axes_size
 
@@ -967,10 +969,36 @@ class ScatterPlot(AbstractPlot):
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         for args in plot_args:
+            # Ignore fit_style or legend_fontsize keywords
+            args['kws'].pop('fit_style', None)
+            args['kws'].pop('legend_fontsize', None)  # use a small default so the text fits on the plot
+
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
-        axs.legend()
+
+        if self._do_add_fit:
+            self._add_linfit(axs, data, flag0_only)
+
+        # Use legend fontsize from the first set of plot args
+        legend_fontsize = plot_args[0]['kws'].get('legend_fontsize', 7)
+        axs.legend(fontsize=legend_fontsize)
+
+    def _add_linfit(self, ax, data: TcconData, flag0_only: bool = False):
+        fit_flag_category = self._get_flag_category(self._fit_flag_category, flag0_only)
+        fit_data = self.get_plot_data(data, fit_flag_category)
+        fit_flag_kws = self.get_plot_kws(data, fit_flag_category)
+        fit_style = fit_flag_kws.get('fit_style', dict())
+
+        fit_label = fit_style.get('label', 'Fit to {data} data\n{fit}')
+        data_label = data.get_flag0_or_all_label() if fit_flag_category is None else data.get_label(fit_flag_category)
+        fit_label = utils.preformat_string(fit_label, data=data_label)
+        fit_style['label'] = fit_label
+
+        fit_style.setdefault('linestyle', ':')
+        fit_style.setdefault('color', 'C1')
+
+        utils.add_linfit(ax, fit_data['x'], fit_data['y'], **fit_style)
 
 
 class HexbinPlot(ScatterPlot):
@@ -1017,31 +1045,17 @@ class HexbinPlot(ScatterPlot):
 
         # Also need to extract the "fit_style" if present, because that isn't passed to hexbin
         # Same for "legend_fontsize"
-        fit_style = args['kws'].pop('fit_style', dict())
+        args['kws'].pop('fit_style', None)
         legend_fontsize = args['kws'].pop('legend_fontsize', 7)  # use a small default so the text fits on the plot
 
         h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
         plt.colorbar(h, cax=self._caxes[idata], label=clabel)
 
-        self._add_linfit(axs, data, fit_style, flag0_only)
+        self._add_linfit(axs, data, flag0_only)
 
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend(fontsize=legend_fontsize)
-
-    def _add_linfit(self, ax, data: TcconData, fit_style: dict, flag0_only: bool = False):
-        fit_flag_category = self._get_flag_category(self._fit_flag_category, flag0_only)
-        fit_data = self.get_plot_data(data, fit_flag_category)
-
-        fit_label = fit_style.get('label', 'Fit to {data} data\n{fit}')
-        data_label = data.get_flag0_or_all_label() if fit_flag_category is None else data.get_label(fit_flag_category)
-        fit_label = utils.preformat_string(fit_label, data=data_label)
-        fit_style['label'] = fit_label
-
-        fit_style.setdefault('linestyle', ':')
-        fit_style.setdefault('color', 'C1')
-
-        utils.add_linfit(ax, fit_data['x'], fit_data['y'], **fit_style)
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         # For hexbin, this needs overridden. We only ever have one set of plot arguments,
@@ -1095,7 +1109,7 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
     def __init__(self, other_plots, yvar, default_style, limits: Limits, width=20, height=10, key=None,
                  time_buffer_days=2):
         super().__init__(other_plots=other_plots, xvar='time', yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height)
+                         key=key, width=width, height=height, add_fit=False)
         self._time_buffer_days = time_buffer_days
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
