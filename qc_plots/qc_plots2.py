@@ -1472,7 +1472,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         return f'{self.yvar}_rolling{self.rolling_window}_{ops}_timeseries.png'
 
 
-def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=True):
+def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):
     plots_config = config['plots']
     plots = []
     for iplot, section in enumerate(plots_config, start=1):
