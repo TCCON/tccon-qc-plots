@@ -103,6 +103,19 @@ all = {color = "deepskyblue"}
 flag0 = {color = "deepskyblue"}
 
 
+[style.default.rolling-derivative]
+clone = "scatter"
+
+[style.main.rolling-derivative]
+clone = "scatter"
+
+[style.ref.rolling-derivative]
+clone = "scatter"
+
+[style.context.rolling-derivative]
+clone = "scatter"
+
+
 [style.default.timing-error-am-pm]
 both = {marker = "o", markersize = 1, linestyle="none"}
 am = {color = "black"}
@@ -143,6 +156,11 @@ sza_ranges = [[70, 80], [40, 50], [20, 30]]
 kind = "rolling-timeseries"
 yvar = "xluft"
 ops = "median"
+
+[[plots]]
+kind = "rolling-derivative"
+yvar = "zco2_4852a_zo"
+dvar = "solzen"
 
 [[plots]]
 kind = "timeseries-2panel"

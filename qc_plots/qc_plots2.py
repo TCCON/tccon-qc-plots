@@ -326,7 +326,7 @@ class AbstractPlot(ABC):
 
         return plot_args
 
-    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], _format_label: bool = True) -> dict:
         # Get the default style: style dictionaries are organized plot_kind -> flag category,
         # Allow both to be missing, and just provide an empty dictionary as the default
         style_fc = data.default_category if flag_category is None else flag_category
@@ -337,10 +337,11 @@ class AbstractPlot(ABC):
         kws = deepcopy(default)
         kws.update(specific)
 
-        # Since labels need some extra logic to format, add it separately here
-        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
-        label_spec = kws.get('label', '{data}')
-        kws['label'] = label_spec.format(data=data_label)
+        if _format_label:
+            # Since labels need some extra logic to format, add it separately here if we're supposed to
+            data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+            label_spec = kws.get('label', '{data}')
+            kws['label'] = label_spec.format(data=data_label)
         return kws
 
     def get_legend_kws(self):
@@ -784,7 +785,7 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
 
         return df_am, df_pm
 
-    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory],  _format_label: bool = True) -> dict:
         # AM/PM plots have their styles organized differently since they plot either flag0 or all data but not both
         # The default style may be specified for "both" (AM and PM), or just AM/PM. The more specific styles override
         # the less specific ones
@@ -803,12 +804,13 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         style_pm.update(self._get_style(data.styles, self.plot_kind, 'pm'))
 
         # Since labels need some extra logic to format, add it separately here
-        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
-        sza_min, sza_max = self.sza_ranges[0]
-        am_label_spec = style_am.get('label', r'{data} AM SZA $\in [{ll}, {ul}]$')
-        style_am['label'] = am_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
-        pm_label_spec = style_pm.get('label', r'{data} PM SZA $\in [{ll}, {ul}]$')
-        style_pm['label'] = pm_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
+        if _format_label:
+            data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+            sza_min, sza_max = self.sza_ranges[0]
+            am_label_spec = style_am.get('label', r'{data} AM SZA $\in [{ll}, {ul}]$')
+            style_am['label'] = am_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
+            pm_label_spec = style_pm.get('label', r'{data} PM SZA $\in [{ll}, {ul}]$')
+            style_pm['label'] = pm_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
 
         return {'am': style_am, 'pm': style_pm}
 
@@ -870,7 +872,7 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
         return dfs_out
 
-    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> list:
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory],  _format_label: bool = True) -> list:
         # This
         style = deepcopy(self._default_style.get(self.plot_kind, dict()))
         style.update(data.styles.get(self.plot_kind, dict()))
@@ -888,10 +890,11 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
         # Next set up the labels, using the data's label plus the SZA range
         # If there was a label in the user specified options, it has already been
         # duplicated
-        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
-        label_spec = style.get('label', [r'{data} SZA $\in [{ll}, {ul}]$'] * nranges)
-        labels = [ls.format(data=data_label, ll=r[0], ul=r[1]) for ls, r in zip(label_spec, self.sza_ranges)]
-        style['label'] = labels
+        if _format_label:
+            data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+            label_spec = style.get('label', [r'{data} SZA $\in [{ll}, {ul}]$'] * nranges)
+            labels = [ls.format(data=data_label, ll=r[0], ul=r[1]) for ls, r in zip(label_spec, self.sza_ranges)]
+            style['label'] = labels
 
         # Finally reorganize from a dict of lists to a list of dicts
         styles_out = []
@@ -945,11 +948,13 @@ class ScatterPlot(AbstractPlot):
             y = data.get_data(self.yvar, flag_category)
         return {'x': x, 'y': y}
 
-    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
-        kws = super().get_plot_kws(data, flag_category)
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], _format_label: bool = True) -> dict:
+        kws = super().get_plot_kws(data, flag_category, _format_label=_format_label)
         # For scatter plots, we want there to be no connecting lines by default - don't make the user
-        # provide that for every plot style in the config
+        # provide that for every plot style in the config. Also set a default marker so that we avoid
+        # mysterious empty plots
         kws.setdefault('linestyle', 'none')
+        kws.setdefault('marker', '.')
         return kws
 
     def get_save_name(self):
@@ -1095,10 +1100,11 @@ class HexbinPlot(ScatterPlot):
         # which either plots flag0 data or all data, depending on the user flags.
         return self._get_plot_args_mono(data, self._hexbin_flag_category, flag0_only=flag0_only)
 
-    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
-        kws = super().get_plot_kws(data, flag_category)
-        # Remove linestyle (from ScatterPlot) and label (from AbstractPlot). Neither are used for hexbin plots.
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], _format_label: bool = True) -> dict:
+        kws = super().get_plot_kws(data, flag_category, _format_label=_format_label)
+        # Remove linestyle, marker (from ScatterPlot), and label (from AbstractPlot). None are used for hexbin plots.
         kws.pop('linestyle')
+        kws.pop('marker')
         kws.pop('label')
 
         return kws
@@ -1280,6 +1286,101 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
         return f'{self.yvar}_{self.freq}_{self.op}_timeseries.png'
 
 
+class RollingDerivativePlot(TimeseriesPlot):
+    plot_kind = 'rolling-derivative'
+
+    def __init__(self, other_plots, yvar, dvar, default_style, limits: Limits, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None, derivative_order=1,
+                 gap='20000 days', rolling_window=500, flag_category=None, time_buffer_days=2):
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         legend_kws=legend_kws, key=key, width=width, height=height, time_buffer_days=time_buffer_days)
+
+        self.dvar = dvar
+        self.derivative_order = derivative_order
+        self.gap = gap
+        self.rolling_window = rolling_window
+        self.flag_category = None if flag_category is None else FlagCategory(flag_category)
+
+    def _derivative_str(self, latex=True) -> str:
+        n = self.derivative_order
+        n = f'^{n}' if n != 1 else ''
+        s = f'$d{n}${self.yvar}/$d${self.dvar}${n}$'.replace('$$', '')  # double $$ occur is n is an empty string and cause rendering problems
+        if latex:
+            return s
+        else:
+            return s.replace('$', '').replace('^', '')
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, axs = super().setup_figure(data, show_all, fig, axs)
+        deriv_str = self._derivative_str()
+        axs.set_title(f'Rolling {deriv_str} timeseries')
+        return fig, axs
+
+    def get_plot_args(self, data: TcconData, flag0_only: bool = False):
+        def roll(x, y, t):
+            df = pd.DataFrame({'x': x, 'y': y, 't': t})
+            all_derivatives = []
+            for _, grouped_df in self.split_by_gaps(df, self.gap, 't'):
+                derivatives = np.full(grouped_df.shape[0], np.nan)
+
+                i = -1
+                for roll_df in grouped_df.rolling(self.rolling_window, center=True, min_periods=1):
+                    i += 1
+                    if self.derivative_order == 1:
+                        fit, _, _ = utils.compute_linfit(roll_df['x'].to_numpy(), roll_df['y'].to_numpy())
+                        derivatives[i] = fit[0]  # fit has slope then intercept
+                    else:
+                        raise NotImplementedError('Only derivatives of order 1 implemented')
+
+                all_derivatives.append(pd.DataFrame({'x': grouped_df['t'], 'y': derivatives}))
+
+            return pd.concat(all_derivatives)
+
+        flag_category = self._get_flag_category(self.flag_category, flag0_only)
+        raw_data_vals = self.get_plot_data(data, flag_category)
+        rolled_derivatives = roll(raw_data_vals['x'], raw_data_vals['y'], raw_data_vals['t'])
+        rolled_data = {'x': rolled_derivatives['x'].to_numpy(), 'y': rolled_derivatives['y'].to_numpy()}
+        data_kws = self.get_plot_kws(data, flag_category)
+        legend_kws = self.get_legend_kws()
+
+        return [{'data': rolled_data, 'kws': data_kws, 'legend_kws': legend_kws}]
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        if flag_category is None:
+            x = data.get_flag0_or_all_data(self.dvar)
+            y = data.get_flag0_or_all_data(self.yvar)
+            t = data.get_flag0_or_all_data('time')
+        else:
+            x = data.get_data(self.dvar, flag_category)
+            y = data.get_data(self.yvar, flag_category)
+            t = data.get_data('time', flag_category)
+        return {'x': x, 'y': y, 't': t}
+
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], _format_label: bool = True) -> dict:
+        # Do not let the superclass method format the label because we need to do that here
+        kws = super().get_plot_kws(data, flag_category, _format_label=False)
+        if _format_label:
+            data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+            label_spec = kws.get('label', '{n} spectra {data}')
+            kws['label'] = label_spec.format(data=data_label, n=self.rolling_window)
+        return kws
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        # Needed overridden because we don't want QC limit lines
+
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        for args in plot_args:
+            args['kws'].pop('fit_style', None)
+            axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
+
+        # legend kws are always in the first set of plot argument
+        axs.legend(**plot_args[0]['legend_kws'])
+
+    def get_save_name(self):
+        deriv_str = self._derivative_str(latex=False).replace('/', '_')
+        return f'{deriv_str}_rolling{self.rolling_window}_timeseries.png'
+
+
 class RollingTimeseriesPlot(TimeseriesPlot):
     plot_kind = 'rolling-timeseries'
 
@@ -1333,7 +1434,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
         return args
 
-    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], op=None) -> dict:
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], op=None, _format_label: bool = True) -> dict:
         # Get the default style: style dictionaries are organized plot_kind -> flag category,
         # Allow both to be missing, and just provide an empty dictionary as the default
         if op is not None:
@@ -1359,10 +1460,11 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         # No connecting lines by default
         kws.setdefault('linestyle', 'none')
 
-        # Since labels need some extra logic to format, add it separately here
-        data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
-        label_spec = kws.get('label', '{data}' if op is None else '{n} spectra {op} {data}')
-        kws['label'] = label_spec.format(data=data_label, op=op, n=self.rolling_window)
+        if _format_label:
+            # Since labels need some extra logic to format, add it separately here
+            data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+            label_spec = kws.get('label', '{data}' if op is None else '{n} spectra {op} {data}')
+            kws['label'] = label_spec.format(data=data_label, op=op, n=self.rolling_window)
         return kws
 
     def get_save_name(self):

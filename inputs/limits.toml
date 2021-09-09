@@ -31,3 +31,6 @@ fvsi = [0, 20]
 "*_zo" = [-0.006, 0.006]
 "*_cfampocl" = [0, 0.005]
 "*_cfperiod" = [-1, 50]
+
+[rolling-derivative]
+zco2_4852a_zo = [-1e-4, 1e-4]

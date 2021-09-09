@@ -34,6 +34,27 @@ def preformat_string(s, **frozen_kwargs):
     return PreformattedString(s)
 
 
+def _lin_model(x, a, b):
+    return a * x + b
+
+
+def compute_linfit(x, y, yerr=None):
+    x = np.array(x)
+    y = np.array(y)
+
+    # linear fit using y = a*x + b
+    if yerr is not None:
+        yerr = np.array(yerr)
+        fit, cov = curve_fit(_lin_model, x, y, p0=[1, 0], sigma=yerr)
+    else:
+        fit, cov = curve_fit(_lin_model, x, y, p0=[1, 0])
+
+    # pearson correlation coefficient
+    R = pearsonr(x, y)[0]
+
+    return fit, cov, R
+
+
 def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
     """
     Add a line with the results of a linear fit to y = a*x + b
@@ -45,21 +66,7 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
         - y: y axis data
     """
 
-    def lin_model(x, a, b):
-        return a * x + b
-
-    x = np.array(x)
-    y = np.array(y)
-
-    # linear fit using y = a*x + b
-    if yerr:
-        yerr = np.array(yerr)
-        fit, cov = curve_fit(lin_model, x, y, p0=[1, 0], sigma=yerr)
-    else:
-        fit, cov = curve_fit(lin_model, x, y, p0=[1, 0])
-
-    # pearson correlation coefficient
-    R = pearsonr(x, y)[0]
+    fit, cov, R = compute_linfit(x, y, yerr)
 
     fitstr = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(
         fit[0], np.sqrt(cov[0][0]), fit[1], np.sqrt(cov[1][1]), R ** 2
@@ -68,7 +75,7 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
 
     # plot line fits
     xfit = np.array([np.min(x), np.max(x)])
-    ax.plot(xfit, lin_model(xfit, fit[0], fit[1]), label=label, **style)
+    ax.plot(xfit, _lin_model(xfit, fit[0], fit[1]), label=label, **style)
 
 
 def freq_op_str(freq, op):
@@ -77,3 +84,16 @@ def freq_op_str(freq, op):
         return f'{freq_name} {op}s'
     else:
         return f'{op}s, frequency={freq}'
+
+
+def ordinal_str(i):
+    if 10 < i % 100 < 20:
+        return f'{i}th'
+    elif i % 10 == 1:
+        return f'{i}st'
+    elif i % 10 == 2:
+        return f'{i}nd'
+    elif i % 10 == 3:
+        return f'{i}rd'
+    else:
+        return f'{i}th'

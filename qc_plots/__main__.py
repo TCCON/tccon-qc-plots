@@ -3,7 +3,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from PIL import Image
 from PyPDF2 import PdfFileWriter, PdfFileReader
-
+import sys
 import tomli
 
 from . import qc_plots2
@@ -88,7 +88,8 @@ def driver(nc_in, config, ref=None, context=None, flag0=False, show_all=False, o
         fig_paths = []
         n = len(plots)
         for i, plot in enumerate(plots, start=1):
-            print(f'  - Plot {i}/{n}: {plot.get_save_name()}', end='')
+            sys.stdout.write(f'  - Plot {i}/{n}: {plot.get_save_name()}')
+            sys.stdout.flush()
             try:
                 this_path = plot.make_plot(data, flag0_only=flag0, show_all=show_all)
             except IndexError as err:
