@@ -230,13 +230,15 @@ class Limits:
 class AbstractPlot(ABC):
     plot_kind = None
 
-    def __init__(self, other_plots, default_style, limits: Limits, key=None, width=20, height=10):
+    def __init__(self, other_plots, default_style, limits: Limits, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None):
         self.key = key
         self._other_plots = other_plots
         self._default_style = default_style
         self._limits = limits
         self._width = width
         self._height = height
+        self._legend_kws = dict() if legend_kws is None else legend_kws
 
     @classmethod
     def from_config_section(cls, section, other_plots, full_config, limits_file):
@@ -309,7 +311,8 @@ class AbstractPlot(ABC):
         # There will always be at least one thing to plot, whether it is all data or just flag0 data
         plot_args = [{
             'data': self.get_plot_data(data, FlagCategory.FLAG0),
-            'kws': self.get_plot_kws(data, FlagCategory.FLAG0)
+            'kws': self.get_plot_kws(data, FlagCategory.FLAG0),
+            'legend_kws': self.get_legend_kws()
         }]
 
         # Whether there is more data to plot depends on whether the user specified that we should only plot
@@ -317,7 +320,7 @@ class AbstractPlot(ABC):
         if not flag0_only and data.has_flag_category(FlagCategory.FLAGGED):
             plot_args.append({
                 'data': self.get_plot_data(data, FlagCategory.FLAGGED),
-                'kws': self.get_plot_kws(data, FlagCategory.FLAGGED)
+                'kws': self.get_plot_kws(data, FlagCategory.FLAGGED),
             })
 
         return plot_args
@@ -339,12 +342,18 @@ class AbstractPlot(ABC):
         kws['label'] = label_spec.format(data=data_label)
         return kws
 
+    def get_legend_kws(self):
+        kws = deepcopy(self._get_style(self._default_style, self.plot_kind, 'legend_kws'))
+        kws.update(self._legend_kws)
+        kws.setdefault('fontsize', 7)
+        return kws
+
     def _get_style(self, styles, plot_kind, sub_category: Union[FlagCategory, str]):
         plot_styles = styles.get(plot_kind, dict())
-        if 'clone' in plot_styles:
-            return self._get_style(styles, plot_styles['clone'], sub_category)
+        sc = sub_category if isinstance(sub_category, str) else sub_category.value
+        if 'clone' in plot_styles and sc not in plot_styles:
+            return self._get_style(styles, plot_styles['clone'], sc)
         else:
-            sc = sub_category if isinstance(sub_category, str) else sub_category.value
             return plot_styles.get(sc, dict())
 
     def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
@@ -419,7 +428,8 @@ class AbstractPlot(ABC):
         flag_category = self._get_flag_category(flag_category, flag0_only)
         plot_args = [{
             'data': self.get_plot_data(data, flag_category),
-            'kws': self.get_plot_kws(data, flag_category)
+            'kws': self.get_plot_kws(data, flag_category),
+            'legend_kws': self.get_legend_kws()
         }]
         return plot_args
 
@@ -547,9 +557,10 @@ class TimeseriesMixin:
 class FlagAnalysisPlot(AbstractPlot):
     plot_kind = 'flag-analysis'
 
-    def __init__(self, other_plots, default_style, limits: Limits, key=None, min_percent=1.0, width=20, height=10):
+    def __init__(self, other_plots, default_style, limits: Limits, key=None, min_percent=1.0, width=20, height=10,
+                 legend_kws: Optional[dict] = None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
-                         width=width, height=height)
+                         width=width, height=height, legend_kws=legend_kws)
         self.min_percent = min_percent
 
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
@@ -573,7 +584,8 @@ class FlagAnalysisPlot(AbstractPlot):
         # The flag summary plot always uses all data
         plot_args = [{
             'data': self.get_plot_data(data, FlagCategory.ALL_DATA),
-            'kws': self.get_plot_kws(data, FlagCategory.ALL_DATA)
+            'kws': self.get_plot_kws(data, FlagCategory.ALL_DATA),
+            'legend_kws': self.get_legend_kws()
         }]
 
         return plot_args
@@ -635,7 +647,6 @@ class FlagAnalysisPlot(AbstractPlot):
         # The counts for the number of spectra flagged go on top, the percent flagged below
         flag_df = plot_args['data']['counts']
         flag_df_pcnt = plot_args['data']['percentages']
-        legend_fontsize = plot_args['kws'].pop('legend_fontsize', 7)
         barplot = flag_df.plot(kind='bar', ax=axs[0], **plot_args['kws'])
         barplot_pcnt = flag_df_pcnt.plot(kind='bar', ax=axs[1], **plot_args['kws'])
 
@@ -648,7 +659,7 @@ class FlagAnalysisPlot(AbstractPlot):
                 y = p.get_height() * 1.005
                 curplot.annotate(label, (x, y))
 
-        axs[0].legend(fontsize=legend_fontsize)
+        axs[0].legend(**plot_args['legend_kws'])
         # Plotting with Pandas automatically adds a legend, so we need to remove it from the second axes
         axs[1].get_legend().remove()
         
@@ -658,13 +669,15 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
     _title_prefix = ''
 
     def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
-                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
+                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None):
         if any(len(r) != 2 for r in sza_ranges):
             raise TypeError('Each SZA range must be a two-element sequence')
         if any(r[1] < r[0] for r in sza_ranges):
             raise TypeError('Each SZA range must have the smaller value first')
+
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key, 
-                         width=width, height=height)
+                         width=width, height=height, legend_kws=legend_kws)
         self.sza_ranges = sza_ranges
         self.yvar = yvar
         self.freq = freq
@@ -702,11 +715,13 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
             return [{
                 'data': self.get_plot_data(data, FlagCategory.FLAG0),
                 'kws': self.get_plot_kws(data, FlagCategory.FLAG0),
+                'legend_kws': self.get_legend_kws()
             }]
         else:
             return [{
                 'data': self.get_plot_data(data, FlagCategory.ALL_DATA),
-                'kws': self.get_plot_kws(data, FlagCategory.ALL_DATA)
+                'kws': self.get_plot_kws(data, FlagCategory.ALL_DATA),
+                'legend_kws': self.get_legend_kws()
             }]
 
     def get_plot_data(self, data: TcconData, flag_category: FlagCategory):
@@ -733,13 +748,14 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
     _title_prefix = 'Timing check AM vs. PM'
 
     def __init__(self, other_plots, default_style, sza_range: Sequence[float], limits: Limits,
-                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
+                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None):
         if len(sza_range) != 2:
             raise TypeError('SZA range must have two elements (min, max)')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
-                         width=width, height=height, sza_ranges=[sza_range], yvar=yvar, freq=freq, op=op,
-                         time_buffer_days=time_buffer_days)
+                         width=width, height=height, legend_kws=legend_kws, sza_ranges=[sza_range], yvar=yvar,
+                         freq=freq, op=op, time_buffer_days=time_buffer_days)
 
     def get_save_name(self):
         return 'timing_error_check_{y}_{freq}_{op}_AM_PM_sza_{ll}_to_{ul}_VS_time.png'.format(
@@ -812,7 +828,7 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         if df_pm.shape[0] > 0:
             axs.plot(df_pm.index, df_pm['y'], **afternoon_kws)
 
-        axs.legend()
+        axs.legend(**plot_args['legend_kws'])
 
 
 class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
@@ -820,14 +836,15 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
     _title_prefix = 'Timing check multiple SZAs'
 
     def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
-                 am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10):
+                 am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None):
 
         if am_or_pm.lower() not in {'am', 'pm'}:
             raise TypeError('Allows values for am_or_pm are "am" or "pm" only')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
-                         width=width, height=height, sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op,
-                         time_buffer_days=time_buffer_days)
+                         width=width, height=height, legend_kws=legend_kws, sza_ranges=sza_ranges, yvar=yvar,
+                         freq=freq, op=op, time_buffer_days=time_buffer_days)
         self.am_or_pm = am_or_pm
 
     def get_save_name(self):
@@ -897,16 +914,17 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
                 continue
             axs.plot(df.index, df['y'], **kw)
 
-        axs.legend()
+        axs.legend(**plot_args['legend_kws'])
 
 
 class ScatterPlot(AbstractPlot):
     plot_kind = 'scatter'
 
     def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None,
                  add_fit: bool = True, fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
-                         width=width, height=height)
+                         width=width, height=height, legend_kws=legend_kws)
         self.xvar = xvar
         self.yvar = yvar
         self._do_add_fit = add_fit
@@ -990,9 +1008,8 @@ class ScatterPlot(AbstractPlot):
         if self._do_add_fit:
             self._add_linfit(axs, data, flag0_only)
 
-        # Use legend fontsize from the first set of plot args
-        legend_fontsize = plot_args[0]['kws'].get('legend_fontsize', 7)
-        axs.legend(fontsize=legend_fontsize)
+        # legend keywords are only ever in the first set of plot args
+        axs.legend(**plot_args[0]['legend_kws'])
 
     def _add_linfit(self, ax, data: TcconData, flag0_only: bool = False):
         fit_flag_category = self._get_flag_category(self._fit_flag_category, flag0_only)
@@ -1015,9 +1032,11 @@ class HexbinPlot(ScatterPlot):
     plot_kind = 'hexbin'
 
     def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None,
                  hexbin_flag_category=None, fit_flag_category=None, show_reference=False, show_context=True):
         super().__init__(other_plots=other_plots, xvar=xvar, yvar=yvar, default_style=default_style, limits=limits,
-                         fit_flag_category=fit_flag_category, key=key, width=width, height=height)
+                         legend_kws=legend_kws, fit_flag_category=fit_flag_category, key=key,
+                         width=width, height=height)
         self._hexbin_flag_category = None if hexbin_flag_category is None else FlagCategory(hexbin_flag_category)
         self._show_ref = show_reference
         self._show_context = show_context
@@ -1056,7 +1075,6 @@ class HexbinPlot(ScatterPlot):
         # Also need to extract the "fit_style" if present, because that isn't passed to hexbin
         # Same for "legend_fontsize"
         args['kws'].pop('fit_style', None)
-        legend_fontsize = args['kws'].pop('legend_fontsize', 7)  # use a small default so the text fits on the plot
 
         h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
         plt.colorbar(h, cax=self._caxes[idata], label=clabel)
@@ -1065,7 +1083,7 @@ class HexbinPlot(ScatterPlot):
 
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
-        axs.legend(fontsize=legend_fontsize)
+        axs.legend(**args['legend_kws'])
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         # For hexbin, this needs overridden. We only ever have one set of plot arguments,
@@ -1116,10 +1134,10 @@ class HexbinPlot(ScatterPlot):
 class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
     plot_kind = 'timeseries'
 
-    def __init__(self, other_plots, yvar, default_style, limits: Limits, width=20, height=10, key=None,
-                 time_buffer_days=2):
+    def __init__(self, other_plots, yvar, default_style, limits: Limits, width=20, height=10,
+                 legend_kws: Optional[dict] = None, key=None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, xvar='time', yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height, add_fit=False)
+                         key=key, width=width, height=height, legend_kws=legend_kws, add_fit=False)
         self._time_buffer_days = time_buffer_days
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -1139,16 +1157,18 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
             args['kws'].pop('fit_style', None)
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
-        axs.legend()
+
+        # legend kws are always in the first set of plot argument
+        axs.legend(**plot_args[0]['legend_kws'])
 
 
 class Timeseries2PanelPlot(TimeseriesPlot):
     plot_kind = 'timeseries-2panel'
 
     def __init__(self, other_plots, yvar, yerror_var, default_style, limits: Limits, key=None, width=20, height=10,
-                 time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height, time_buffer_days=time_buffer_days)
+                         key=key, width=width, height=height, time_buffer_days=time_buffer_days, legend_kws=legend_kws)
         self.yerror_var = yerror_var
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False):
@@ -1218,16 +1238,18 @@ class Timeseries2PanelPlot(TimeseriesPlot):
 
         self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
         self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
-        axs['main'].legend()
+
+        # Legend keywords are always in the first set of plot args
+        axs['main'].legend(**plot_args[0]['legend_kws'])
 
 
 class ResampledTimeseriesPlot(TimeseriesPlot):
     plot_kind = 'resampled-timeseries'
 
     def __init__(self, other_plots, yvar, freq, op, default_style, limits: Limits, key=None, width=20, height=10,
-                 time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height, time_buffer_days=time_buffer_days)
+                         key=key, width=width, height=height, legend_kws=legend_kws, time_buffer_days=time_buffer_days)
         self.freq = freq
         self.op = op
 
@@ -1257,9 +1279,10 @@ class RollingTimeseriesPlot(TimeseriesPlot):
     plot_kind = 'rolling-timeseries'
 
     def __init__(self, other_plots, yvar, ops, default_style, limits: Limits, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None,
                  gap='20000 days', rolling_window=500, uncertainty=False, flag_category=None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height, time_buffer_days=time_buffer_days)
+                         legend_kws=legend_kws, key=key, width=width, height=height, time_buffer_days=time_buffer_days)
         self.ops = [ops] if isinstance(ops, str) else ops
         self.gap = gap
         self.rolling_window = rolling_window
@@ -1281,7 +1304,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         raw_data_vals = self.get_plot_data(data, flag_category)
         raw_data_kws = self.get_plot_kws(data, flag_category)
 
-        args = [{'data': raw_data_vals, 'kws': raw_data_kws}]
+        args = [{'data': raw_data_vals, 'kws': raw_data_kws, 'legend_kws': self.get_legend_kws()}]
         for op in self.ops:
             op_vals = roll(raw_data_vals['x'], raw_data_vals['y'], op)
             op_kws = self.get_plot_kws(data, flag_category, op=op)

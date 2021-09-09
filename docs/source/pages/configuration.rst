@@ -51,6 +51,7 @@ the more complex, so let's look at an example right away::
     all = {color = "black", marker = "o", markersize = 1}
     flag0 = {color = "black", marker = "o", markersize = 1}
     flagged = {color = "red", marker = "o", markersize = 1}
+    legend_kws = {ncol = 2}
 
     [style.main.scatter]
     all = {color = "royalblue"}
@@ -100,6 +101,21 @@ and ``main`` section's ``flagged`` entries, and so is::
 (In this case, both sections specified the same color, so it didn't matter that ``main`` overrode the color value from
 ``default``.)
 
+All plot types are permitted to include ``legend_kws`` as a key within the "default" subsection, as you see in this
+example. This can point to a dictionary of keywords to pass to the
+`matplotlib legend function <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html>`_. Unlike the
+other components of styles, the legend keywords can be overridden on individual plots using the ``legend_kws`` key
+in a ``[[plots]]`` subsection of the TOML file.
+
+.. warning::
+   ``legend_kws`` is only read from the "default" subsection. If you put it in "main", "ref", or "context", it will be
+   ignored.
+
+.. note::
+   The `legend documentation <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html>`_ makes a
+   distinction between when ``legend`` is called on a figure vs. axes. Currently, all plot types in the TCCON QC
+   program call ``legend`` on axes.
+
 .. _StyleCloning:
 
 Cloning styles
@@ -114,7 +130,7 @@ For example, in the default configuration::
     flagged = {color = "red", marker = "o", markersize = 1}
 
     [style.default.timeseries]
-    clone = 'scatter'
+    clone = "scatter"
 
 By specifying ``clone = 'scatter'`` in the ``[style.default.timeseries]`` section, this means that all the styles
 defined for ``[style.default.scatter]`` are replicated in ``[style.default.timeseries]``. In other words, the previous
@@ -138,6 +154,14 @@ timeseries plots. Default to default, main to main, ref to ref, and context to c
 .. note::
    Not all plot types support cloning styles. If they do not, this will be noted in :ref:`PlotTypes` below.
 
+You can override specific keys within a subsection after cloning. For example::
+
+    [style.default.timeseries]
+    clone = "scatter"
+    legend_kws = {ncol = 2}
+
+would clone the ``all``, ``flag0``, and ``flagged`` values from ``[style.default.scatter]`` (from the first
+example in this section) but use ``{ncol = 2}`` for the ``legend_kws`` value.
 
 .. _PlotTypes:
 
@@ -171,6 +195,8 @@ All plot types accept the following as optional keys:
    There is currently no check to protect against two plots having the same key. If you get odd results when
    trying to refer to another plot, make sure you don't have duplicated plot keys!
 
+* ``legend_kws`` (default = ``{}``): keyword to pass to the `legend <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html>`_
+  call for this plot only. Will be merged with legend keywords defined in the default style for this plot type.
 * ``width`` (default = ``20``): initial width of the plot in centimeters
 * ``height`` (default = ``10``): initial height of the plot in centimeters
 

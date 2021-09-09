@@ -36,6 +36,7 @@ flag0 = {cmap = "Greys", bins = "log", mincnt = 1, zorder = 0.8, fit_style = {co
 
 [style.default.timeseries]
 clone = 'scatter'
+legend_kws = {ncol = 2}
 
 [style.main.timeseries]
 clone = 'scatter'
@@ -49,6 +50,7 @@ clone = 'scatter'
 
 [style.default.timeseries-2panel]
 clone = 'scatter'
+legend_kws = {ncol = 2}
 
 [style.main.timeseries-2panel]
 clone = 'scatter'
@@ -62,6 +64,7 @@ clone = 'scatter'
 
 [style.default.resampled-timeseries]
 clone = 'scatter'
+legend_kws = {ncol = 2}
 
 [style.main.resampled-timeseries]
 clone = 'scatter'
@@ -81,6 +84,7 @@ median = {marker = "o", markersize = 1, color="black"}
 mean = {marker = "o", markersize = 1, color="hotpink"}
 std = {marker = "o", markersize = 1, color="green"}
 quantile = {marker = "o", markersize = 1, color="green"}
+legend_kws = {ncol = 2}
 
 [style.main.rolling-timeseries]
 all = {color = "royalblue"}
@@ -324,6 +328,7 @@ kind = "scatter"
 xvar = "solzen"
 yvar = "xco2"
 match_axes_size = "xco2-vs-sza-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.55, 0.5]}
 
 [[plots]]
 kind = "hexbin"
@@ -338,6 +343,7 @@ kind = "scatter"
 xvar = "solzen"
 yvar = "xluft"
 match_axes_size = "xluft-vs-sza-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.55, 0.5]}
 
 [[plots]]
 kind = "hexbin"
