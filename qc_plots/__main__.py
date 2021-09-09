@@ -44,29 +44,46 @@ def images_to_pdf(fig_path_list, pdf_path: Path, size='medium', quality='high'):
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('nc_in',help='full path to the netCDF file from which plots should be made, or a path to a directory (plots will be made from all *.nc files in that directory)')
-    parser.add_argument('-r','--ref',default='',help='full path to another netCDF file to use as reference')
-    parser.add_argument('-c', '--context', default='', help='full path to another netCDF file to use as context (i.e. full record for the site being plotted)')
+    parser.add_argument('-r','--ref',help='full path to another netCDF file to use as reference')
+    parser.add_argument('-c', '--context', help='full path to another netCDF file to use as context (i.e. full record for the site being plotted)')
     parser.add_argument('-d', '--output-dir', default='.', help='Directory to output the .pdf plots to, the default is "outputs" in the code repo')
     parser.add_argument('--flag0',action='store_true',help='only plot flag=0 data with axis ranges only within the vmin/vmax values of each variable')
-    parser.add_argument('--cmap',default='PuBu',help='valid name of a matplotlib colormap https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html')
     parser.add_argument('--config', default=DEFAULT_CONFIG, help='full path to the input .toml file for variables to plot')
     parser.add_argument('--limits', default=DEFAULT_LIMITS, help='full path to the input .toml file for axis ranges')
     parser.add_argument('--show-all',action='store_true',help='if given, the axis ranges of the plots will automatically fit in all the data, even huge outliers')
-    parser.add_argument('--roll-window',type=int,default=500,help='Size of the rolling window in number of spectra')
-    parser.add_argument('--roll-gaps',default='20000 days',help='Minimum time interval for which the data will be split for rolling stats')
     parser.add_argument('--size',choices=('small','medium','large'),default='medium',help='Size of the figures, default is %(default)s')
     parser.add_argument('--quality',choices=('low','medium','high'),default='high',help='Quality of the figures, default is %(default)s')
 
     return vars(parser.parse_args())
 
 
-def driver(nc_in, config, flag0=False, show_all=False, output_dir='.', size='medium', quality='high', **kwargs):
+def driver(nc_in, config, ref=None, context=None, flag0=False, show_all=False, output_dir='.', size='medium', quality='high', **kwargs):
     with open(config) as f:
         config = tomli.load(f)
 
     with ExitStack() as stack:
         primary_styles = config.get('style', dict()).get('main', dict())
         data = [stack.enter_context(qc_plots2.TcconData(qc_plots2.DataCategory.PRIMARY, nc_in, styles=primary_styles))]
+        if context is not None:
+            context_styles = config.get('style', dict()).get('context', dict())
+            context_data = qc_plots2.TcconData(
+                qc_plots2.DataCategory.CONTEXT,
+                context,
+                exclude_times=data[0].times,
+                styles=context_styles
+            )
+            data.append(stack.enter_context(context_data))
+
+        if ref is not None:
+            ref_styles = config.get('style', dict()).get('ref', dict())
+            ref_data = qc_plots2.TcconData(
+                qc_plots2.DataCategory.REFERENCE,
+                ref,
+                styles=ref_styles,
+                allowed_flag_categories={qc_plots2.FlagCategory.FLAG0}
+            )
+            data.append(stack.enter_context(ref_data))
+
         plots = qc_plots2.setup_plots(config)
         fig_paths = []
         n = len(plots)

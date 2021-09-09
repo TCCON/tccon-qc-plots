@@ -163,15 +163,24 @@ class TcconData:
 
     def _get_flag0_label(self) -> str:
         site_name = self.nc_dset.long_name
-        return '{} flag==0'.format(site_name)
+        if self.data_category == DataCategory.PRIMARY:
+            return f'{site_name} flag==0'
+        else:
+            return f'{site_name} flag==0 ({self.data_category.value})'
 
     def _get_flagged_label(self) -> str:
         site_name = self.nc_dset.long_name
-        return '{} flagged'.format(site_name)
+        if self.data_category == DataCategory.PRIMARY:
+            return f'{site_name} flagged'
+        else:
+            return f'{site_name} flagged ({self.data_category.value})'
 
     def _get_alldata_label(self) -> str:
         site_name = self.nc_dset.long_name
-        return '{} all data'.format(site_name)
+        if self.data_category == DataCategory.PRIMARY:
+            return f'{site_name} all data'
+        else:
+            return f'{site_name} all data ({self.data_category.value})'
 
     @staticmethod
     def nctime_to_pytime(nc_time_var: ncdf.Variable):
@@ -202,9 +211,9 @@ class Limits:
         # Finally try getting limits from the variable in the netCDF dataset
         # If those attributes aren't present, default to None (i.e. do not set limits)
         vmins = [getattr(d.nc_dset[varname], 'vmin', None) for d in data]
-        vmins = [v for v in vmins if vmins is not None]
+        vmins = [v for v in vmins if v is not None]
         vmaxes = [getattr(d.nc_dset[varname], 'vmax', None) for d in data]
-        vmaxes = [v for v in vmaxes if vmaxes is not None]
+        vmaxes = [v for v in vmaxes if v is not None]
         vmin = min(vmins) if len(vmins) > 0 else None
         vmax = max(vmaxes) if len(vmaxes) > 0 else None
         return vmin, vmax
@@ -661,6 +670,11 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         self.freq = freq
         self.op = op
         self._time_buffer_days = time_buffer_days
+
+    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+                  img_path: Path = DEFAULT_IMG_DIR, tight=True):
+        data = self._get_main_data(data)
+        return super().make_plot([data], flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
         
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
         fig, ax = self._make_or_check_fig_ax_args(fig, axs)
@@ -1031,7 +1045,7 @@ class HexbinPlot(ScatterPlot):
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         flag_cat = self._get_flag_category(self._hexbin_flag_category, flag0_only)
-        clabel = f'{data.nc_dset.long_name} ({flag_cat.value} {data.data_category.value})'
+        clabel = data.get_flag0_or_all_label() if flag_cat is None else data.get_label(flag_cat)
 
         assert len(plot_args) == 1
         args = plot_args[0]
@@ -1080,7 +1094,7 @@ class HexbinPlot(ScatterPlot):
                 data_to_plot.append(d)
             elif d.data_category == DataCategory.CONTEXT and self._show_context:
                 data_to_plot.append(d)
-            else:
+            elif d.data_category not in {DataCategory.REFERENCE, DataCategory.CONTEXT}:
                 data_to_plot.append(d)
 
         return data_to_plot
@@ -1122,6 +1136,7 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         for args in plot_args:
+            args['kws'].pop('fit_style', None)
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend()
@@ -1197,6 +1212,7 @@ class Timeseries2PanelPlot(TimeseriesPlot):
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         plot_args = self.get_plot_args(data, flag0_only=flag0_only)
         for args in plot_args:
+            args['kws'].pop('fit_style', None)  # can't leave fit style in if present
             axs['main'].plot(args['data']['x'], args['data']['y'], **args['kws'])
             axs['error'].plot(args['data']['x'], args['data']['yerr'], **args['kws'])
 

@@ -67,7 +67,8 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
     label = label.format(fit=fitstr)
 
     # plot line fits
-    ax.plot(x, lin_model(x, fit[0], fit[1]), label=label, **style)
+    xfit = np.array([np.min(x), np.max(x)])
+    ax.plot(xfit, lin_model(xfit, fit[0], fit[1]), label=label, **style)
 
 
 def freq_op_str(freq, op):

@@ -14,13 +14,15 @@ flag0 = {color = "royalblue"}
 flagged = {color = "red"}
 
 [style.ref.scatter]
-all = {color = "lightgray"}
-flag0 = {color = "lightgray"}
+# use zorder to ensure reference data is always in the background
+all = {color = "lightgray", zorder=1.7, fit_style = {color = "slategray"}}
+flag0 = {color = "lightgray", zorder=1.7, fit_style = {color = "slategray"}}
 
 [style.context.scatter]
-all = {color = "royalblue"}
-flag0 = {color = "royalblue"}
-flagged = {color = "tomato"}
+# use zorder to keep context behind main data, with flagged data behind the flag0 data
+all = {color = "deepskyblue", zorder=1.85, fit_style = {color = "navy"}}
+flag0 = {color = "deepskyblue", zorder=1.85, fit_style = {color = "navy"}}
+flagged = {color = "gold", zorder=1.8}
 
 
 [style.main.hexbin]
@@ -28,8 +30,8 @@ all = {cmap = "PuBu", bins = "log", mincnt = 1}
 flag0 = {cmap = "PuBu", bins = "log", mincnt = 1}
 
 [style.context.hexbin]
-all = {cmap = "Grays", bins = "log", mincnt = 1, fit_style = {color = "black"}}
-flag0 = {cmap = "Grays", bins = "log", mincnt = 1, fit_style = {color = "black"}}
+all = {cmap = "Greys", bins = "log", mincnt = 1, zorder = 0.8, fit_style = {color = "black"}}
+flag0 = {cmap = "Greys", bins = "log", mincnt = 1, zorder = 0.8, fit_style = {color = "black"}}
 
 
 [style.default.timeseries]
@@ -85,8 +87,12 @@ all = {color = "royalblue"}
 flag0 = {color = "royalblue"}
 
 [style.ref.rolling-timeseries]
-all = {color = "lightgray"}
-flag0 = {color = "lightgray"}
+all = {color = "lightgray", zorder = 1.7}
+flag0 = {color = "lightgray", zorder = 1.7}
+median = {marker = "o", markersize = 1, color="slategray", zorder = 1.7}
+mean = {marker = "o", markersize = 1, color="slategray", zorder = 1.7}
+std = {marker = "o", markersize = 1, color="lightsteelblue", zorder = 1.7}
+quantile = {marker = "o", markersize = 1, color="lightsteelblue", zorder = 1.7}
 
 [style.context.rolling-timeseries]
 all = {color = "deepskyblue"}
