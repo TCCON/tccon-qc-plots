@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Optional, Sequence, Tuple, Union
+import warnings
 
 import tomli
 
@@ -363,7 +364,11 @@ class AbstractPlot(ABC):
             self._plot(d, i, axs=axs, flag0_only=flag0_only)
         fig_path = img_path / self.get_save_name()
         if tight:
-            fig.tight_layout()
+            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
+            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fig.tight_layout()
         fig.savefig(fig_path, dpi=300)
         plt.close(fig)
         return fig_path
