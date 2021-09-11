@@ -1,13 +1,15 @@
 from argparse import ArgumentParser
 from contextlib import ExitStack
 from pathlib import Path
+import tempfile
 from PIL import Image
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import sys
+import tempfile
 import tomli
 
 from . import qc_plots2, qc_email
-from .constants import DEFAULT_CONFIG, DEFAULT_LIMITS
+from .constants import DEFAULT_CONFIG, DEFAULT_IMG_DIR, DEFAULT_LIMITS
 
 
 def images_to_pdf(fig_path_list, pdf_path: Path, size='medium', quality='high'):
@@ -56,6 +58,7 @@ def send_email(pdf_path, nc_file, emails=(None, None), email_config=None):
                 send_to=emails[1],
                 attachment=pdf_path
             )
+            print('Email sent.')
 
     if email_config is not None:
         print(f'Sending {pdf_path} by email based on config file {email_config}')
@@ -67,6 +70,7 @@ def send_email(pdf_path, nc_file, emails=(None, None), email_config=None):
             attachment=pdf_path,
             nc_file=nc_basename
         )
+        print('Email sent.')
 
 
 def parse_args():
@@ -87,6 +91,8 @@ def parse_args():
     parser.add_argument('--show-all', action='store_true',
                         help='if given, the axis ranges of the plots will automatically fit in all the data, even '
                              'huge outliers')
+    parser.add_argument('--use-tmp-img-dir', action='store_true', help='Save intermediate images to a temporary directory, '
+                                                                       'instead of `outputs` in the code directory')
     parser.add_argument('--size', choices=('small', 'medium', 'large'), default='medium',
                         help='Size of the figures, default is %(default)s')
     parser.add_argument('--quality', choices=('low', 'medium', 'high'), default='high',
@@ -103,15 +109,23 @@ def parse_args():
                            help='Create a default email config TOML file and exit. The usual positional argument '
                                 '(NC_IN) will be used as the path to create the TOML file at.')
 
+    parser.add_argument('--pdb', action='store_true', help='Launch python debugger')
+
     return vars(parser.parse_args())
 
 
 def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.',
-           size='medium', quality='high', emails=(None, None), email_config=None, **_):
+           use_tmp_img_dir=False, size='medium', quality='high', emails=(None, None), email_config=None, **_):
     with open(config) as f:
         config = tomli.load(f)
 
     with ExitStack() as stack:
+        if use_tmp_img_dir:
+            img_dir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
+        else:
+            img_dir = Path(DEFAULT_IMG_DIR)
+        print(f'Will save intermediate images to {img_dir}')
+            
         primary_styles = config.get('style', dict()).get('main', dict())
         data = [stack.enter_context(
             qc_plots2.TcconData(
@@ -147,7 +161,7 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
             sys.stdout.write(f'  - Plot {i}/{n}: {plot.get_save_name()}')
             sys.stdout.flush()
             try:
-                this_path = plot.make_plot(data, flag0_only=flag0, show_all=show_all)
+                this_path = plot.make_plot(data, flag0_only=flag0, show_all=show_all, img_path=img_dir)
             except IndexError as err:
                 print(f' SKIPPED ({err})')
             else:
@@ -158,11 +172,15 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
         pdf_path = Path(output_dir) / pdf_name
         images_to_pdf(fig_paths, pdf_path, size=size, quality=quality)
 
-    send_email(emails, email_config, pdf_path)
+    send_email(pdf_path=pdf_path, nc_file=nc_in, emails=emails, email_config=email_config)
 
 
 def main():
     clargs = parse_args()
+    if clargs.pop('pdb'):
+        import pdb
+        pdb.set_trace()
+
     if clargs.pop('gen_email_config'):
         qc_email.write_default_config(clargs['nc_in'])
     else:
