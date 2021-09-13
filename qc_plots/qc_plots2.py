@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import timedelta, datetime
@@ -439,6 +440,18 @@ class AbstractPlot(ABC):
         }]
         return plot_args
 
+    @classmethod
+    def get_label_string(cls, main_data, variable):
+        units = cls.get_units(main_data, variable)
+        if units:  # okay to just check for truthiness; this way empty strings avoid leaving empty parentheses
+            return f'{variable} ({units})'
+        else:
+            return f'{variable}'
+
+    @staticmethod
+    def get_units(main_data, variable):
+        return getattr(main_data.nc_dset[variable], 'units', '')
+
     @abstractmethod
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
         pass
@@ -701,11 +714,7 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         ax.set_title(f'{self._title_prefix} ({freq_op_str})')
 
         main_data = self._get_main_data(data)
-        yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
-        if yunits:
-            ax.set_ylabel(f'{self.yvar} ({yunits})')
-        else:
-            ax.set_ylabel(f'{self.yvar}')
+        ax.set_ylabel(self.get_label_string(main_data, self.yvar))
 
         data_for_limits = self._get_data_for_limits(data)
         # We will override the x limits in the plotting function, since that knows the resampled frequency
@@ -982,17 +991,8 @@ class ScatterPlot(AbstractPlot):
             ax = axs
         ax.grid(True)
 
-        xunits = getattr(main_data.nc_dset[self.xvar], 'units', None)
-        if xunits:
-            ax.set_xlabel(f'{self.xvar} ({xunits})')
-        else:
-            ax.set_xlabel(f'{self.xvar}')
-
-        yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
-        if yunits:
-            ax.set_ylabel(f'{self.yvar} ({yunits})')
-        else:
-            ax.set_ylabel(f'{self.yvar}')
+        ax.set_xlabel(self.get_label_string(main_data, self.xvar))
+        ax.set_ylabel(self.get_label_string(main_data, self.yvar))
 
         if not show_all:
             # Reference data should not affect the limits
@@ -1173,6 +1173,43 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
         axs.legend(**plot_args[0]['legend_kws'])
 
 
+class TimeseriesDeltaPlot(TimeseriesPlot):
+    plot_kind = 'delta-timeseries'
+
+    def __init__(self, other_plots, yvar1, yvar2, default_style, limits: Limits, width=20, height=10,
+                 legend_kws: Optional[dict] = None, key=None, time_buffer_days=2):
+        super().__init__(other_plots=other_plots, yvar=yvar1, default_style=default_style, limits=limits,
+                         key=key, width=width, height=height, legend_kws=legend_kws, time_buffer_days=time_buffer_days)
+        self.yvar2 = yvar2
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, ax = super().setup_figure(data=data, show_all=show_all, fig=fig, axs=axs)
+        main_data = self._get_main_data(data)
+        yunits = self.get_units(main_data, self.yvar)
+        yunits2 = self.get_units(main_data, self.yvar2)
+        if yunits == yunits2:
+            ylabel = f'{self.yvar} - {self.yvar2} ({yunits})'
+        else:
+            print(f'\nWARNING: differencing variables ({self.yvar}, {self.yvar2}) with different units ({yunits}, {yunits2})', file=sys.stderr)
+            ylabel = f'{self.yvar} - {self.yvar2} ({yunits} - {yunits2})'
+        ax.set_ylabel(ylabel)
+        return fig, ax
+
+    def get_save_name(self):
+        return f'{self.yvar}_MINUS_{self.yvar2}_timeseries.png'
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        if flag_category is None:
+            x = data.get_flag0_or_all_data(self.xvar)
+            y1 = data.get_flag0_or_all_data(self.yvar)
+            y2 = data.get_flag0_or_all_data(self.yvar2)
+        else:
+            x = data.get_data(self.xvar, flag_category)
+            y1 = data.get_data(self.yvar, flag_category)
+            y2 = data.get_data(self.yvar2, flag_category)
+        return {'x': x, 'y': y1 - y2}
+
+
 class Timeseries2PanelPlot(TimeseriesPlot):
     plot_kind = 'timeseries-2panel'
 
@@ -1191,23 +1228,9 @@ class Timeseries2PanelPlot(TimeseriesPlot):
         for ax in axs.values():
             ax.grid(True)
 
-        xunits = getattr(main_data.nc_dset[self.xvar], 'units', None)
-        if xunits:
-            axs['main'].set_xlabel(f'{self.xvar} ({xunits})')
-        else:
-            axs['main'].set_xlabel(f'{self.xvar}')
-
-        yunits = getattr(main_data.nc_dset[self.yvar], 'units', None)
-        if yunits:
-            axs['main'].set_ylabel(f'{self.yvar} ({yunits})')
-        else:
-            axs['main'].set_ylabel(f'{self.yvar}')
-
-        yerr_units = getattr(main_data.nc_dset[self.yerror_var], 'units', None)
-        if yerr_units:
-            axs['error'].set_ylabel(f'{self.yerror_var} ({yerr_units})')
-        else:
-            axs['error'].set_ylabel(f'{self.yerror_var}')
+        axs['main'].set_xlabel(self.get_label_string(main_data, self.xvar))
+        axs['main'].set_ylabel(self.get_label_string(main_data, self.yvar))
+        axs['error'].set_ylabel(self.get_label_string(main_data, self.yerror_var))
 
         if not show_all:
             # Reference data should not affect the limits
@@ -1312,6 +1335,11 @@ class RollingDerivativePlot(TimeseriesPlot):
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
         fig, axs = super().setup_figure(data, show_all, fig, axs)
+        main_data = self._get_main_data(data)
+        yunits = self.get_units(main_data, self.yvar)
+        dunits = self.get_units(main_data, self.dvar)
+        axs.set_ylabel(f'{self.yvar}/{self.dvar} slope ({yunits}/{dunits})')
+
         deriv_str = self._derivative_str()
         axs.set_title(f'Rolling {deriv_str} timeseries')
         return fig, axs
@@ -1472,7 +1500,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         return f'{self.yvar}_rolling{self.rolling_window}_{ops}_timeseries.png'
 
 
-def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=True):
+def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):
     plots_config = config['plots']
     plots = []
     for iplot, section in enumerate(plots_config, start=1):

@@ -62,6 +62,19 @@ clone = 'scatter'
 clone = 'scatter'
 
 
+[style.default.delta-timeseries]
+clone = 'timeseries'
+
+[style.main.delta-timeseries]
+clone = 'timeseries'
+
+[style.ref.delta-timeseries]
+clone = 'timeseries'
+
+[style.context.delta-timeseries]
+clone = 'timeseries'
+
+
 [style.default.resampled-timeseries]
 clone = 'scatter'
 legend_kws = {ncol = 2}
