@@ -116,6 +116,10 @@ def parse_args():
 
 def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.',
            use_tmp_img_dir=False, size='medium', quality='high', emails=(None, None), email_config=None, **_):
+
+    print(f'Using {config} as plots configuration file')
+    print(f'Using {limits} as plots limits file')
+
     with open(config) as f:
         config = tomli.load(f)
 

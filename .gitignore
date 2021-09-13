@@ -60,3 +60,5 @@ Thumbs.db
 # the conda source file created by install.sh
 .init_conda
 
+# .egg-info created by setup.py
+*.egg-info
