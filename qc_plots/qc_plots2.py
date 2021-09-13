@@ -1,4 +1,3 @@
-import sys
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import timedelta, datetime
@@ -11,6 +10,7 @@ import netCDF4 as ncdf
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import sys
 from typing import Optional, Sequence, Tuple, Union
 import warnings
 
@@ -195,7 +195,7 @@ class Limits:
         with open(limits_file) as f:
             self.limits = tomli.load(f)
 
-    def get_limit(self, varname: str, data: Union[TcconData, Sequence[TcconData]], plot_kind: Optional[str] = None) -> Tuple[float, float]:
+    def get_limit(self, varname: str, data: Union[TcconData, Sequence[TcconData]], plot_kind: Optional[str] = None) -> Tuple[float, float, bool]:
         if isinstance(data, TcconData):
             data = [data]
 
@@ -203,12 +203,14 @@ class Limits:
         plot_section = self.limits.get(plot_kind, dict())
         plot_limits = self._get_var_from_section(varname, plot_section)
         if plot_limits is not None:
-            return tuple(plot_limits)
+            # If we found limits, the third return value is False to tell the caller to turn off axis autoscaling
+            return plot_limits[0], plot_limits[1], False
 
         defaults_section = self.limits.get('default', dict())
         default_limits = self._get_var_from_section(varname, defaults_section)
         if default_limits is not None:
-            return tuple(default_limits)
+            # If we found limits, the third return value is False to tell the caller to turn off axis autoscaling
+            return default_limits[0], default_limits[1], False
 
         # Finally try getting limits from the variable in the netCDF dataset
         # If those attributes aren't present, default to None (i.e. do not set limits)
@@ -218,7 +220,13 @@ class Limits:
         vmaxes = [v for v in vmaxes if v is not None]
         vmin = min(vmins) if len(vmins) > 0 else None
         vmax = max(vmaxes) if len(vmaxes) > 0 else None
-        return vmin, vmax
+        # In this branch whether or not the caller should turn of autoscaling depends on whether or not we found
+        # both limits. If missing either, we should allow autoscaling so that the plot displays properly. Even
+        # setting limits as `None` will turn off autoscaling by default.
+        if (vmin is None) != (vmax is None):
+            print(f'\nWARNING: found only one limit for variable {varname}; it will be ignored', file=sys.stderr)
+        autoscale = vmin is None or vmax is None
+        return vmin, vmax, autoscale
 
     @staticmethod
     def _get_var_from_section(varname: str, section: dict):
@@ -720,7 +728,8 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         # We will override the x limits in the plotting function, since that knows the resampled frequency
         self.format_time_axis(ax, data_for_limits, show_all=show_all)
         if not show_all:
-            ax.set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
+            ymin, ymax, yscale = self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind)
+            ax.set_ylim(ymin, ymax, auto=yscale)
         ax.grid(True)
 
         return fig, ax
@@ -997,8 +1006,10 @@ class ScatterPlot(AbstractPlot):
         if not show_all:
             # Reference data should not affect the limits
             data_for_limits = self._get_data_for_limits(data)
-            ax.set_xlim(self._limits.get_limit(self.xvar, data_for_limits, self.plot_kind))
-            ax.set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
+            xmin, xmax, xscale = self._limits.get_limit(self.xvar, data_for_limits, self.plot_kind)
+            ax.set_xlim(xmin, xmax, auto=xscale)
+            ymin, ymax, yscale = self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind)
+            ax.set_ylim(ymin, ymax, auto=yscale)
 
         ax.set_title(f'{self.yvar} vs. {self.xvar}')
 
@@ -1130,7 +1141,10 @@ class HexbinPlot(ScatterPlot):
 
     def _compute_extent(self, x, y, data):
         def get_limits_inner(varname, xy):
-            lims = self._limits.get_limit(varname, data)
+            # autoscaling is irrelevant for the hexbin plots - if we don't have a priori
+            # limits, we calculate them from the data
+            limmin, limmax, _ = self._limits.get_limit(varname, data)
+            lims = [limmin, limmax]
             if None in lims:
                 if isinstance(xy, np.ma.masked_array):
                     xy = xy.filled(np.nan)
@@ -1235,8 +1249,10 @@ class Timeseries2PanelPlot(TimeseriesPlot):
         if not show_all:
             # Reference data should not affect the limits
             data_for_limits = self._get_data_for_limits(data)
-            axs['main'].set_ylim(self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind))
-            axs['error'].set_ylim(self._limits.get_limit(self.yerror_var, data_for_limits, self.plot_kind))
+            ymin, ymax, yscale = self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind)
+            axs['main'].set_ylim(ymin, ymax, auto=yscale)
+            ymin2, ymax2, yscale2 = self._limits.get_limit(self.yerror_var, data_for_limits, self.plot_kind)
+            axs['error'].set_ylim(ymin2, ymax2, auto=yscale2)
 
         # For whatever reason, both axes need their format set for the ticks to behave properly
         for ax in axs.values():

@@ -355,6 +355,10 @@ kind = "timeseries"
 yvar = "wspd"
 
 [[plots]]
+kind = "timeseries"
+yvar = "prior_index"
+
+[[plots]]
 kind = "scatter"
 xvar = "solzen"
 yvar = "xco2"
