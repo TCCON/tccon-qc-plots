@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from datetime import timedelta, datetime
+from datetime import datetime
 from enum import Enum
 from fnmatch import fnmatch
 import matplotlib.dates as mdates
@@ -56,14 +56,25 @@ class TcconData:
                  nc_file,
                  styles: dict,
                  exclude_times=None,
+                 include_times=None,
                  allowed_flag_categories=None):
         self.data_category = data_category
         self.nc_dset = ncdf.Dataset(nc_file)
         self.styles = styles
-        self.times = self.nctime_to_pytime(self.nc_dset['time'])
+
+        # Directly converting the netCDF times to matplotlib times is ~700x
+        # faster, in my testing (JLL). I've done my best to check that the
+        # conversion will be accurate within the `nctime_to_mpltime` function
+        # by verifying that at least one conversion is correct. 
+        #
+        self.datetimes = self.nctime_to_pytime(self.nc_dset['time'])
+        # self.times = self.pytime_to_mpltime(self.datetimes)
+        self.times = self.nctime_to_mpltime(self.nc_dset['time'])
 
         if exclude_times is not None:
             self.all_idx = (self.times < np.min(exclude_times)) | (self.times > np.max(exclude_times))
+        elif include_times is not None:
+            self.all_idx = (self.times >= np.min(include_times)) & (self.times <= np.max(include_times))
         else:
             self.all_idx = np.ones(self.times.shape, dtype=np.bool_)
 
@@ -124,6 +135,8 @@ class TcconData:
     def _get_variable(self, varname) -> Union[np.ndarray, np.ma.masked_array]:
         if varname == 'time':
             return self.times
+        elif varname == 'datetime':
+            return self.datetimes
         else:
             return self.nc_dset[varname][tuple()]
 
@@ -188,6 +201,25 @@ class TcconData:
     def nctime_to_pytime(nc_time_var: ncdf.Variable):
         cftimes = ncdf.num2date(nc_time_var[:], units=nc_time_var.units, calendar=nc_time_var.calendar)
         return np.array([datetime(*t.timetuple()[:6]) for t in cftimes])
+
+    @staticmethod
+    def pytime_to_mpltime(pytimes):
+        return mdates.date2num(pytimes)
+
+    @staticmethod
+    def nctime_to_mpltime(nc_time_var: ncdf.Variable):
+        # First, check that the matplotlib epoch is the numpy epoch
+        mpl_epoch = np.datetime64(mdates.get_epoch()).astype('float')
+        assert np.isclose(mpl_epoch, 0)
+
+        # Second, check that converting to numpy.datetime64[s] gives the same answer as converting
+        # to the python time first
+        cftime = ncdf.num2date(nc_time_var[0], units=nc_time_var.units, calendar=nc_time_var.calendar)
+        pytime = datetime(*cftime.timetuple()[:6])
+        assert pytime == nc_time_var[0].astype('datetime64[s]').item()
+
+        # If so we can do a very efficient conversion
+        return mdates.date2num(nc_time_var[:].astype('datetime64[s]'))
 
 
 class Limits:
@@ -486,8 +518,9 @@ class TimeseriesMixin:
     @staticmethod
     def format_time_axis_custom_times(ax, first_time, last_time, buffer_days=2, show_all: bool = False):
         if not show_all:
-            xmin = first_time - timedelta(days=buffer_days)
-            xmax = last_time + timedelta(days=buffer_days)
+            # assumes that times are in Matplotlib date numbers, which are days since some epoch
+            xmin = first_time - buffer_days
+            xmax = last_time + buffer_days
             ax.set_xlim(xmin, xmax)
 
         # Also override the x-axis label
@@ -749,16 +782,18 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
             }]
 
     def get_plot_data(self, data: TcconData, flag_category: FlagCategory):
+        # NB: unlike other plots, we need actual datetime types for time to
+        # permit resampling to work.
         if flag_category is None:
             data = {
-                'time': data.get_flag0_or_all_data('time'),
+                'time': data.get_flag0_or_all_data('datetime'),
                 'solzen': data.get_flag0_or_all_data('solzen'),
                 'azim': data.get_flag0_or_all_data('azim'),
                 'y': data.get_flag0_or_all_data(self.yvar),
             }
         else:
             data = {
-                'time': data.get_data('time', flag_category),
+                'time': data.get_data('datetime', flag_category),
                 'solzen': data.get_data('solzen', flag_category),
                 'azim': data.get_data('azim', flag_category),
                 'y': data.get_data(self.yvar, flag_category)
@@ -792,6 +827,9 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         xx_sza = (df['solzen'] >= sza_min) & (df['solzen'] <= sza_max)
         xx_am = df['azim'] <= 180
         xx_pm = df['azim'] > 180
+
+        # Also need to make an additional column that converts the Matplotlib date numbers
+        # back into actual time stamps
 
         df_am = df.loc[xx_sza & xx_am, :].set_index('time').resample(self.freq)
         df_am = getattr(df_am, self.op)()  # this gets the method named `self.op` and calls it
@@ -1311,10 +1349,10 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
 
     def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
         if flag_category is None:
-            x = data.get_flag0_or_all_data(self.xvar)
+            x = data.get_flag0_or_all_data('datetime')
             y = data.get_flag0_or_all_data(self.yvar)
         else:
-            x = data.get_data(self.xvar, flag_category)
+            x = data.get_data('datetime', flag_category)
             y = data.get_data(self.yvar, flag_category)
 
         # Now we need to resample the data to the specified frequency before returning it
@@ -1393,11 +1431,11 @@ class RollingDerivativePlot(TimeseriesPlot):
         if flag_category is None:
             x = data.get_flag0_or_all_data(self.dvar)
             y = data.get_flag0_or_all_data(self.yvar)
-            t = data.get_flag0_or_all_data('time')
+            t = data.get_flag0_or_all_data('datetime')
         else:
             x = data.get_data(self.dvar, flag_category)
             y = data.get_data(self.yvar, flag_category)
-            t = data.get_data('time', flag_category)
+            t = data.get_data('datetime', flag_category)
         return {'x': x, 'y': y, 't': t}
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], _format_label: bool = True) -> dict:
@@ -1446,8 +1484,8 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         return fig, axs
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
-        def roll(x, y, o):
-            tmp = self.roll_data(x, y, npts=self.rolling_window, ops=o, gap=self.gap)
+        def roll(x, y, t, o):
+            tmp = self.roll_data(x, y, times=t, npts=self.rolling_window, ops=o, gap=self.gap)
             return {'x': tmp['x'].to_numpy(), 'y': tmp['y'].to_numpy()}
 
         flag_category = self._get_flag_category(self.flag_category, flag0_only)
@@ -1456,20 +1494,20 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
         args = [{'data': raw_data_vals, 'kws': raw_data_kws, 'legend_kws': self.get_legend_kws()}]
         for op in self.ops:
-            op_vals = roll(raw_data_vals['x'], raw_data_vals['y'], op)
+            op_vals = roll(raw_data_vals['x'], raw_data_vals['y'], raw_data_vals['t'], op)
             op_kws = self.get_plot_kws(data, flag_category, op=op)
             args.append({'data': op_vals, 'kws': op_kws})
 
             if self.uncertainty and op == 'mean':
-                dy = roll(raw_data_vals['x'], raw_data_vals['y'], 'std')['y']
+                dy = roll(raw_data_vals['x'], raw_data_vals['y'], raw_data_vals['t'], 'std')['y']
                 unc_kws = self.get_plot_kws(data, flag_category, op='std')
                 unc_kws['label'] = 'Uncertainty on mean'
                 args.append({'data': {'x': op_vals['x'], 'y': op_vals['y'] + dy}, 'kws': deepcopy(unc_kws)})
                 unc_kws['label'] = ''  # don't show the label for the second series
                 args.append({'data': {'x': op_vals['x'], 'y': op_vals['y'] - dy}, 'kws': unc_kws})
             elif self.uncertainty and op == 'median':
-                uq = roll(raw_data_vals['x'], raw_data_vals['y'], 'quantile0.75')
-                lq = roll(raw_data_vals['x'], raw_data_vals['y'], 'quantile0.25')
+                uq = roll(raw_data_vals['x'], raw_data_vals['y'], raw_data_vals['t'], 'quantile0.75')
+                lq = roll(raw_data_vals['x'], raw_data_vals['y'], raw_data_vals['t'], 'quantile0.25')
                 unc_kws = self.get_plot_kws(data, flag_category, 'quantile')
                 unc_kws['label'] = 'Uncertainty on median (interquartile range)'
                 args.append({'data': uq, 'kws': deepcopy(unc_kws)})
@@ -1477,6 +1515,18 @@ class RollingTimeseriesPlot(TimeseriesPlot):
                 args.append({'data': lq, 'kws': deepcopy(unc_kws)})
 
         return args
+    
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        if flag_category is None:
+            x = data.get_flag0_or_all_data(self.xvar)
+            y = data.get_flag0_or_all_data(self.yvar)
+            t = data.get_flag0_or_all_data('datetime')
+        else:
+            x = data.get_data(self.xvar, flag_category)
+            y = data.get_data(self.yvar, flag_category)
+            t = data.get_data('datetime', flag_category)
+        return {'x': x, 'y': y, 't': t}
+
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], op=None, _format_label: bool = True) -> dict:
         # Get the default style: style dictionaries are organized plot_kind -> flag category,

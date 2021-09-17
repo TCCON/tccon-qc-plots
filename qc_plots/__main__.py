@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from contextlib import ExitStack
+import numpy as np
 from pathlib import Path
 import tempfile
 from PIL import Image
@@ -138,6 +139,8 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 styles=primary_styles
             ))]
 
+        ref_include_times = [np.min(data[0].times), np.max(data[0].times)]
+
         if context is not None:
             context_styles = config.get('style', dict()).get('context', dict())
             context_data = qc_plots2.TcconData(
@@ -147,6 +150,7 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 styles=context_styles
             )
             data.append(stack.enter_context(context_data))
+            ref_include_times += [np.min(data[1].times), np.max(data[1].times)]
 
         if ref is not None:
             ref_styles = config.get('style', dict()).get('ref', dict())
@@ -154,6 +158,7 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 qc_plots2.DataCategory.REFERENCE,
                 ref,
                 styles=ref_styles,
+                include_times=ref_include_times,  # ensure reference data only plotted for times when context or main data exists
                 allowed_flag_categories={qc_plots2.FlagCategory.FLAG0}
             )
             data.append(stack.enter_context(ref_data))
