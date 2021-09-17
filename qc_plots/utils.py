@@ -1,3 +1,4 @@
+import froll
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
@@ -76,6 +77,28 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
     # plot line fits
     xfit = np.array([np.min(x), np.max(x)])
     ax.plot(xfit, _lin_model(xfit, fit[0], fit[1]), label=label, **style)
+
+
+def fortran_rolling_derivatives(x, y, window, min_periods=1):
+    if not isinstance(x,np.ndarray) or np.ndim(x) != 1:
+        raise TypeError('x must be a 1D numpy array)')
+
+    if not isinstance(y,np.ndarray) or np.ndim(y) != 1:
+        raise TypeError('y must be a 1D numpy array)')
+
+    if x.size != y.size:
+        raise TypeError('x and y must be the same size')
+
+    # The fortran code expects double precision; convert only if necessary
+    if x.dtype != 'float64':
+        x = x.astype('float64')
+    if x.dtype != 'float64':
+        y = y.astype('float64')
+
+    slopes = np.full_like(x, np.nan)
+    froll.rolling_linfit(x, y, window, min_periods, x.size, slopes)
+    return slopes
+
 
 
 def freq_op_str(freq, op):

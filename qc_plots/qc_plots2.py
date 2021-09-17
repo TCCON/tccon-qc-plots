@@ -1400,20 +1400,18 @@ class RollingDerivativePlot(TimeseriesPlot):
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         def roll(x, y, t):
+            if self.derivative_order != 1:
+                raise NotImplementedError('Only derivatives of order 1 implemented')
+                
             df = pd.DataFrame({'x': x, 'y': y, 't': t})
             all_derivatives = []
             for _, grouped_df in self.split_by_gaps(df, self.gap, 't'):
-                derivatives = np.full(grouped_df.shape[0], np.nan)
-
-                i = -1
-                for roll_df in grouped_df.rolling(self.rolling_window, center=True, min_periods=1):
-                    i += 1
-                    if self.derivative_order == 1:
-                        fit, _, _ = utils.compute_linfit(roll_df['x'].to_numpy(), roll_df['y'].to_numpy())
-                        derivatives[i] = fit[0]  # fit has slope then intercept
-                    else:
-                        raise NotImplementedError('Only derivatives of order 1 implemented')
-
+                derivatives = utils.fortran_rolling_derivatives(
+                    x = grouped_df['x'].to_numpy(),
+                    y = grouped_df['y'].to_numpy(),
+                    window=self.rolling_window,
+                    min_periods=1
+                )
                 all_derivatives.append(pd.DataFrame({'x': grouped_df['t'], 'y': derivatives}))
 
             return pd.concat(all_derivatives)
