@@ -43,6 +43,10 @@ def compute_linfit(x, y, yerr=None):
     x = np.array(x)
     y = np.array(y)
 
+    if x.size == 0 or y.size == 0:
+        # Can't fit with no data; return NaNs for everything
+        return np.full(2, np.nan), np.full([2,2], np.nan), np.nan
+
     # linear fit using y = a*x + b
     if yerr is not None:
         yerr = np.array(yerr)
@@ -66,6 +70,10 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
         - x: x axis data
         - y: y axis data
     """
+    if np.size(x) == 0:
+        # if no data, the min/max ops will fail - and there's nothing to
+        # do anyway, so return early.
+        return
 
     fit, cov, R = compute_linfit(x, y, yerr)
 
@@ -74,9 +82,10 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
     )
     label = label.format(fit=fitstr)
 
-    # plot line fits
-    xfit = np.array([np.min(x), np.max(x)])
-    ax.plot(xfit, _lin_model(xfit, fit[0], fit[1]), label=label, **style)
+    # plot line fits. 
+    if np.size(x) > 0:
+        xfit = np.array([np.min(x), np.max(x)])
+        ax.plot(xfit, _lin_model(xfit, fit[0], fit[1]), label=label, **style)
 
 
 def fortran_rolling_derivatives(x, y, window, min_periods=1):

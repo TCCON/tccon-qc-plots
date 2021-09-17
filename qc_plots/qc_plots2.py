@@ -534,6 +534,11 @@ class TimeseriesMixin:
 
     @staticmethod
     def resample_data(times, yvals, freq, op):
+        if np.size(yvals) == 0:
+            # If no data, the index will not be a DatetimeIndex and the resampling
+            # will error. Avoid that by returning an empty dataframe.
+            return pd.DataFrame({'y': []}, index=pd.DatetimeIndex([]))
+
         df = pd.DataFrame({'y': yvals}, index=times)
         df = getattr(df.resample(freq), op)()  # this retrieves the method named `op` and calls it
         return df['y']
@@ -1402,6 +1407,11 @@ class RollingDerivativePlot(TimeseriesPlot):
         def roll(x, y, t):
             if self.derivative_order != 1:
                 raise NotImplementedError('Only derivatives of order 1 implemented')
+            
+            if np.size(x) == 0:
+                # Empty data will cause this to break. Return early.
+                return pd.DataFrame({'x': [], 'y': []})
+
                 
             df = pd.DataFrame({'x': x, 'y': y, 't': t})
             all_derivatives = []
@@ -1483,6 +1493,10 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
         def roll(x, y, t, o):
+            if np.size(x) == 0:
+                # No data will cause the roll_data function to break, so just return empty arrays
+                return {'x': np.array([]), 'y': np.array([])}
+
             tmp = self.roll_data(x, y, times=t, npts=self.rolling_window, ops=o, gap=self.gap)
             return {'x': tmp['x'].to_numpy(), 'y': tmp['y'].to_numpy()}
 
