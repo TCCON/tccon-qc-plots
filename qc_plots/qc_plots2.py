@@ -716,7 +716,7 @@ class FlagAnalysisPlot(AbstractPlot):
         barplot_pcnt = flag_df_pcnt.plot(kind='bar', ax=axs[1], **plot_args['kws'])
 
         # Annotate the bars with the exact counts/percentages
-        formats = ['{:.0f}', '{:.2f}']
+        formats = ['{:.0f}', '{:.2f}%']
         for i, curplot in enumerate([barplot, barplot_pcnt]):
             for p in curplot.patches:
                 label = formats[i].format(p.get_height())
