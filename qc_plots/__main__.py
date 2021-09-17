@@ -83,6 +83,7 @@ def parse_args():
                                                 'for the site being plotted)')
     parser.add_argument('-d', '--output-dir', default='.', help='Directory to output the .pdf plots to, the default is '
                                                                 '"outputs" in the code repo')
+    parser.add_argument('--suffix', default='', help='Suffix to append to the PDF name before the extension. Default is nothing.') 
     parser.add_argument('--flag0', action='store_true', help='only plot flag=0 data with axis ranges only within the '
                                                              'vmin/vmax values of each variable')
     parser.add_argument('--config', default=DEFAULT_CONFIG,
@@ -115,7 +116,7 @@ def parse_args():
     return vars(parser.parse_args())
 
 
-def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.',
+def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.', suffix='',
            use_tmp_img_dir=False, size='medium', quality='high', emails=(None, None), email_config=None, **_):
 
     print(f'Using {config} as plots configuration file')
@@ -177,7 +178,9 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 print(' DONE')
                 fig_paths.append(this_path)
 
-        pdf_name = Path(nc_in).with_suffix('.pdf' if not flag0 else '.flag0.pdf').name
+        reg_ext = '{}.pdf'.format(suffix)
+        flag0_ext = '{}.flag0.pdf'.format(suffix)
+        pdf_name = Path(nc_in).with_suffix(reg_ext if not flag0 else flag0_ext).name
         pdf_path = Path(output_dir) / pdf_name
         images_to_pdf(fig_paths, pdf_path, size=size, quality=quality)
 
