@@ -8,6 +8,7 @@ from PyPDF2 import PdfFileWriter, PdfFileReader
 import sys
 import tempfile
 import tomli
+from urllib.parse import urljoin
 
 from . import qc_plots2, qc_email
 from .constants import DEFAULT_CONFIG, DEFAULT_IMG_DIR, DEFAULT_LIMITS
@@ -44,20 +45,23 @@ def images_to_pdf(fig_path_list, pdf_path: Path, size='medium', quality='high'):
         temp_pdf_path.unlink()
 
 
-def send_email(pdf_path, nc_file, emails=(None, None), email_config=None):
+def send_email(pdf_path, nc_file, emails=(None, None), email_config=None, attach_plots=True, plot_url=None):
     if any(e is not None for e in emails):
         if not all(e is not None for e in emails):
             print('WARNING: provided either a sender or receiver email but not both; will not use the provided email')
         else:
             print(f'Sending {pdf_path} by email from {emails[0]} to {emails[1]}')
             subject = 'TCCON QC plots: {}'.format(Path(pdf_path).name)
-            body = "This email was sent from the python program qc_plots"
+            body = "This email was sent from the python program qc_plots."
+            if plot_url is not None:
+                full_plot_url = urljoin(plot_url, Path(pdf_path).name)
+                body += ' Plots hosted at {full_plot_url}.'
             qc_email.send_email(
                 subject=subject,
                 body=body,
                 send_from=emails[0],
                 send_to=emails[1],
-                attachment=pdf_path
+                attachment=pdf_path if attach_plots else None
             )
             print('Email sent.')
 
@@ -68,8 +72,9 @@ def send_email(pdf_path, nc_file, emails=(None, None), email_config=None):
         qc_email.send_email_from_config(
             email_config,
             site_id=site_id,
-            attachment=pdf_path,
-            nc_file=nc_basename
+            attachment=pdf_path if attach_plots else None,
+            nc_file=nc_basename,
+            plot_url=urljoin(plot_url, Path(pdf_path).name) if plot_url is not None else None
         )
         print('Email sent.')
 
@@ -111,13 +116,21 @@ def parse_args():
                            help='Create a default email config TOML file and exit. The usual positional argument '
                                 '(NC_IN) will be used as the path to create the TOML file at.')
 
+    parser.add_argument('--plot-url', help='URL where the plots are served from. A web server must be configured to map this URL to the output directory.')
+    parser.add_argument('--no-attach-plots', dest='attach_plots', action='store_false', 
+                        help='Do not attach plots to the email. If --plot-url is not provided, a warning is issued (as there will be '
+                             'no indication in the email how to access the plots.')
     parser.add_argument('--pdb', action='store_true', help='Launch python debugger')
 
     return vars(parser.parse_args())
 
 
 def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.', suffix='',
-           use_tmp_img_dir=False, size='medium', quality='high', emails=(None, None), email_config=None, **_):
+           use_tmp_img_dir=False, size='medium', quality='high', emails=(None, None), email_config=None, 
+           plot_url=None, attach_plots=True, **_):
+
+    if not attach_plots and plot_url is None:
+        print('WARNING: attach_plots is False and plot_url is None; the email will give no indication how to access the plots', file=sys.stderr)
 
     print(f'Using {config} as plots configuration file')
     print(f'Using {limits} as plots limits file')
@@ -184,7 +197,7 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
         pdf_path = Path(output_dir) / pdf_name
         images_to_pdf(fig_paths, pdf_path, size=size, quality=quality)
 
-    send_email(pdf_path=pdf_path, nc_file=nc_in, emails=emails, email_config=email_config)
+    send_email(pdf_path=pdf_path, nc_file=nc_in, emails=emails, email_config=email_config, attach_plots=attach_plots, plot_url=plot_url)
 
 
 def main():

@@ -104,11 +104,13 @@ def send_email(subject, body, send_from, send_to, attachment, smtp_args=None, au
     message['To'] = send_to
     message['Subject'] = subject
     message.attach(MIMEText(body, 'plain'))
-    with open(attachment, 'rb') as infile:
-        payload = MIMEApplication(infile.read(), _subtype='pdf')
-    encoders.encode_base64(payload)
-    payload.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment))
-    message.attach(payload)
+
+    if attachment is not None:
+        with open(attachment, 'rb') as infile:
+            payload = MIMEApplication(infile.read(), _subtype='pdf')
+        encoders.encode_base64(payload)
+        payload.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment))
+        message.attach(payload)
 
     # send the message with SMTP
     if smtp_args is not None:
@@ -150,16 +152,21 @@ def send_email_ext(subject, body, send_from, send_to, attachment, cfg):
     sflag = cfg['subject_flag']
     pgrm = cfg['program']
 
-    args = [pgrm, sflag, subject, fflag, send_from, aflag, attachment, send_to]
+    args = [pgrm, sflag, subject, fflag, send_from, send_to]
+    if attachment is not None:
+        args.insert(-1, aflag)
+        args.insert(-1, str(attachment))
+
     if cfg['body_arg'] == 'stdin':
-        run(args, input=body.encode('utf8'))
+        run(args, input=body.encode('utf8'), check=True)
+        print('Email sent using command: {} < {}'.format(' '.join(args), body.encode('utf8')))
     else:
         raise NotImplementedError('body_arg == {} not implemented for sending an email by an external program'.format(
             cfg['body_arg']
         ))
 
 
-def send_email_from_config(cfg_file, site_id, attachment, nc_file):
+def send_email_from_config(cfg_file, site_id, attachment, nc_file, plot_url=None):
     """Send an email using a config dictionary to determine how to send it.
 
     Inputs:
@@ -177,10 +184,20 @@ def send_email_from_config(cfg_file, site_id, attachment, nc_file):
 
     to_addr = cfg['email']['to']
     from_addr = cfg['email']['from']
-    body = cfg['email'].get('body', _default_body).format(
+    body = cfg['email'].get('body', _default_body)
+
+    # We need to make sure that the plot_url makes it into the body of the email even if
+    # there isn't a slot for it in the configured body.
+    if plot_url is not None and '{plot_url}' not in body:
+        body += ' The plots are available at {plot_url}'
+
+
+    body = body.format(
         date=datetime.now(timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M %Z'),
-        basename=os.path.basename(nc_file)
+        basename=os.path.basename(nc_file),
+        plot_url=plot_url
     )
+
     if cfg['email']['subject_from_site_id']:
         try:
             subject = '[#{}]'.format(cfg['email']['sites'][site_id])
