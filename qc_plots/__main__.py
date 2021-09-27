@@ -15,7 +15,14 @@ from . import qc_plots2, qc_email
 from .constants import DEFAULT_CONFIG, DEFAULT_IMG_DIR, DEFAULT_LIMITS
 
 
-def images_to_pdf(fig_path_list, plots: Sequence[qc_plots2.AbstractPlot], pdf_path: Path, nc_path: Path, size='medium', quality='high', cfg: Optional[dict] = None):
+def images_to_pdf(fig_path_list, 
+                  plots: Sequence[qc_plots2.AbstractPlot], 
+                  pdf_path: Path, 
+                  nc_path: Path, 
+                  size='medium', 
+                  quality='high', 
+                  cfg: Optional[dict] = None):
+
     size_divisor = {'small': 3, 'medium': 2, 'large': 1}[size]
     quality = {'low': 30, 'medium': 60, 'high': 95}[quality]
     temp_pdf_path = pdf_path.with_suffix('.tmp.pdf')
@@ -33,7 +40,7 @@ def images_to_pdf(fig_path_list, plots: Sequence[qc_plots2.AbstractPlot], pdf_pa
             except AttributeError:
                 # We get an attribute error if opening a file produces a None, since it can't seek
                 raise IOError('Error opening plot file "{}" for concatenation into the PDF'.format(fig_path))
-        im_list = [im.resize((im.width // size_divisor, im.height // size_divisor)) for im in im_list]
+        im_list = [im.resize((im.width // size_divisor, im.height // size_divisor), resample=Image.LANCZOS) for im in im_list]
         im_list[0].save(temp_pdf_path, "PDF", quality=quality, save_all=True, append_images=im_list[1:])
 
         # add bookmarks to the temporary pdf file and save the final file
@@ -77,7 +84,7 @@ def _add_bookmarks_to_pdf(input: PdfFileReader, output: PdfFileWriter, plots: Se
             output.addBookmark(p.name, i)
 
 
-def send_email(pdf_path, nc_file, emails=(None, None), email_config=None, attach_plots=True, plot_url=None):
+def send_email(pdf_path, email_pdf_path, nc_file, emails=(None, None), email_config=None, attach_plots=True, plot_url=None):
     if any(e is not None for e in emails):
         if not all(e is not None for e in emails):
             print('WARNING: provided either a sender or receiver email but not both; will not use the provided email')
@@ -87,13 +94,13 @@ def send_email(pdf_path, nc_file, emails=(None, None), email_config=None, attach
             body = "This email was sent from the python program qc_plots."
             if plot_url is not None:
                 full_plot_url = urljoin(plot_url, Path(pdf_path).name)
-                body += ' Plots hosted at {full_plot_url}.'
+                body += f' Plots hosted at {full_plot_url}.'
             qc_email.send_email(
                 subject=subject,
                 body=body,
                 send_from=emails[0],
                 send_to=emails[1],
-                attachment=pdf_path if attach_plots else None
+                attachment=email_pdf_path if attach_plots else None
             )
             print('Email sent.')
 
@@ -104,7 +111,7 @@ def send_email(pdf_path, nc_file, emails=(None, None), email_config=None, attach
         qc_email.send_email_from_config(
             email_config,
             site_id=site_id,
-            attachment=pdf_path if attach_plots else None,
+            attachment=email_pdf_path if attach_plots else None,
             nc_file=nc_basename,
             plot_url=urljoin(plot_url, Path(pdf_path).name) if plot_url is not None else None
         )
@@ -152,17 +159,26 @@ def parse_args():
     parser.add_argument('--no-attach-plots', dest='attach_plots', action='store_false', 
                         help='Do not attach plots to the email. If --plot-url is not provided, a warning is issued (as there will be '
                              'no indication in the email how to access the plots.')
+    parser.add_argument('--attachment-size', choices=('small', 'medium', 'large'), default=None,
+                        help='Size for the attached plots, will use --size if not specified.')
+    parser.add_argument('--attachment-quality', choices=('low', 'medium', 'high'), default=None,
+                        help='Quality for the attached plots, will use --quality if not specified.')        
     parser.add_argument('--pdb', action='store_true', help='Launch python debugger')
 
     return vars(parser.parse_args())
 
 
 def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.', suffix='',
-           use_tmp_img_dir=False, size='medium', quality='high', emails=(None, None), email_config=None, 
-           plot_url=None, attach_plots=True, **_):
+           use_tmp_img_dir=False, size='medium', quality='high', attachment_size=None, attachment_quality=None,
+           emails=(None, None), email_config=None, plot_url=None, attach_plots=True, **_):
 
     if not attach_plots and plot_url is None:
         print('WARNING: attach_plots is False and plot_url is None; the email will give no indication how to access the plots', file=sys.stderr)
+
+    if attachment_size is None:
+        attachment_size = size
+    if attachment_quality is None:
+        attachment_quality = quality
 
     print(f'Using {config} as plots configuration file')
     print(f'Using {limits} as plots limits file')
@@ -228,8 +244,15 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
         pdf_name = Path(nc_in).with_suffix(reg_ext if not flag0 else flag0_ext).name
         pdf_path = Path(output_dir) / pdf_name
         images_to_pdf(fig_paths, plots, pdf_path, Path(nc_in), size=size, quality=quality, cfg=config)
+        
+        if attachment_quality != quality or attachment_size != size:
+            email_pdf_path = Path(stack.enter_context(tempfile.TemporaryDirectory()))
+            email_pdf_path = email_pdf_path / pdf_name
+            images_to_pdf(fig_paths, plots, email_pdf_path, Path(nc_in), size=attachment_size, quality=attachment_quality, cfg=config)
+        else:
+            email_pdf_path = pdf_path
 
-    send_email(pdf_path=pdf_path, nc_file=nc_in, emails=emails, email_config=email_config, attach_plots=attach_plots, plot_url=plot_url)
+        send_email(pdf_path=pdf_path, email_pdf_path=email_pdf_path, nc_file=nc_in, emails=emails, email_config=email_config, attach_plots=attach_plots, plot_url=plot_url)
 
 
 def main():
