@@ -31,33 +31,91 @@ from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 #   - Test uncertainty and multiple ops for the rolling plots
 
 class FlagCategory(Enum):
+    """An enumeration representing different subsets of data
+    """
     ALL_DATA = 'all'
     FLAG0 = 'flag0'
     FLAGGED = 'flagged'
 
 
 class DataCategory(Enum):
+    """An enumeration representing different roles of a data file
+
+    The roles are:
+
+    * ``PRIMARY`` - the main data being plotted, this will usually be the :file:`*.nc` file given
+      as a positional argument to the plotting script.
+    * ``REFERENCE`` - good quality data used as a reference to compare the primary data against.
+    * ``CONTEXT`` - a longer timeseries to put the primary data in context of the full instrument record
+    """
     PRIMARY = 'primary'
     REFERENCE = 'reference'
     CONTEXT = 'context'
 
 
 class DataError(Exception):
+    """An exception to raise if a given subset of data cannot be provided.
+    """
     pass
 
 
 class PlotClassError(Exception):
+    """An exception to raise if a requested plot kind is not available.
+    """
     pass
 
 
 class TcconData:
+    """A wrapper class around a TCCON netCDF dataset 
+    
+    These instances provide controlled access to the underlying dataset, allowing the
+    data to be subset by flag and time if needed. They also carry some ancillary information,
+    such as plotting styles associated with their data type and how to label the different 
+    data subtypes in the legend.
+
+    Access to data is through the :py:meth:`get_flag0_or_all_data` and :py:meth:`get_data` 
+    methods. Labels for the data in the legend are accessed through the :py:meth:`get_label`
+    and :py:meth:`get_flag0_or_all_label` methods.
+
+    This class can be used as a context manager in place of :py:class:`netCDF4.Dataset`.
+
+    .. warning::
+       ``exclude_times`` and ``include_times`` are mutually exclusive. If both are given, ``exclude_times``
+       takes precedence and ``include_times`` is ignored.
+
+    Parameters
+    ----------
+    data_category
+        Which category of data this instance represents; used by certain plots to skip 
+        datasets that they should not plot.
+
+    nc_file
+        Path to the netCDF file to read data from.
+
+    styles
+        A dictionary of plot style keywords to use for this type of data; expected to be
+        3 levels: plot kind, data subset, keywords.
+
+    exclude_times
+        A sequence of times that this instance will exclude data that overlaps. That is,
+        the data getter methods will not return any data from the underlying dataset with
+        a timestamp between the minimum and maximum times in this sequence.
+
+    include_times
+        The reverse of ``exclude_times``, if this is provided, the data getter methods will
+        *only* return data with a timestamp between the minimum and maximum times in this sequence.
+
+    allowed_flag_categories
+        If given, a sequence of ``FlagCategory`` instances that limit which categories this dataset is 
+        permitted to return.
+    """
     def __init__(self,
                  data_category: DataCategory,
                  nc_file,
                  styles: dict,
                  exclude_times=None,
                  include_times=None,
-                 allowed_flag_categories=None):
+                 allowed_flag_categories: Optional[Sequence[FlagCategory]] = None):
         self.data_category = data_category
         self.nc_dset = ncdf.Dataset(nc_file)
         self.styles = styles
@@ -70,6 +128,9 @@ class TcconData:
         self.datetimes = self.nctime_to_pytime(self.nc_dset['time'])
         # self.times = self.pytime_to_mpltime(self.datetimes)
         self.times = self.nctime_to_mpltime(self.nc_dset['time'])
+
+        if exclude_times is not None and include_times is not None:
+            warnings.warn('Both exclude_times and include_times cannot be set; exclude_times takes precedence - include_times will be ignored.')
 
         if exclude_times is not None:
             self.all_idx = (self.times < np.min(exclude_times)) | (self.times > np.max(exclude_times))
@@ -102,9 +163,34 @@ class TcconData:
         self.nc_dset.close()
 
     def has_flag_category(self, flag_category: FlagCategory) -> bool:
+        """Check whether this instance can provide data in a certain flag category.
+        """
         return flag_category in self._allowed_flag_categories
 
-    def get_data(self, varname, flag_category: FlagCategory) -> np.ma.masked_array:
+    def get_data(self, varname: str, flag_category: FlagCategory) -> np.ma.masked_array:
+        """Get a subset of the data from the underlying netCDF dataset.
+
+        This will retrieve the subset of data for variable ``varname`` that has the
+        flags allowed by ``flag_category``. If this :py:class:`~qc_plots.qc_plots2.TcconData`
+        instance has additional limits on e.g. the times allowed, the subset will respect 
+        those limits.
+
+        Parameters
+        ----------
+        varname
+            The name of the variable in the underlying netCDF file to retrieve, with two special
+            cases. "time" will return the time variable from the netCDF file, but converted to
+            matplotlib date numbers for faster plotting. "datetime" will instead return the time
+            variable converted to Python datetime instances.
+
+        flag_category
+            Which subset of data to return.
+
+        Returns
+        -------
+        np.ma.masked_array
+            The data from the netCDF dataset.
+        """
         if flag_category not in self._allowed_flag_categories:
             raise DataError('This TcconData instance does not provide data in flag category {}'.format(flag_category))
 
@@ -116,7 +202,9 @@ class TcconData:
             return self._get_flagged_data(varname)
 
     @property
-    def default_category(self):
+    def default_category(self) -> FlagCategory:
+        """The default subset of data that :py:meth:`get_flag0_or_all_data` would return.
+        """
         if FlagCategory.FLAG0 in self._allowed_flag_categories:
             return FlagCategory.FLAG0
         elif FlagCategory.ALL_DATA in self._allowed_flag_categories:
@@ -125,6 +213,11 @@ class TcconData:
             raise DataError('This TcconData instance provides neither flag0 nor all data')
 
     def get_flag0_or_all_data(self, varname) -> np.ma.masked_array:
+        """Get the best "default" subset of data for this dataset
+
+        This method behaves similarly to :py:meth:`get_data`, expect that it will return flag = 0
+        data if allowed, otherwise it returns all data.
+        """
         if FlagCategory.FLAG0 in self._allowed_flag_categories:
             return self._get_flag0_data(varname)
         elif FlagCategory.ALL_DATA in self._allowed_flag_categories:
@@ -158,6 +251,19 @@ class TcconData:
         return data[self.flagged_idx]
 
     def get_label(self, flag_category: FlagCategory) -> str:
+        """Get the label to use in the legend for a subset of data from this dataset
+
+        Parameters
+        ----------
+        flag_category
+            Which subset of data the label is for.
+
+        Returns
+        -------
+        str
+            The legend label. This will be the TCCON site long name, followed by a string
+            describing the subset of data.
+        """
         if flag_category not in self._allowed_flag_categories:
             raise DataError('This TcconData instance does not provide data in flag category {}'.format(flag_category))
 
@@ -169,6 +275,11 @@ class TcconData:
             return self._get_alldata_label()
 
     def get_flag0_or_all_label(self) -> str:
+        """Get the label to use in the legend for the default subset of data.
+
+        This is analgous to :py:meth:`get_flag0_or_all_data` in that it returns
+        the legend label for flag = 0 if it can, other wise all data.
+        """
         if FlagCategory.FLAG0 in self._allowed_flag_categories:
             return self._get_flag0_label()
         elif FlagCategory.ALL_DATA in self._allowed_flag_categories:
@@ -199,15 +310,21 @@ class TcconData:
 
     @staticmethod
     def nctime_to_pytime(nc_time_var: ncdf.Variable):
+        """Convert time in a netCDF variable to an array of Python datetime objects.
+        """
         cftimes = ncdf.num2date(nc_time_var[:], units=nc_time_var.units, calendar=nc_time_var.calendar)
         return np.array([datetime(*t.timetuple()[:6]) for t in cftimes])
 
     @staticmethod
     def pytime_to_mpltime(pytimes):
+        """Convert time from a sequence of Python datetime objects to an array of matplotlib date numbers.
+        """
         return mdates.date2num(pytimes)
 
     @staticmethod
     def nctime_to_mpltime(nc_time_var: ncdf.Variable):
+        """Convert time from a netCDF variable to an array of matplotlib date numbers.
+        """
         # First, check that the matplotlib epoch is the numpy epoch
         mpl_epoch = np.datetime64(mdates.get_epoch()).astype('float')
         assert np.isclose(mpl_epoch, 0)
@@ -223,11 +340,58 @@ class TcconData:
 
 
 class Limits:
+    """A class that provides an interface to retrieve desired plot limits for a given variable.
+
+    Parameters
+    ----------
+    limits_file
+        A path to a TOML file containing information on desired limits for different variables
+        in different plots. See the :ref:`Limits` section in the configuration page for details
+        on this file format.
+    """
     def __init__(self, limits_file):
         with open(limits_file) as f:
             self.limits = tomli.load(f)
 
     def get_limit(self, varname: str, data: Union[TcconData, Sequence[TcconData]], plot_kind: Optional[str] = None) -> Tuple[float, float, bool]:
+        """Retrieve the desired plot axis limits for a given variable.
+
+        This function will try to get limits from:
+
+        #. The plot-specific section of the limits configuration
+        #. The default section of the limits configuration
+        #. The "vmin" and "vmax" attributes in the netCDF datasets contained in ``data``. If >1 dataset,
+           then the min and max, respectively, across all files is used.
+
+        If either the upper or lower limit is not set by any of these methods, the third return
+        value will be ``True``. This third value can be passed as the ``auto`` keyword for the ``set_xlim``
+        or ``set_ylim`` methods of a matplotlib axes handle, and will ensure that the axis scales automatically
+        if a manual limit could not be determined.
+
+        Parameters
+        ----------
+        varname
+            Which variable in the ``data`` instance(s) to get limits for.
+
+        data
+            A :py:class:`~qc_plots.qc_plots2.TcconData` instance or sequence of instances that will be included on 
+            the plot.
+
+        plot_kind
+            The string identifying the kind of plot to get limits for.
+
+        Returns
+        -------
+        float
+            The lower limit for the plot axis. 
+
+        float
+            The upper limit for the plot axis.
+
+        bool
+            Whether or not the axis should continue to automatically scale. This will be ``True`` if
+            autoscale should be kept on for this axis, ``False`` otherwise.
+        """
         if isinstance(data, TcconData):
             data = [data]
 
@@ -270,9 +434,45 @@ class Limits:
 
 
 class AbstractPlot(ABC):
+    """The abstract parent class for all concrete plotting classes.
+
+    Any plotting class should inherit directly or indirectly (ie. through intermediate parent classes)
+    from this class. In addition to implemented all abstract classes, child classes must ensure that 
+    they have a unique string for the ``plot_kind`` class attribute. This attribute will be used as the
+    "kind" argument in the plotting configuration file. If a class uses ``None`` as ``plot_kind``, then it
+    cannot be instantiated from the configuration file. (This may be useful to create an intermediate
+    abstract class.)
+
+    Parameters
+    ----------
+    other_plots
+        A sequence of other :py:class:`AbstractPlot` subclass instances that represent all other plots
+        to be made, based on the configuration. Used if one plot needs to look up another plot to, for
+        example, ensure that their main plot areas' sizes match. This will need to be passed as a list
+        reference (i.e. do not make a copy) so that you can append plots to that list and plots added
+        after this one is instantiated are accessible to it.
+
+    default_style
+        The dictionary with the default styles for *all* plot kinds.
+
+    limits
+        The :py:class:`Limits` instance to use when setting axis limits for this plot.
+
+    key
+        A string to use to refer to this plot from other plots.
+
+    width
+        Width of the plot in centimeters.
+
+    height
+        Height of the plot in centimeters.
+
+    legend_kws
+        Dictionary of keywords to set the style of the legend for this plot specifically.
+    """
     plot_kind = None
 
-    def __init__(self, other_plots, default_style, limits: Limits, key=None, width=20, height=10,
+    def __init__(self, other_plots, default_style: dict, limits: Limits, key: Optional[str] = None, width=20, height=10,
                  legend_kws: Optional[dict] = None):
         self.key = key
         self._other_plots = other_plots
@@ -283,7 +483,23 @@ class AbstractPlot(ABC):
         self._legend_kws = dict() if legend_kws is None else legend_kws
 
     @classmethod
-    def from_config_section(cls, section, other_plots, full_config, limits_file):
+    def from_config_section(cls, section: dict, other_plots, full_config: dict, limits_file):
+        """Create an :py:class:`AbstractPlot` instance from one ``[[plots]]`` section of the configuration file.
+
+        Parameters
+        ----------
+        section
+            The dictionary representing one ``[[plots]]`` section in the configuration file.
+
+        other_plots
+            The list of other plot instances required by the class ``__init__`` method, see class docstring.
+
+        full_config
+            The dictionary representing the full configuration files.
+
+        limits_file
+            The path to the limits configuration file.
+        """
         kind = section.pop('kind')
         klass = cls._dispatch_plot_kind(kind)
         default_styles = full_config.get('style', dict()).get('default', dict())
@@ -343,13 +559,48 @@ class AbstractPlot(ABC):
             raise PlotClassError(f'Plot kind "{kind}" not implemented') from None
 
     def get_plot_by_key(self, key):
+        """Find another plot by its key.
+
+        If two plots have the same key, the first one is returned.
+
+        Raises
+        ------
+        KeyError
+            If no plot has the specified key.
+        """
         for plot in self._other_plots:
             if plot.key is not None and plot.key == key:
                 return plot
 
         raise KeyError(f'No plot with key {key} found')
 
-    def get_plot_args(self, data: TcconData, flag0_only: bool = False):
+    def get_plot_args(self, data: TcconData, flag0_only: bool = False) -> Sequence[dict]:
+        """Return a list of dictionaries providing the data and style keywords for each series to plot.
+
+        This default implementation will always return flag = 0 data and style keywords as the first
+        dictionary. If flag > 0 data is permitted from the input ``data``, a second dictionary with that
+        data and its style is also included. The first dictionary will also include legend keywords.
+
+        .. note::
+           For consistency, any subclass overriding this method should return a list of dictionaries
+           using the keys "data", "kws", and "legend_kws".
+
+        Parameters
+        ----------
+        data
+            :py:class:`TcconData` instance to extract data subsets from. 
+
+        flag0_only
+            Whether the QC plots program was requested to show only flag = 0 data. If so, the returned
+            list will only have one element.
+
+        Returns
+        -------
+        Sequence[dict]
+            A list of dictionaries with keywords "data", "kws", and (in the first) "legend_kws", pointing
+            to data to plot, plot style keywords, and legend style keywords, respectively.
+        """
+
         # There will always be at least one thing to plot, whether it is all data or just flag0 data
         plot_args = [{
             'data': self.get_plot_data(data, FlagCategory.FLAG0),
@@ -368,6 +619,26 @@ class AbstractPlot(ABC):
         return plot_args
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], _format_label: bool = True) -> dict:
+        """Get the style keywords to use when plotting a given subset of data.
+
+        Parameters
+        ----------
+        data
+            :py:class:`TcconData` instance data is subset from. 
+
+        flag_category
+            Which subset of data to get the style for.
+
+        _format_label
+            Whether to apply the formatting to the "label" keyword (replacing "{data}" with the label for this
+            subset of data). Can be set to ``False`` if this should be delayed so that a subclass can format the
+            label.
+
+        Returns
+        -------
+        dict
+            A dictionary of style keywords, to pass to the plotting function as ``fxn(.., **kws)``.
+        """
         # Get the default style: style dictionaries are organized plot_kind -> flag category,
         # Allow both to be missing, and just provide an empty dictionary as the default
         style_fc = data.default_category if flag_category is None else flag_category
@@ -385,7 +656,14 @@ class AbstractPlot(ABC):
             kws['label'] = label_spec.format(data=data_label)
         return kws
 
-    def get_legend_kws(self):
+    def get_legend_kws(self) -> dict:
+        """Get legend style keywords to use for this plot.
+
+        Returns
+        -------
+        dict
+            A dictionary of legend keyword to pass to the ``legend`` call as ``legend(..., **kws)``.
+        """
         kws = deepcopy(self._get_style(self._default_style, self.plot_kind, 'legend_kws'))
         kws.update(self._legend_kws)
         kws.setdefault('fontsize', 7)
@@ -400,7 +678,33 @@ class AbstractPlot(ABC):
             return plot_styles.get(sc, dict())
 
     def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
-                  img_path: Path = DEFAULT_IMG_DIR, tight=True):
+                  img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        """Setup, create, and save this plot as an image.
+
+        Parameters
+        ----------
+        data
+            The :py:class:`TcconData` instance(s) to draw data from to plot. Depending on the plot kind,
+            only a subset of them may be used.
+
+        flag0_only
+            Set to ``True`` to limit the plotted data to flag = 0 only.
+
+        show_all
+            Set to ``True`` to ignore specified plot limits and automatically scale the plots to include 
+            all data.
+
+        img_path
+            Where to save the plot as an image.
+
+        tight
+            Set to ``True`` to trim extra whitespace from the plot using matplotlib's tight layout. 
+
+        Returns
+        -------
+        Path
+            Path to where the image was saved.
+        """
         fig, axs = self.setup_figure(data, show_all=show_all)
         for i, d in enumerate(data):
             self._plot(d, i, axs=axs, flag0_only=flag0_only)
@@ -431,6 +735,20 @@ class AbstractPlot(ABC):
         return fig, axs
 
     def add_qc_lines(self, ax, axis: str, nc_var: ncdf.Variable):
+        """Add lines giving the allowed limits for a variable, ultimately derived in the :file:`??_qc.dat` file.
+
+        Parameters
+        ----------
+        ax
+            Axes handle to plot on.
+
+        axis
+            Either "x" or "y", which axis these lines give the limits for. "x" means the lines are
+            drawn vertically, "y" mean horizontally.
+
+        nc_var
+            Handle to the netCDF variable instance that is the variable being plotted on this axis.
+        """
         axline_fxn = ax.axvline if axis == 'x' else ax.axhline
         vmin = getattr(nc_var, 'vmin', None)
         if vmin is not None:
@@ -482,6 +800,7 @@ class AbstractPlot(ABC):
 
     @classmethod
     def get_label_string(cls, main_data, variable):
+        """Get an axis label with the variable name and (if available) units."""
         units = cls.get_units(main_data, variable)
         if units:  # okay to just check for truthiness; this way empty strings avoid leaving empty parentheses
             return f'{variable} ({units})'
@@ -494,29 +813,149 @@ class AbstractPlot(ABC):
 
     @abstractmethod
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
+        """Set up the figure and axes for this plot.
+
+        This method must be implemented in child classes and must return a handle to the figure itself
+        plus a handle to the axes or an array of axes handles if >1 panel created. (These are the same
+        return values as :py:func:`matplotlib.pyplot.subplots`.)
+
+        Parameters
+        ----------
+        data
+            The :py:class:`TcconData` instance(s) data will be taken from, to use for plot limits.
+
+        show_all
+            If ``True``, plots will automatically scale their axes to include all data, rather than
+            use fixed limits.
+
+        fig
+            A handle to an existing matplotlib figure to use, if the figure and axes needed set up
+            outside this function, but their limits/labels/etc need set by this function.
+
+        axs
+            A handle or array of handles to axes; same use case as ``fig``.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Handle to created figure.
+
+        matplotlib.axes.Axes or array of such
+            Handle(s) to created axes.
+        """
         pass
 
     @abstractmethod
     def get_plot_data(self, data: TcconData, flagged_category: FlagCategory):
+        """Method that obtains and preprocesses data to plot.
+
+        Parameters
+        ----------
+        data
+            The :py:class:`TcconData` instance to get data to plot from.
+
+        flagged_category
+            Which subset of data to get.
+
+        Returns
+        -------
+        plot_data
+            A collection of data to be plotted. The type may vary depending on the subclass
+            implementation; a dictionary of numpy arrays is preferred, but some subclasses
+            may return a :py:class:`pandas.DataFrame` or other collection instead.
+        """
         pass
 
     @abstractmethod
     def get_save_name(self):
+        """Returns the base file name to use when saving this figure as an image, including the extension.
+        
+        .. warning::
+           Make sure that each plot created returns a unique save name, or some plots will be overwritten
+           and lost! It's usually good to include the names of the variables being plotted, as well as any
+           other important instance variables, in the name to ensure that different instances of the same
+           class will have unique file names.
+        """
         pass
 
     @abstractmethod
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        """Plot all subsets of one dataset.
+
+        Parameters
+        ----------
+        data
+            The :py:class:`TcconData` instance to get data to plot from.
+
+        idata
+            0-based index that gives the position of ``data`` in the list of all datasets to plot.
+
+        axs
+            Axes to plot into. May be a single axes handle or a sequence of such handles.
+
+        flag0_only
+            Whether to only include flag = 0 data in the plot, regardless of the available subsets
+            in ``data``.
+        """
         pass
 
 
 class TimeseriesMixin:
+    """Mixin class that provides common utilities for timeseries plots
+
+    This class is not intented to be instantiated, instead it would be an extra parent class to a concrete
+    plotting class. The concrete class would therefore get all the methods defined on this class.
+    """
+
     def format_time_axis(self, ax, data: Sequence[TcconData], xvar='time', buffer_days=2, show_all: bool = False):
+        """Format the x-axis of a plot as a time axis, including limits, name, and tick format.
+
+        Parameters
+        ----------
+        ax
+            Matplotlib axes handle to format
+
+        data
+            :py:class:`TcconData` instances to be plotted; used to determine first and last times.
+
+        xvar
+            Variable to use for the x-axis, if the time is not called "time" in the :py:class:`TcconData` instances,
+            use this to give the correct variable name.
+
+        buffer_days
+            How many days to leave before the first and after the last data point so that they are not smooshed against
+            the edge of the plot.
+
+        show_all
+            Whether to leave the axis alone to automatically scale as the data is plotted.
+        """
         first_time = min(np.min(d.get_data(xvar, FlagCategory.ALL_DATA)) for d in data)
         last_time = max(np.max(d.get_data(xvar, FlagCategory.ALL_DATA)) for d in data)
         self.format_time_axis_custom_times(ax, first_time, last_time, buffer_days=buffer_days, show_all=show_all)
 
     @staticmethod
     def format_time_axis_custom_times(ax, first_time, last_time, buffer_days=2, show_all: bool = False):
+        """Format the x-axis of a plot as a time axis (limits, name, and ticks) with specified first and last times
+
+        Parameters
+        ----------
+        ax
+            Matplotlib axes handle to format
+
+        first_time
+            Earliest time to include on the axis (excluding the buffer). Expected to be a matplotlib date number.
+
+        last_time
+            Latest time to include on the axis (excluding the buffer). Expected to be a matplotlib date number.
+
+        buffer_days
+            How many days to leave before the first time and after the last time so that they are not smooshed against
+            the edge of the plot.
+
+        show_all
+            Whether to leave the axis alone to automatically scale as the data is plotted.
+        """
+
         if not show_all:
             # assumes that times are in Matplotlib date numbers, which are days since some epoch
             xmin = first_time - buffer_days
@@ -533,7 +972,29 @@ class TimeseriesMixin:
         ax.xaxis.set_major_formatter(formatter)
 
     @staticmethod
-    def resample_data(times, yvals, freq, op):
+    def resample_data(times, yvals, freq, op) -> pd.Series:
+        """Apply an arbitrary operation to resample time series data to a coarser time resolution.
+
+        Parameters
+        ----------
+        times
+            A :py:class:`pandas.DatetimeIndex` like sequence of datetimes giving the times of the data.
+
+        yvals
+            The data to resample
+
+        freq
+            A `Pandas frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+            that specifies the temporal frequency to resample to.
+
+        op
+            The name of the operation to apply; usual values are "mean", "median", "std", etc.
+
+        Returns
+        -------
+        pd.Series
+            The resampled ``yvals``.
+        """
         if np.size(yvals) == 0:
             # If no data, the index will not be a DatetimeIndex and the resampling
             # will error. Avoid that by returning an empty dataframe.
@@ -544,25 +1005,33 @@ class TimeseriesMixin:
         return df['y']
 
     @classmethod
-    def roll_data(cls, xvals, yvals, npts, ops, gap, times=None):
-        """
-        Compute rolling statistics on data
+    def roll_data(cls, xvals: np.ndarray, yvals: np.ndarray, npts: int, ops: Sequence[str], gap: str, times=None):
+        """Compute rolling statistics on data
 
-        Inputs:
-            - xvals: array of x values
-            - yvals: array of y values
-            - npts: number of points to use in the rolling window
-            - ops: name of an operation to do on the rolling windows, or a list of such names
-            - gap: a Pandas Timedelta string (https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html)
-              specifying the longest time difference between adjacent points that a rolling window can operate over.
-              That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
-              gap will have the rolling operation applied to each separately.
-            - times: if `xvals` is not a time variable, then this input must be the times corresponding to the `xvals`
-              and `yvals`. It is used to split on gaps.
+        Parameters
+        ----------
+        xvals
+            array of x values
+        yvals
+            array of y values
+        npts
+            number of points to use in the rolling window
+        ops
+            name of an operation to do on the rolling windows, or a list of such names
+        gap
+            a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+            specifying the longest time difference between adjacent points that a rolling window can operate over.
+            That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+            gap will have the rolling operation applied to each separately.
+        times
+            if ``xvals`` is not a time variable, then this input must be the times corresponding to the ``xvals``
+            and ``yvals``. It is used to split on gaps.
 
-        Outputs:
-            - outputs: If `ops` was a single string (e.g. "median"), then a single dataframe with "x", "y", and (if
-            `times` was given) "time" columns that has the result of the rolling operation. If `ops` was a list, then
+        Returns
+        -------
+        outputs
+            If ``ops`` was a single string (e.g. "median"), then a single dataframe with "x", "y", and (if
+            ``times` was given) "time" columns that has the result of the rolling operation. If ``ops`` was a list, then
             the output is a list of dataframes, each one with the result of the corresponding operation.
         """
         if isinstance(ops, str):
@@ -600,16 +1069,22 @@ class TimeseriesMixin:
             return outputs
 
     @staticmethod
-    def split_by_gaps(df, gap, time):
-        """
-        Split an input dataframe with a datetime variable into a groupby dataframe with each group having data without gaps larger than the "gap" variable
+    def split_by_gaps(df: pd.DataFrame, gap: str, time):
+        """Split an input dataframe with a datetime variable into a groupby dataframe with each group having data without gaps larger than the "gap" variable
 
-        Inputs:
-            - df: pandas dataframe with a datetime
-            - time: column name of the datetime variable
-            - gap: minimum gap length, a string compatible with pandas Timedelta https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html
-        Outputs:
-            - df_by_gaps: groupby object with each group having data without gaps larger than the "gap" variable
+        Parameters
+        ----------
+        df
+            pandas dataframe with a datetime column
+        gap
+            minimum gap length, a string compatible with pandas `Timedelta <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        time
+            column name of the datetime variable
+        
+        Returns
+        -------
+        df_by_gaps
+            groupby object with each group having data without gaps larger than the "gap" variable
         """
 
         df['isgap'] = df[time].diff() > pd.Timedelta(gap)
@@ -620,9 +1095,20 @@ class TimeseriesMixin:
 
 
 class FlagAnalysisPlot(AbstractPlot):
+    """Concrete plotting class that generates bar graphs for the number/percent of spectra flagged by different variables
+
+    Configuration plot kind = ``"flag-analysis"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    min_percent
+        Minimum percent of spectrum removed by a flag for that flag to be included in the plot.
+    """
     plot_kind = 'flag-analysis'
 
-    def __init__(self, other_plots, default_style, limits: Limits, key=None, min_percent=1.0, width=20, height=10,
+    def __init__(self, other_plots, default_style: dict, limits: Limits, key=None, min_percent: float = 1.0, width=20, height=10,
                  legend_kws: Optional[dict] = None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
                          width=width, height=height, legend_kws=legend_kws)
@@ -730,11 +1216,13 @@ class FlagAnalysisPlot(AbstractPlot):
         
         
 class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
+    """Intermediate abstract plot class for timing error plots
+    """
     plot_kind = None
     _title_prefix = ''
 
-    def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
-                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10,
+    def __init__(self, other_plots, default_style: dict, sza_ranges: Sequence[Sequence[float]], limits: Limits,
+                 yvar: str = 'xluft', freq: str = 'W', op: str = 'median', time_buffer_days: int = 2, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None):
         if any(len(r) != 2 for r in sza_ranges):
             raise TypeError('Each SZA range must be a two-element sequence')
@@ -808,11 +1296,37 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
 
 
 class TimingErrorAMvsPM(TimingErrorAbstractPlot):
+    """Concrete plotting class that creates plots to detect timing error by morning/afternoon differences
+
+    Configuration plot kind = ``"timing-error-am-pm"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    sza_range
+        Two element list giving the lower and upper SZA limits to average morning and afternoon data
+        between. Data outside these SZA limits are not used.
+
+    yvar
+        Variable to average for morning and afternoon to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that specifies the temporal resolution to average to.
+
+    op
+        What operation to apply to the morning & afternoon data. Usually "median", "mean", etc.
+
+    time_buffer_days
+        How many days before the first and after the last data point to push the axis x-limits to make the plot
+        nicer to read.
+    """
     plot_kind = 'timing-error-am-pm'
     _title_prefix = 'Timing check AM vs. PM'
 
-    def __init__(self, other_plots, default_style, sza_range: Sequence[float], limits: Limits,
-                 yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10,
+    def __init__(self, other_plots, default_style: dict, sza_range: Sequence[float], limits: Limits,
+                 yvar: str = 'xluft', freq: str = 'W', op: str = 'median', time_buffer_days: int = 2, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None):
         if len(sza_range) != 2:
             raise TypeError('SZA range must have two elements (min, max)')
@@ -900,11 +1414,40 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
 
 
 class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
+    """Concrete plot to identify timing errors from averages in different SZA ranges.
+
+    Configuration plot kind = ``"timing-error-szas"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    sza_ranges
+        List of two element lists giving the lower and upper SZA limits to average data
+        between. Data outside these SZA limits are not used.
+
+    am_or_pm
+        Whether to look at morning ("am") or afternoon ("pm") data.
+
+    yvar
+        Variable to average for morning and afternoon to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that specifies the temporal resolution to average to.
+
+    op
+        What operation to apply to the morning & afternoon data. Usually "median", "mean", etc.
+
+    time_buffer_days
+        How many days before the first and after the last data point to push the axis x-limits to make the plot
+        nicer to read.
+    """
     plot_kind = 'timing-error-szas'
     _title_prefix = 'Timing check multiple SZAs'
 
-    def __init__(self, other_plots, default_style, sza_ranges: Sequence[Sequence[float]], limits: Limits,
-                 am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days=2, key=None, width=20, height=10,
+    def __init__(self, other_plots, default_style: dict, sza_ranges: Sequence[Sequence[float]], limits: Limits,
+                 am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days: int = 2, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None):
 
         if am_or_pm.lower() not in {'am', 'pm'}:
@@ -987,9 +1530,30 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
 
 class ScatterPlot(AbstractPlot):
+    """Concrete plotting class for plotting one variable against another
+
+    Configuration plot kind = ``"scatter"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    xvar
+        Variable to plot along the x-axis
+
+    yvar
+        Variable to plot along the y-axis
+
+    add_fit
+        Whether or not to add a linear fit to the y vs. x data
+
+    fit_flag_category
+        Which subset of data to calculate the linear fit to. If ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used for each data type.
+    """
     plot_kind = 'scatter'
 
-    def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
+    def __init__(self, other_plots, xvar: str, yvar: str, default_style: dict, limits: Limits, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None,
                  add_fit: bool = True, fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
@@ -1093,11 +1657,41 @@ class ScatterPlot(AbstractPlot):
 
 
 class HexbinPlot(ScatterPlot):
+    """Concrete plotting class for a 2D histogram of one variable vs. another
+
+    Configuration plot kind = ``"hexbin"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    xvar
+        Variable to plot on the x-axis
+
+    yvar
+        Variable to plot on the y-axis
+
+    hexbin_flag_category
+        Which subset of data to include in the 2D histogram. If ``None``, then the "default" 
+        (flag = 0 if available, all data if not) subset from each data type is plotted.
+
+    fit_flag_category
+        Which subset of data to calculate the linear fit to. If ``None``, then the "default" 
+        (flag = 0 if available, all data if not) subset from each data type is plotted.
+
+    show_reference
+        Whether or not to show reference data as an additional histogram on the plot.
+
+    show_context
+        Whether or not to show context data as an additional histogram on the plot.
+    """
     plot_kind = 'hexbin'
 
-    def __init__(self, other_plots, xvar, yvar, default_style, limits: Limits, key=None, width=20, height=10,
+    def __init__(self, other_plots, xvar: str, yvar: str, default_style: dict, limits: Limits, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None,
-                 hexbin_flag_category=None, fit_flag_category=None, show_reference=False, show_context=True):
+                 hexbin_flag_category: Optional[FlagCategory] = None, 
+                 fit_flag_category: Optional[FlagCategory] = None, 
+                 show_reference=False, show_context=True):
         super().__init__(other_plots=other_plots, xvar=xvar, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, fit_flag_category=fit_flag_category, key=key,
                          width=width, height=height)
@@ -1200,9 +1794,24 @@ class HexbinPlot(ScatterPlot):
 
 
 class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
+    """Concrete plotting class for simple timeseries of data
+
+    Configuration plot kind = ``"timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the y-axis.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
     plot_kind = 'timeseries'
 
-    def __init__(self, other_plots, yvar, default_style, limits: Limits, width=20, height=10,
+    def __init__(self, other_plots, yvar: str, default_style: dict, limits: Limits, width=20, height=10,
                  legend_kws: Optional[dict] = None, key=None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, xvar='time', yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, legend_kws=legend_kws, add_fit=False)
@@ -1231,9 +1840,25 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
 
 
 class TimeseriesDeltaPlot(TimeseriesPlot):
+    """Concrete plotting class for time series that plot the difference of two variables.
+
+    Configuration plot kind = ``"delta-timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar1, yvar2
+        Variables to take the difference of to plot on the y-axis. Difference
+        will be ``yvar1 - yvar2``.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
     plot_kind = 'delta-timeseries'
 
-    def __init__(self, other_plots, yvar1, yvar2, default_style, limits: Limits, width=20, height=10,
+    def __init__(self, other_plots, yvar1: str, yvar2: str, default_style: dict, limits: Limits, width=20, height=10,
                  legend_kws: Optional[dict] = None, key=None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar1, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, legend_kws=legend_kws, time_buffer_days=time_buffer_days)
@@ -1268,9 +1893,27 @@ class TimeseriesDeltaPlot(TimeseriesPlot):
 
 
 class Timeseries2PanelPlot(TimeseriesPlot):
+    """Concrete plotting class for a two-panel plot, with a second time series in a smaller upper plot
+
+    Configuration plot kind = ``"timeseries-2panel"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the lower, large y-axis.
+
+    yerror_var
+        Variable to plot on the upper, small y-axis.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
     plot_kind = 'timeseries-2panel'
 
-    def __init__(self, other_plots, yvar, yerror_var, default_style, limits: Limits, key=None, width=20, height=10,
+    def __init__(self, other_plots, yvar: str, yerror_var: str, default_style: dict, limits: Limits, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, time_buffer_days=time_buffer_days, legend_kws=legend_kws)
@@ -1337,9 +1980,32 @@ class Timeseries2PanelPlot(TimeseriesPlot):
 
 
 class ResampledTimeseriesPlot(TimeseriesPlot):
+    """Concrete plotting class to plot a timeseries of data resampled to a coarser temporal frequency.
+
+    Configuration plot kind = ``"resampled-timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that determines the temporal resolution of the resampled data.
+
+    op
+        The operation to apply to resample the data. Usually "median", "mean", "std", etc.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+
     plot_kind = 'resampled-timeseries'
 
-    def __init__(self, other_plots, yvar, freq, op, default_style, limits: Limits, key=None, width=20, height=10,
+    def __init__(self, other_plots, yvar: str, freq: str, op: str, default_style: dict, limits: Limits, key=None, width=20, height=10,
                  legend_kws: Optional[dict] = None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, legend_kws=legend_kws, time_buffer_days=time_buffer_days)
@@ -1369,11 +2035,46 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
 
 
 class RollingDerivativePlot(TimeseriesPlot):
+    """Concrete plotting class to plot a derivative of one variable vs. another over a rolling window.
+
+    Configuration plot kind = ``"rolling-derivative"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable in the numerator of the derivative.
+
+    dvar
+        Variable in the denominator of the derivative.
+
+    derivative_order
+        What order derivative to calculate; 1 = slope, 2 = curvature, etc. Currently only order 1 is implemented.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling derivatives applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the derivative at each time.
+
+    flag_category
+        What subset of data to use to compute the derivative. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
     plot_kind = 'rolling-derivative'
 
-    def __init__(self, other_plots, yvar, dvar, default_style, limits: Limits, key=None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, derivative_order=1,
-                 gap='20000 days', rolling_window=500, flag_category=None, time_buffer_days=2):
+    def __init__(self, other_plots, yvar: str, dvar: str, default_style: dict, limits: Limits, key=None, width=20, height=10,
+                 legend_kws: Optional[dict] = None, derivative_order: int = 1,
+                 gap: str = '20000 days', rolling_window: int = 500, flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, key=key, width=width, height=height, time_buffer_days=time_buffer_days)
 
@@ -1472,11 +2173,51 @@ class RollingDerivativePlot(TimeseriesPlot):
 
 
 class RollingTimeseriesPlot(TimeseriesPlot):
+    """Concrete plotting class to plot a rolling mean/median/etc timeseries.
+
+    Configuration plot kind = ``"rolling-derivative"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the y-axis and compute the rolling value of.
+
+    ops
+        A single operation name (e.g. "mean", "median", "std" etc.) or list of names to apply to the rolling
+        window. A list will cause multiple rolling values to be plotted; each can have a different style applied
+        to it. Quantile operations require special note: since computing the quantile on data requires an extra
+        argument to specify *which* quantile, a string like "quantile0.25" is required to give both the operation
+        and quantile value.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling operation applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the rolling value at each time.
+
+    uncertainty
+        Whether to include uncertainty on median or mean operations. Median values will have the interquartile 
+        range as the uncertainty; mean values will have the 1-sigma standard deviation.
+
+    flag_category
+        What subset of data to use to compute the rolling value. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
     plot_kind = 'rolling-timeseries'
 
-    def __init__(self, other_plots, yvar, ops, default_style, limits: Limits, key=None, width=20, height=10,
-                 legend_kws: Optional[dict] = None,
-                 gap='20000 days', rolling_window=500, uncertainty=False, flag_category=None, time_buffer_days=2):
+    def __init__(self, other_plots, yvar: str, ops: Union[str, Sequence[str]], default_style: dict, 
+                 limits: Limits, key=None, width=20, height=10, legend_kws: Optional[dict] = None,
+                 gap: str = '20000 days', rolling_window: int = 500, uncertainty: bool = False, 
+                 flag_category: Optional[FlagCategory] = None, time_buffer_days: int = 2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, key=key, width=width, height=height, time_buffer_days=time_buffer_days)
         self.ops = [ops] if isinstance(ops, str) else ops
