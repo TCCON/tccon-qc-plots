@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from contextlib import ExitStack
-from typing import Optional
+from typing import Optional, Sequence
 import numpy as np
 from pathlib import Path
 import tempfile
@@ -15,7 +15,7 @@ from . import qc_plots2, qc_email
 from .constants import DEFAULT_CONFIG, DEFAULT_IMG_DIR, DEFAULT_LIMITS
 
 
-def images_to_pdf(fig_path_list, fig_name_list, pdf_path: Path, nc_path: Path, size='medium', quality='high', cfg: Optional[dict] = None):
+def images_to_pdf(fig_path_list, plots: Sequence[qc_plots2.AbstractPlot], pdf_path: Path, nc_path: Path, size='medium', quality='high', cfg: Optional[dict] = None):
     size_divisor = {'small': 3, 'medium': 2, 'large': 1}[size]
     quality = {'low': 30, 'medium': 60, 'high': 95}[quality]
     temp_pdf_path = pdf_path.with_suffix('.tmp.pdf')
@@ -25,7 +25,7 @@ def images_to_pdf(fig_path_list, fig_name_list, pdf_path: Path, nc_path: Path, s
         nfig = len(fig_path_list)
         
         for ifig, fig_path in enumerate(fig_path_list, start=1):
-            fig_name = fig_name_list[ifig-1]
+            fig_name = plots[ifig-1].name
             try:
                 this_img = img_stack.enter_context(Image.open(fig_path).convert('RGB'))
                 _add_plot_info_to_image(this_img, ifig, nfig, fig_name, nc_path, cfg=cfg)
@@ -43,9 +43,7 @@ def images_to_pdf(fig_path_list, fig_name_list, pdf_path: Path, nc_path: Path, s
         input = PdfFileReader(pdf_in)
         output = PdfFileWriter()
 
-        for i, fig_path in enumerate(fig_path_list):
-            output.addPage(input.getPage(i))
-            output.addBookmark(Path(fig_path).stem, i)
+        _add_bookmarks_to_pdf(input, output, plots, cfg=cfg)
 
         output.write(pdf_out)
         temp_pdf_path.unlink()
@@ -61,6 +59,22 @@ def _add_plot_info_to_image(this_img, ifig: int, nfig: int, fig_name: str, nc_pa
     artist = ImageDraw.Draw(this_img)
     text_str = f'Plot # {ifig}/{nfig}: {fig_name}\nInput file: {nc_path.name}'
     artist.text((8, 8), text_str, font=font, fill=(0, 0, 0))
+
+
+def _add_bookmarks_to_pdf(input: PdfFileReader, output: PdfFileWriter, plots: Sequence[qc_plots2.AbstractPlot], cfg: Optional[dict] = None):
+    if cfg is None:
+        cfg = dict()
+
+    bookmark_all = cfg.get('image_postprocessing', dict()).get('bookmark_all', None)
+    if bookmark_all is None:
+        bookmark_all = all(p.bookmark is None for p in plots)
+
+    for i, p in enumerate(plots):
+        output.addPage(input.getPage(i))
+        if p.bookmark is not None:
+            output.addBookmark(p.bookmark, i)
+        elif p.bookmark is None and bookmark_all:
+            output.addBookmark(p.name, i)
 
 
 def send_email(pdf_path, nc_file, emails=(None, None), email_config=None, attach_plots=True, plot_url=None):
@@ -197,7 +211,6 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
 
         plots = qc_plots2.setup_plots(config, limits_file=limits)
         fig_paths = []
-        fig_names = []
         n = len(plots)
         for i, plot in enumerate(plots, start=1):
             sys.stdout.write(f'  - Plot {i}/{n}: {plot.get_save_name()}')
@@ -209,13 +222,12 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
             else:
                 print(' DONE')
                 fig_paths.append(this_path)
-                fig_names.append(plot.name)
 
         reg_ext = '{}.pdf'.format(suffix)
         flag0_ext = '{}.flag0.pdf'.format(suffix)
         pdf_name = Path(nc_in).with_suffix(reg_ext if not flag0 else flag0_ext).name
         pdf_path = Path(output_dir) / pdf_name
-        images_to_pdf(fig_paths, fig_names, pdf_path, Path(nc_in), size=size, quality=quality, cfg=config)
+        images_to_pdf(fig_paths, plots, pdf_path, Path(nc_in), size=size, quality=quality, cfg=config)
 
     send_email(pdf_path=pdf_path, nc_file=nc_in, emails=emails, email_config=email_config, attach_plots=attach_plots, plot_url=plot_url)
 
