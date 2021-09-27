@@ -192,7 +192,10 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
         else:
             img_dir = Path(DEFAULT_IMG_DIR)
         print(f'Will save intermediate images to {img_dir}')
-            
+
+        # --------- #    
+        # Load data #
+        # --------- #
         primary_styles = config.get('style', dict()).get('main', dict())
         data = [stack.enter_context(
             qc_plots2.TcconData(
@@ -225,20 +228,39 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
             )
             data.append(stack.enter_context(ref_data))
 
+        # -------------------- #
+        # Setup and make plots #
+        # -------------------- #
         plots = qc_plots2.setup_plots(config, limits_file=limits)
+
+        extra_data = dict()
+        extra_styles = config.get('style', dict()).get('extra', dict())
+        for plot in plots:
+            if isinstance(plot, qc_plots2.AuxPlotMixin):
+                for extra_data_file in plot.get_extra_data_files_required():
+                    if extra_data_file not in extra_data:
+                        extra_data[extra_data_file] = qc_plots2.TcconData(
+                            qc_plots2.DataCategory.EXTRA,
+                            extra_data_file,
+                            styles=extra_styles, # temporary until I decide how to handle violin plot styles
+                        )
+
         fig_paths = []
         n = len(plots)
         for i, plot in enumerate(plots, start=1):
             sys.stdout.write(f'  - Plot {i}/{n}: {plot.get_save_name()}')
             sys.stdout.flush()
             try:
-                this_path = plot.make_plot(data, flag0_only=flag0, show_all=show_all, img_path=img_dir)
+                this_path = plot.make_plot(data, extra_data=extra_data, flag0_only=flag0, show_all=show_all, img_path=img_dir)
             except IndexError as err:
                 print(f' SKIPPED ({err})')
             else:
                 print(' DONE')
                 fig_paths.append(this_path)
 
+        # ------------------------- #
+        # Combine plots into PDF(s) #
+        # ------------------------- #
         reg_ext = '{}.pdf'.format(suffix)
         flag0_ext = '{}.flag0.pdf'.format(suffix)
         pdf_name = Path(nc_in).with_suffix(reg_ext if not flag0 else flag0_ext).name

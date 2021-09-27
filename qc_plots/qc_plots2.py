@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 from PyPDF2.generic import Bookmark
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from math import ceil
 import netCDF4 as ncdf
 import numpy as np
@@ -52,6 +53,7 @@ class DataCategory(Enum):
     PRIMARY = 'primary'
     REFERENCE = 'reference'
     CONTEXT = 'context'
+    EXTRA = 'extra'
 
 
 class DataError(Exception):
@@ -708,7 +710,7 @@ class AbstractPlot(ABC):
         else:
             return plot_styles.get(sc, dict())
 
-    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
         """Setup, create, and save this plot as an image.
 
@@ -929,6 +931,55 @@ class AbstractPlot(ABC):
             in ``data``.
         """
         pass
+
+
+class AuxPlotMixin(ABC):
+    @abstractmethod
+    def get_extra_data_files_required(self) -> Sequence[Path]:
+        pass
+
+
+class ViolinAuxPlotMixin(AuxPlotMixin):
+    def init_violins(self, data_file, aux_plot_side='right', aux_plot_size='10%', aux_plot_pad=0.5):
+        self._side_plot_data_file = Path(data_file)
+        self._aux_plot_side = aux_plot_side
+        self._aux_plot_size = aux_plot_size
+        self._aux_plot_pad = aux_plot_pad
+        self._aux_flag_category = FlagCategory.FLAG0
+
+    def create_side_plot_axes(self, orig_ax):
+        divider = make_axes_locatable(orig_ax)
+        new_ax = divider.append_axes(self._aux_plot_side, size=self._aux_plot_size, pad=self._aux_plot_pad, sharey=orig_ax)
+        new_ax.set_xticks([])
+        return new_ax
+
+    def plot_violins(self, extra_data, yvar_key, side_ax):
+        violin_data = extra_data[self._side_plot_data_file]
+        yvals = self.get_plot_data(violin_data, self._aux_flag_category)[yvar_key].filled(np.nan)
+        yvals = yvals[np.isfinite(yvals)]
+
+        style_fc = extra_data.default_category if self._aux_flag_category is None else self._aux_flag_category
+        violin_style = self._get_style(violin_data.styles, 'aux-violin', style_fc)
+        fill_color = violin_style.pop('fill_color', None)
+        line_color = violin_style.pop('line_color', None)
+
+        violin_parts = side_ax.violinplot(yvals, [0], **violin_style)
+        for key, part in violin_parts.items():
+            if key == 'bodies' and fill_color is not None:
+                plt.setp(part, color=fill_color)
+            elif key != 'bodies' and line_color is not None:
+                plt.setp(part, color=line_color)
+
+
+        ylabel = violin_data.get_label(self._aux_flag_category)
+        side_ax.set_ylabel(ylabel)
+        if self._aux_plot_side == 'right':
+            # If the extra axis is left, we just keep the label on the left
+            # If it is above/below, same.
+            side_ax.yaxis.set_label_position('right')
+
+    def get_extra_data_files_required(self) -> Sequence[Path]:
+        return [self._side_plot_data_file]
 
 
 class TimeseriesMixin:
@@ -1213,11 +1264,11 @@ class FlagAnalysisPlot(AbstractPlot):
     def get_save_name(self):
         return 'flags_summary.png'
 
-    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
         # The flag plot is only configured to show the current data
         data = [self._get_main_data(data)]
-        return super().make_plot(data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+        return super().make_plot(data, extra_data=extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
 
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         # There should only ever be one set of plot arguments, since we overrode the get_plot_args
@@ -1269,10 +1320,10 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         self.op = op
         self._time_buffer_days = time_buffer_days
 
-    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
         data = self._get_main_data(data)
-        return super().make_plot([data], flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+        return super().make_plot([data], extra_data=extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
         
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
         fig, ax = self._make_or_check_fig_ax_args(fig, axs)
@@ -1749,10 +1800,10 @@ class HexbinPlot(ScatterPlot):
     def get_save_name(self):
         return f'{self.yvar}_VS_{self.xvar}_hexbin.png'
 
-    def make_plot(self, data: Sequence[TcconData], flag0_only: bool = False, show_all: bool = False,
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
         data_to_plot = self._get_data_to_plot(data)
-        return super().make_plot(data=data_to_plot, flag0_only=flag0_only, show_all=show_all, img_path=img_path,
+        return super().make_plot(data=data_to_plot, extra_data=extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path,
                                  tight=tight)
 
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
@@ -1874,6 +1925,60 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
 
         # legend kws are always in the first set of plot argument
         axs.legend(**plot_args[0]['legend_kws'])
+
+
+class TimeseriesPlusViolinPlot(TimeseriesPlot, ViolinAuxPlotMixin):
+    plot_kind = 'timeseries+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar: str,
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None, 
+                 key=None, 
+                 time_buffer_days=2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5):
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         time_buffer_days=time_buffer_days)
+        self.init_violins(data_file=violin_data_file,
+                          aux_plot_side=violin_plot_side,
+                          aux_plot_size=violin_plot_size,
+                          aux_plot_pad=violin_plot_pad)
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, ax = super().setup_figure(data, show_all=show_all, fig=fig, axs=axs)
+        violin_ax = self.create_side_plot_axes(ax)
+        return fig, {'main': ax, 'violin': violin_ax}
+
+    def get_save_name(self):
+        return f'{self.yvar}_timeseries_with_violin.png'
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        fig, axs = self.setup_figure(data, show_all=show_all)
+        for i, d in enumerate(data):
+            self._plot(d, i, axs=axs['main'], flag0_only=flag0_only)
+        self.plot_violins(extra_data, 'y', axs['violin'])
+
+        fig_path = img_path / self.get_save_name()
+        if tight:
+            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
+            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fig.tight_layout()
+        fig.savefig(fig_path, dpi=300)
+        plt.close(fig)
+        return fig_path
+
 
 
 class TimeseriesDeltaPlot(TimeseriesPlot):
