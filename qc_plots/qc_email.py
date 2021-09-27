@@ -220,8 +220,10 @@ def send_email_from_config(cfg_file, site_id, attachment, nc_file, plot_url=None
     else:
         smtp_info = cfg['server']['smtp']
         smtp_args = [smtp_info['smtp_address'], smtp_info['port']]
+        # Not tested!
         if 'password' in smtp_info:
-            smtp_args.append(smtp_info['password'])
-        req_auth = smtp_info.get('requires_auth', True)
+            auth = smtp_info['password']
+        else:
+            auth = smtp_info.get('requires_auth', True)
         send_email(subject=subject, body=body, send_from=from_addr, send_to=to_addr, attachment=attachment,
-                   smtp_args=smtp_args, authenticate=req_auth)
+                   smtp_args=smtp_args, authenticate=auth)
