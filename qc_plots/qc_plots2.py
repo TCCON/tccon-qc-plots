@@ -462,6 +462,16 @@ class AbstractPlot(ABC):
     key
         A string to use to refer to this plot from other plots.
 
+    name
+        A name to use for this plot along with the plot number in the upper left corner of the page.
+        If not provided, then the automatic save name for this plot (without the file extension) is used.
+
+    bookmark
+        The value to use as the bookmark for this page. Will only matter if the overall configuration
+        ``bookmark_all`` (for the main program) is ``None`` or ``False``. This input can be a string to
+        use as the bookmark name or ``True`` to indicate that this plot should use the value for ``name``
+        as its bookmark.
+
     width
         Width of the plot in centimeters.
 
@@ -2209,7 +2219,7 @@ class RollingDerivativePlot(TimeseriesPlot):
 class RollingTimeseriesPlot(TimeseriesPlot):
     """Concrete plotting class to plot a rolling mean/median/etc timeseries.
 
-    Configuration plot kind = ``"rolling-derivative"``
+    Configuration plot kind = ``"rolling-timeseries"``
 
     For parameters not listed here, see :py:class:`AbstractPlot`.
 
@@ -2342,6 +2352,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
         # No connecting lines by default
         kws.setdefault('linestyle', 'none')
+        kws.setdefault('marker', '.')
 
         if _format_label:
             # Since labels need some extra logic to format, add it separately here
@@ -2353,6 +2364,119 @@ class RollingTimeseriesPlot(TimeseriesPlot):
     def get_save_name(self):
         ops = '+'.join(self.ops)
         return f'{self.yvar}_rolling{self.rolling_window}_{ops}_timeseries.png'
+
+
+class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
+    """Concrete plotting class for time series that plots the difference of two variables with rolling operations.
+
+    Configuration plot kind = ``"delta-rolling-timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar1, yvar2
+        Variables to take the difference of to plot on the y-axis. Difference
+        will be ``yvar1 - yvar2``.
+
+    ops
+        A single operation name (e.g. "mean", "median", "std" etc.) or list of names to apply to the rolling
+        window. A list will cause multiple rolling values to be plotted; each can have a different style applied
+        to it. Quantile operations require special note: since computing the quantile on data requires an extra
+        argument to specify *which* quantile, a string like "quantile0.25" is required to give both the operation
+        and quantile value.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling operation applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the rolling value at each time.
+
+    uncertainty
+        Whether to include uncertainty on median or mean operations. Median values will have the interquartile 
+        range as the uncertainty; mean values will have the 1-sigma standard deviation.
+
+    flag_category
+        What subset of data to use to compute the rolling value. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+    plot_kind = 'delta-rolling-timeseries'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar1: str, 
+                 yvar2: str,
+                 ops: Union[str, Sequence[str]], 
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 gap: str = '20000 days', 
+                 rolling_window: int = 500, 
+                 uncertainty: bool = False, 
+                 flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2):
+
+        super().__init__(other_plots=other_plots, 
+                         yvar=yvar1, 
+                         ops=ops,
+                         default_style=default_style, 
+                         limits=limits, 
+                         key=key, 
+                         name=name, 
+                         bookmark=bookmark, 
+                         width=width, 
+                         height=height, 
+                         legend_kws=legend_kws,
+                         gap=gap, 
+                         rolling_window=rolling_window,
+                         uncertainty=uncertainty, 
+                         flag_category=flag_category, 
+                         time_buffer_days=time_buffer_days)
+        
+        self.yvar2 = yvar2
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, ax = super().setup_figure(data=data, show_all=show_all, fig=fig, axs=axs)
+        main_data = self._get_main_data(data)
+        yunits = self.get_units(main_data, self.yvar)
+        yunits2 = self.get_units(main_data, self.yvar2)
+        if yunits == yunits2:
+            ylabel = f'{self.yvar} - {self.yvar2} ({yunits})'
+        else:
+            print(f'\nWARNING: differencing variables ({self.yvar}, {self.yvar2}) with different units ({yunits}, {yunits2})', file=sys.stderr)
+            ylabel = f'{self.yvar} - {self.yvar2} ({yunits} - {yunits2})'
+        ax.set_ylabel(ylabel)
+        return fig, ax
+
+    def get_save_name(self):
+        ops = '+'.join(self.ops)
+        return f'{self.yvar}_MINUS_{self.yvar2}_rolling{self.rolling_window}_{ops}_timeseries.png'
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        if flag_category is None:
+            x = data.get_flag0_or_all_data(self.xvar)
+            y1 = data.get_flag0_or_all_data(self.yvar)
+            y2 = data.get_flag0_or_all_data(self.yvar2)
+            t = data.get_flag0_or_all_data('datetime')
+        else:
+            x = data.get_data(self.xvar, flag_category)
+            y1 = data.get_data(self.yvar, flag_category)
+            y2 = data.get_data(self.yvar2, flag_category)
+            t = data.get_data('datetime', flag_category)
+        
+        return {'x': x, 'y': y1 - y2, 't': t}
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):
