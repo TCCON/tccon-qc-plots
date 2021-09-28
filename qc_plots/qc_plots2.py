@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 from fnmatch import fnmatch
 from PyPDF2.generic import Bookmark
+from matplotlib.axes import Axes
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -400,6 +401,13 @@ class Limits:
 
         # Prefer to get the limit from the limits file, and in the file, prefer plot-specific sections
         plot_section = self.limits.get(plot_kind, dict())
+
+        # For plots with an extra plot "added on", if we can't find limits specific to this kind of plot,
+        # try the kind with no add on.
+        if len(plot_section) == 0 and '+' in plot_kind:
+            base_plot_kind = plot_kind.split('+')[0]
+            plot_section = self.limits.get(base_plot_kind, dict())
+
         plot_limits = self._get_var_from_section(varname, plot_section)
         if plot_limits is not None:
             # If we found limits, the third return value is False to tell the caller to turn off axis autoscaling
@@ -704,6 +712,13 @@ class AbstractPlot(ABC):
 
     def _get_style(self, styles, plot_kind, sub_category: Union[FlagCategory, str]):
         plot_styles = styles.get(plot_kind, dict())
+
+        # For plots with an extra kind added on, if we can't find a style for the
+        # specific plot that we're making, try the base plot kind with nothing added.
+        if len(plot_styles) == 0 and '+' in plot_kind:
+            base_plot_kind = plot_kind.split('+')[0]
+            plot_styles = styles.get(base_plot_kind, dict())
+
         sc = sub_category if isinstance(sub_category, str) else sub_category.value
         if 'clone' in plot_styles and sc not in plot_styles:
             return self._get_style(styles, plot_styles['clone'], sc)
@@ -940,26 +955,38 @@ class AuxPlotMixin(ABC):
 
 
 class ViolinAuxPlotMixin(AuxPlotMixin):
-    def init_violins(self, data_file, aux_plot_side='right', aux_plot_size='10%', aux_plot_pad=0.5):
+    def init_violins(self, data_file, aux_plot_side='right', aux_plot_size='10%', aux_plot_pad=0.5, aux_plot_hide_yticks=False,
+                     data_args_index=None):
         self._side_plot_data_file = Path(data_file)
         self._aux_plot_side = aux_plot_side
         self._aux_plot_size = aux_plot_size
         self._aux_plot_pad = aux_plot_pad
         self._aux_flag_category = FlagCategory.FLAG0
+        self._aux_plot_hide_yticks = aux_plot_hide_yticks
+        self._data_args_index = data_args_index
 
     def create_side_plot_axes(self, orig_ax):
         divider = make_axes_locatable(orig_ax)
         new_ax = divider.append_axes(self._aux_plot_side, size=self._aux_plot_size, pad=self._aux_plot_pad, sharey=orig_ax)
         new_ax.set_xticks([])
+        if self._aux_plot_hide_yticks:
+            plt.setp(new_ax.get_yticklabels(), alpha=0.0)
         return new_ax
 
     def plot_violins(self, extra_data, yvar_key, side_ax):
         violin_data = extra_data[self._side_plot_data_file]
-        yvals = self.get_plot_data(violin_data, self._aux_flag_category)[yvar_key].filled(np.nan)
+        if self._data_args_index is None:
+            yvals = self.get_plot_data(violin_data, self._aux_flag_category)[yvar_key]
+        else:
+            std_plot_args = self.get_plot_args(violin_data)
+            yvals = std_plot_args[self._data_args_index]['data'][yvar_key]
+
+        if isinstance(yvals, np.ma.masked_array):
+            yvals = yvals.filled(np.nan)
         yvals = yvals[np.isfinite(yvals)]
 
         style_fc = extra_data.default_category if self._aux_flag_category is None else self._aux_flag_category
-        violin_style = self._get_style(violin_data.styles, 'aux-violin', style_fc)
+        violin_style = deepcopy(self._get_style(violin_data.styles, 'aux-violin', style_fc))
         fill_color = violin_style.pop('fill_color', None)
         line_color = violin_style.pop('line_color', None)
 
@@ -980,6 +1007,43 @@ class ViolinAuxPlotMixin(AuxPlotMixin):
 
     def get_extra_data_files_required(self) -> Sequence[Path]:
         return [self._side_plot_data_file]
+
+    def setup_figure_with_violins(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, axs = self.setup_figure(data, show_all=show_all, fig=fig, axs=axs)
+        if isinstance(axs, Axes):
+            # Single set of axes
+            violin_axs = self.create_side_plot_axes(axs)
+        elif isinstance(axs, dict):
+            # Multiple axes, presumed oriented vertically
+            violin_axs = {k: self.create_side_plot_axes(ax) for k, ax in axs.items()}
+        elif isinstance(axs, np.ndarray) and np.ndim(axs) == 1:
+            # Multiple axes, presumed oriented vertically
+            violin_axs = np.array([self.create_side_plot_axes(ax) for ax in axs])
+        else:
+            raise NotImplementedError('Default setup of auxiliary axes for violin plots expects a single set of axes, a dictionary of axes, or a 1D array of axes')
+        return fig, {'main': axs, 'violin': violin_axs}
+
+    def get_save_name_with_violins(self):
+        orig = Path(self.get_save_name())
+        return f'{orig.stem}_with_violins{orig.suffix}'
+
+    def make_plot_with_violins(self, data: Sequence[TcconData], extra_data: dict, ydata_key: str = 'y', 
+                               flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        fig, axs = self.setup_figure_with_violins(data, show_all=show_all)
+        for i, d in enumerate(data):
+            self._plot(d, i, axs=axs['main'], flag0_only=flag0_only)
+        self.plot_violins(extra_data, ydata_key, axs['violin'])
+
+        fig_path = img_path / self.get_save_name_with_violins()
+        if tight:
+            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
+            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fig.tight_layout()
+        fig.savefig(fig_path, dpi=300)
+        plt.close(fig)
+        return fig_path
 
 
 class TimeseriesMixin:
@@ -1945,39 +2009,19 @@ class TimeseriesPlusViolinPlot(TimeseriesPlot, ViolinAuxPlotMixin):
                  time_buffer_days=2,
                  violin_plot_side='right',
                  violin_plot_size='10%',
-                 violin_plot_pad=0.5):
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
                          time_buffer_days=time_buffer_days)
         self.init_violins(data_file=violin_data_file,
                           aux_plot_side=violin_plot_side,
                           aux_plot_size=violin_plot_size,
+                          aux_plot_hide_yticks=violin_plot_hide_yticks,
                           aux_plot_pad=violin_plot_pad)
 
-    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
-        fig, ax = super().setup_figure(data, show_all=show_all, fig=fig, axs=axs)
-        violin_ax = self.create_side_plot_axes(ax)
-        return fig, {'main': ax, 'violin': violin_ax}
-
-    def get_save_name(self):
-        return f'{self.yvar}_timeseries_with_violin.png'
-
     def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
-        fig, axs = self.setup_figure(data, show_all=show_all)
-        for i, d in enumerate(data):
-            self._plot(d, i, axs=axs['main'], flag0_only=flag0_only)
-        self.plot_violins(extra_data, 'y', axs['violin'])
-
-        fig_path = img_path / self.get_save_name()
-        if tight:
-            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
-            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                fig.tight_layout()
-        fig.savefig(fig_path, dpi=300)
-        plt.close(fig)
-        return fig_path
+        return self.make_plot_with_violins(data=data, extra_data=extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
 
 
 
@@ -2033,6 +2077,53 @@ class TimeseriesDeltaPlot(TimeseriesPlot):
             y1 = data.get_data(self.yvar, flag_category)
             y2 = data.get_data(self.yvar2, flag_category)
         return {'x': x, 'y': y1 - y2}
+
+
+class TimeseriesDeltaPlusViolinsPlot(TimeseriesDeltaPlot, ViolinAuxPlotMixin):
+    plot_kind = 'delta-timeseries+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar1: str, 
+                 yvar2: str, 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits,
+                 name: Optional[str] = None, 
+                 width=20, 
+                 height=10,
+                 legend_kws: Optional[dict] = None, 
+                 key=None, 
+                 time_buffer_days=2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__( 
+                 other_plots=other_plots, 
+                 yvar1=yvar1, 
+                 yvar2=yvar2, 
+                 default_style=default_style, 
+                 limits=limits,
+                 name=name, 
+                 width=width, 
+                 height=height,
+                 legend_kws=legend_kws, 
+                 key=key, 
+                 time_buffer_days=time_buffer_days
+            )
+
+        self.init_violins(data_file=violin_data_file,
+                          aux_plot_side=violin_plot_side,
+                          aux_plot_size=violin_plot_size,
+                          aux_plot_hide_yticks=violin_plot_hide_yticks,
+                          aux_plot_pad=violin_plot_pad)
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+
+    
 
 
 class Timeseries2PanelPlot(TimeseriesPlot):
@@ -2124,6 +2215,94 @@ class Timeseries2PanelPlot(TimeseriesPlot):
         axs['main'].legend(**plot_args[0]['legend_kws'])
 
 
+class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
+    """Concrete plotting class for a two-panel plot, with a second time series in a smaller upper plot and violin plots to the side
+
+    Configuration plot kind = ``"timeseries-2panel"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the lower, large y-axis.
+
+    yerror_var
+        Variable to plot on the upper, small y-axis.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+    plot_kind = 'timeseries-2panel+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar: str, 
+                 yerror_var: str, 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10,
+                 legend_kws: Optional[dict] = None, 
+                 time_buffer_days=2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(
+            other_plots=other_plots, 
+            yvar=yvar, 
+            yerror_var=yerror_var, 
+            default_style=default_style, 
+            limits=limits, 
+            name=name, 
+            bookmark=bookmark, 
+            width=width, 
+            height=height,
+            legend_kws=legend_kws, 
+            time_buffer_days=time_buffer_days
+        )
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+            aux_plot_pad=violin_plot_pad,
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        fig, axs = self.setup_figure_with_violins(data, show_all=show_all)
+        for i, d in enumerate(data):
+            self._plot(d, i, axs=axs['main'], flag0_only=flag0_only)
+
+        
+        self.plot_violins(extra_data, 'y', axs['violin']['main'])
+        self.plot_violins(extra_data, 'yerr', axs['violin']['error'])
+
+        fig_path = img_path / self.get_save_name_with_violins()
+        if tight:
+            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
+            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fig.tight_layout()
+        fig.savefig(fig_path, dpi=300)
+        plt.close(fig)
+        return fig_path
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        # Since the parent class can't accept figure or axes, we need to swallow those arguments here
+        if fig is not None or axs is not None:
+            warnings.warn(f'fig and axs keyword arguments to {self.__class__.__name__}.setup_figure are ignored')
+        return super().setup_figure(data, show_all=show_all)
+
+
 class ResampledTimeseriesPlot(TimeseriesPlot):
     """Concrete plotting class to plot a timeseries of data resampled to a coarser temporal frequency.
 
@@ -2179,6 +2358,80 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
 
     def get_save_name(self):
         return f'{self.yvar}_{self.freq}_{self.op}_timeseries.png'
+
+
+class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMixin):
+    """Concrete plotting class to plot a timeseries of data resampled to a coarser temporal frequency.
+
+    Configuration plot kind = ``"resampled-timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that determines the temporal resolution of the resampled data.
+
+    op
+        The operation to apply to resample the data. Usually "median", "mean", "std", etc.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+
+    plot_kind = 'resampled-timeseries+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar: str, 
+                 freq: str, 
+                 op: str, 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None,
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10,
+                 legend_kws: Optional[dict] = None, 
+                 time_buffer_days=2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(
+            other_plots=other_plots, 
+            yvar=yvar, 
+            freq=freq, 
+            op=op, 
+            default_style=default_style, 
+            limits=limits, 
+            key=key,
+            name=name, 
+            bookmark=bookmark, 
+            width=width, 
+            height=height,
+            legend_kws=legend_kws,
+            time_buffer_days=time_buffer_days
+        )
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_pad=violin_plot_pad,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
 
 
 class RollingDerivativePlot(TimeseriesPlot):
@@ -2319,6 +2572,101 @@ class RollingDerivativePlot(TimeseriesPlot):
     def get_save_name(self):
         deriv_str = self._derivative_str(latex=False).replace('/', '_')
         return f'{deriv_str}_rolling{self.rolling_window}_timeseries.png'
+
+
+class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin):
+    """Concrete plotting class to plot a derivative of one variable vs. another over a rolling window.
+
+    Configuration plot kind = ``"rolling-derivative"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable in the numerator of the derivative.
+
+    dvar
+        Variable in the denominator of the derivative.
+
+    derivative_order
+        What order derivative to calculate; 1 = slope, 2 = curvature, etc. Currently only order 1 is implemented.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling derivatives applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the derivative at each time.
+
+    flag_category
+        What subset of data to use to compute the derivative. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+    plot_kind = 'rolling-derivative+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar: str, 
+                 dvar: str, 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10,
+                 legend_kws: Optional[dict] = None, 
+                 derivative_order: int = 1,
+                 gap: str = '20000 days', 
+                 rolling_window: int = 500, 
+                 flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(
+            other_plots=other_plots, 
+            yvar=yvar, 
+            dvar=dvar, 
+            default_style=default_style, 
+            limits=limits, 
+            key=key, 
+            name=name, 
+            bookmark=bookmark, 
+            width=width, 
+            height=height,
+            legend_kws=legend_kws, 
+            derivative_order=derivative_order,
+            gap=gap, 
+            rolling_window=rolling_window, 
+            flag_category=flag_category, 
+            time_buffer_days=time_buffer_days
+        )
+
+        # To get the derivatives, we need the violin plots to call `get_plot_args` instead of `get_plot_data`
+        # The derivative `get_plot_args` only ever returns 1 value, so we take that as our violin plot data 
+        # (hence data_args_index = 0)
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_pad=violin_plot_pad,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+            data_args_index=0
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
 
 
 class RollingTimeseriesPlot(TimeseriesPlot):
@@ -2471,6 +2819,103 @@ class RollingTimeseriesPlot(TimeseriesPlot):
         return f'{self.yvar}_rolling{self.rolling_window}_{ops}_timeseries.png'
 
 
+class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin):
+    """Concrete plotting class to plot a rolling mean/median/etc timeseries.
+
+    Configuration plot kind = ``"rolling-timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the y-axis and compute the rolling value of.
+
+    ops
+        A single operation name (e.g. "mean", "median", "std" etc.) or list of names to apply to the rolling
+        window. A list will cause multiple rolling values to be plotted; each can have a different style applied
+        to it. Quantile operations require special note: since computing the quantile on data requires an extra
+        argument to specify *which* quantile, a string like "quantile0.25" is required to give both the operation
+        and quantile value.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling operation applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the rolling value at each time.
+
+    uncertainty
+        Whether to include uncertainty on median or mean operations. Median values will have the interquartile 
+        range as the uncertainty; mean values will have the 1-sigma standard deviation.
+
+    flag_category
+        What subset of data to use to compute the rolling value. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+    plot_kind = 'rolling-timeseries+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar: str, 
+                 ops: Union[str, Sequence[str]], 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 gap: str = '20000 days', 
+                 rolling_window: int = 500, 
+                 uncertainty: bool = False, 
+                 flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(
+            other_plots=other_plots, 
+            yvar=yvar, 
+            ops=ops, 
+            default_style=default_style, 
+            limits=limits, 
+            key=key, 
+            name=name, 
+            bookmark=bookmark, 
+            width=width, 
+            height=height, 
+            legend_kws=legend_kws,
+            gap=gap, 
+            rolling_window=rolling_window, 
+            uncertainty=uncertainty, 
+            flag_category=flag_category, 
+            time_buffer_days=time_buffer_days
+        )
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+            aux_plot_pad=violin_plot_pad
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+        
+
+
 class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
     """Concrete plotting class for time series that plots the difference of two variables with rolling operations.
 
@@ -2582,6 +3027,103 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
             t = data.get_data('datetime', flag_category)
         
         return {'x': x, 'y': y1 - y2, 't': t}
+
+
+class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAuxPlotMixin):
+    """Concrete plotting class for time series that plots the difference of two variables with rolling operations.
+
+    Configuration plot kind = ``"delta-rolling-timeseries"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar1, yvar2
+        Variables to take the difference of to plot on the y-axis. Difference
+        will be ``yvar1 - yvar2``.
+
+    ops
+        A single operation name (e.g. "mean", "median", "std" etc.) or list of names to apply to the rolling
+        window. A list will cause multiple rolling values to be plotted; each can have a different style applied
+        to it. Quantile operations require special note: since computing the quantile on data requires an extra
+        argument to specify *which* quantile, a string like "quantile0.25" is required to give both the operation
+        and quantile value.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling operation applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the rolling value at each time.
+
+    uncertainty
+        Whether to include uncertainty on median or mean operations. Median values will have the interquartile 
+        range as the uncertainty; mean values will have the 1-sigma standard deviation.
+
+    flag_category
+        What subset of data to use to compute the rolling value. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+    """
+    plot_kind = 'delta-rolling-timeseries+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 yvar1: str, 
+                 yvar2: str,
+                 ops: Union[str, Sequence[str]], 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 gap: str = '20000 days', 
+                 rolling_window: int = 500, 
+                 uncertainty: bool = False, 
+                 flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(other_plots=other_plots, 
+                         yvar1=yvar1, 
+                         yvar2=yvar2,
+                         ops=ops,
+                         default_style=default_style, 
+                         limits=limits, 
+                         key=key, 
+                         name=name, 
+                         bookmark=bookmark, 
+                         width=width, 
+                         height=height, 
+                         legend_kws=legend_kws,
+                         gap=gap, 
+                         rolling_window=rolling_window,
+                         uncertainty=uncertainty, 
+                         flag_category=flag_category, 
+                         time_buffer_days=time_buffer_days)
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+            aux_plot_pad=violin_plot_pad
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):
