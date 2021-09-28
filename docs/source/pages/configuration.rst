@@ -15,7 +15,36 @@ look for these.
 Primary file
 ------------
 
-The primary configuration file is broken down into two main parts: styles and plots.
+The primary configuration file is broken down into three main parts: image postprocessing, styles, and plots.
+
+.. _ImagePostProc:
+
+Image postprocessing
+********************
+
+This section contains options that pertain to final conversion of the individual figures into combined PDFs.
+It begins with the ``[image_postprocessing]`` header. All options are optional (with one caveat regarding
+``font_file``). Options are:
+
+* ``font_file`` (default = "LiberationSans-Regular.ttf"): TrueType font file to use when writing the plot 
+  number, name, and input file in the top left of each page. This is done using Python's 
+  `Pillow library <https://pillow.readthedocs.io/en/stable/>`_ for image manipulation. Pillow searches common 
+  directories for TrueType files, so in many cases you only need give the file name, and not a full path. 
+
+.. note::
+   If :file:`LiberationSans-Regular.ttf` is not available on your system, you will need to change this option 
+   to a valid TrueType font file, or the QC plots program will crash when it reaches this part. On Linux, fonts 
+   can usually be found under :file:`/usr/share/fonts`.
+
+* ``font_size`` (default = 30): size of the font used to write the plot number, name, etc. in the upper left 
+  corner of each page. 
+
+* ``bookmark_all`` (default = ``None``): this controls whether each page in the output PDF automatically receives
+  a bookmark. Setting this to ``true`` or ``false`` will turn that behavior on or off, respectively.  However, the 
+  default when this is not specified is to check whether any of the plots have a value for their individual ``bookmark``
+  properties. If not, QC plots behaves as if ``bookmark_all`` is ``true`` (and so makes a bookmark for every plot);
+  if so, then QC plots behaves as if ``bookmark_all`` is ``false`` (only making bookmarks for plots that have their
+  individual ``bookmark`` properties set).
 
 Plots
 *****
@@ -177,11 +206,12 @@ The following table summarizes the available plots.
 * "Optional keys" lists keys that may be provided to change the behavior of the given plot.
 * "Style keywords" describes what keys may be passed in the style section for this plot type; using this is "MPL ``function`` kws", meaning any keywords for the Matplotlib function named can be given.
 * "Cloning supported" indicates whether that plot type allows :ref:`style cloning <StyleCloning>`
+* "Aux plots" lists auxiliary plots that can be added to that main style plot. 
 
 
 .. csv-table::
    :file: plot_types.csv
-   :widths: 20, 20, 20, 30, 10
+   :widths: 20, 20, 20, 30, 10, 10
    :header-rows: 1
 
 
@@ -197,6 +227,15 @@ All plot types accept the following as optional keys:
    There is currently no check to protect against two plots having the same key. If you get odd results when
    trying to refer to another plot, make sure you don't have duplicated plot keys!
 
+* ``name`` (default = ``None``): a name to use for the plot alongside the plot number in the upper left corner
+  of each page. If this is not given, then the filename used to save the intermediate plot images is inserted 
+  instead. 
+* ``bookmark`` (default = ``None``): controls whether and how this page gets bookmarked in the output PDF. Assigning
+  a string as this property will use that name for the bookmark in the PDF (e.g. setting ``bookmark = "Flags"`` on 
+  a plot will cause that page in the final PDF to have the bookmark "Flags"). Setting this to ``true`` will use 
+  the value of ``name`` for the bookmark (either the value passed as ``name`` explicitly or the fallback file name).
+  If the :ref:`ImagePostProc` key ``bookmark_all`` is ``true`, then all plots have a bookmark in the final PDF. In 
+  that case, the value of ``bookmark`` is used if available, then QC plots falls back on ``name``.
 * ``legend_kws`` (default = ``{}``): keyword to pass to the `legend <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html>`_
   call for this plot only. Will be merged with legend keywords defined in the default style for this plot type.
 * ``width`` (default = ``20``): initial width of the plot in centimeters
@@ -205,6 +244,10 @@ All plot types accept the following as optional keys:
 .. note::
    This does not guarantee the final page size will be 20 x 10 cm. Excess whitespace is trimmed from the plots
    and the final page size depends on the ``--size`` command line argument.
+
+If a plot has an auxiliary plot added, it may have additional required or optional keys beyond those described in 
+this section (or the plot-specific sections below). See :ref:`AuxPlots` for information on which keys are added by 
+which auxiliary plots.
 
 flag-analysis
 ~~~~~~~~~~~~~
@@ -389,6 +432,24 @@ A plot of a given variable vs. time.
 
 Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`.
 
+delta-timeseries
+~~~~~~~~~~~~~~~~
+
+A plot of the difference of two variables vs. time.
+
+**Required keys**
+
+* ``yvar1`` and ``yvar2``: the two variables to difference. The quantity plotted on the *y*-axis will be ``yvar1 - yvar2``.
+
+**Optional keys**
+
+* ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+
+**Style**
+
+Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`.
+
+
 timeseries-2panel
 ~~~~~~~~~~~~~~~~~
 
@@ -409,6 +470,7 @@ and its error.
 Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`. Both panels will use the same style for
 the same data subset.
 
+
 resampled-timeseries
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -428,6 +490,8 @@ summarized as a mean/median/etc.
 **Style**
 
 Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`.
+
+.. _PT_RollingTimeseries:
 
 rolling-timeseries
 ~~~~~~~~~~~~~~~~~~
@@ -488,6 +552,145 @@ ranges for mean and median operations, respectively.
 If the final style (composed from data-specific + default styles) does not include a linestyle, then
 the linestyle value is set to "none", as for scatter plots. Avoid using the "ls" shorthand for "linestyle"
 since "linestyle" will always be set if absent.
+
+
+delta-rolling-timeseries
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+A rolling timeseries plot of the difference between two quantities in the netCDF file.
+
+**Required keys**
+
+* ``yvar1`` and ``yvar2``: the variables from the netCDF file(s) to difference. The quantity plotted on the *y*-axis is 
+  ``yvar1 - yvar2``. 
+* ``ops``: what operation(s) to use for the rolling, usually "median" or "mean", but any operation supported on a Pandas
+  rolling data frame is supported. This can be either a string for a single operation, or a list of strings to plot
+  multiple rolled series. A special case is the "quantile" operation, this must include the quantile value to calculate,
+  e.g. "quantile0.75" to compute the quantile with ``q = 0.75``.
+
+**Optional keys**
+
+* ``gap`` (default = ``"20000 days"``): this specified a gap in time that the rolling operation will not cross. This can
+  be any string recognized by `Pandas timedelta <https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html>`_.
+  If there is a gap in the data longer than this duration, the data on either side will have the rolling operation
+  applied separately. The default of "20000 days" (~50 years) is set to effectively disable this behavior by default.
+* ``rolling_window`` (default = ``500``): the number of points to use in the rolling window.
+* ``uncertainty`` (default = ``false``): set this to ``true`` to plot uncertainty ranges for mean or median operations;
+  means will use 1-sigma standard deviation and medians the upper and lower quartiles.
+* ``data_category`` (default = ``None``): which subset of the ``yvar`` data to use, both when plotting the raw data and
+  when computing the rolling operation(s). The default behavior is to use the normal subset for a given data type, or
+  ``flag == 0`` data if the ``--flag0`` command line argument is set. Passing one of the strings "all", "flag0", or
+  "flagged" will force the use of that subset (this may result in errors if one of the data files does not have the
+  "flag" variable, which is required to figure out the latter two subsets).
+
+**Style**
+
+Style is the same as for :ref:`PT_RollingTimeseries`.
+
+
+rolling-derivative
+~~~~~~~~~~~~~~~~~~
+
+Rolling derivative plots compute a derivative of one variable vs. another across spectra in a rolling 
+window. For example, if told to compute the first derivative of ``y`` with respect to ``x`` using a 
+rolling window of 500 spectra, this will take spectra 1 through 500 and fit a slope of ``y`` versus 
+``x`` in those 500 spectra, then do the same for spectra 2 through 501, and so on. 
+
+**Required keys**
+
+* ``yvar``: the variable in the numerator of the derivative (the dependent variable).
+* ``dvar``: the varibale in the denominator of the derivative (the independent variable).
+
+**Optional keys**
+
+* ``derivative_order`` (default = ``1``): order of the derivative to calculate; ``1`` will compute a slope, ``2`` curvature, etc.
+  Only ``1`` is implemented.
+* ``gap`` (default = ``"20000 days"``): this specified a gap in time that the rolling operation will not cross. This can
+  be any string recognized by `Pandas timedelta <https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html>`_.
+  If there is a gap in the data longer than this duration, the data on either side will have the rolling operation
+  applied separately. The default of "20000 days" (~50 years) is set to effectively disable this behavior by default.
+* ``rolling_window`` (default = ``500``): the number of points to use in the rolling window.
+* ``data_category`` (default = ``None``): which subset of the data to use when computing the rolling derivative. 
+  The default behavior is to use the normal subset for a given data type, or
+  ``flag == 0`` data if the ``--flag0`` command line argument is set. Passing one of the strings "all", "flag0", or
+  "flagged" will force the use of that subset (this may result in errors if one of the data files does not have the
+  "flag" variable, which is required to figure out the latter two subsets).
+
+.. _AuxPlots:
+
+Auxiliary Plots
+***************
+
+Auxiliary plots are extra panels that can be added to a main plot to provide extra information. To add an 
+auxiliary plot to a page, add ``+<auxkind>`` to the end of the main plot's ``kind`` values. For example, to 
+add a violin plot to a timeseries plot, set the ``kind`` value to ``"timeseries+violin"``.  Internally, 
+``"timeseries"`` and ``"timeseries+violin"`` are implemented as separate plot kinds. While this should be 
+largely transparent to a user, it does have several implications to be aware of:
+
+#. Not all combinations of main + auxiliary plots will be implemented. Which auxiliary plots are supported 
+   with which main plots is listed above in :ref:`PlotTypes`.
+#. Only one auxiliary plot can be combined with a main plot. (Allowing multiple auxiliary plots to be added 
+   to a single plot would require a separate implementation for each possible combination, which isn't practical.
+   Future work could refactor the approach to auxiliary plots to make this more viable.)
+#. A main + auxiliary combination can have different styles and limits than the the main plot type alone; 
+   to continue our example from the first paragraph, you could readily define a ``["timeseries+violin"]`` section 
+   in the :ref:`Limits` or a ``[style.main."timeseries+violin"]`` :ref:`Styles` section to set limits or a style 
+   customized for timeseries plots with a violin plot attached only (i.e. not for normal timeseries plots). However,
+   the default behavior is for the main plot to use the limits and styles it would without the auxiliary plot.
+
+.. note::
+   If you do add a section for a main+auxiliary plot, you will need to quote the plot kind in the TOML file. 
+   Note how in the examples in the last point above, such as ``[style.main."timeseries+violin"]`` the 
+   "timeseries+violin" part is quoted. TOML files will not include plus signs in a string without it being quoted;
+   if you did not quote this (i.e. ``[style.main.timeseries+violin]``), it would be interpreted as a section 
+   named ``[style.main.timeseries]``. If you already have a section named that, you'll get a TOML error when 
+   running QC plots.
+
+Note that in the third point above, the styles referred to are those for the main plot. Styles for the auxiliary 
+plots need to be defined separately in the configurations; this will be described with each plot kind below.
+
+The following subsections describe the available auxiliary plot kinds, including the extra required or optional 
+keys they add to their ``[[plots]]`` section in the configuration file and their style options.
+
+Violin aux plots
+~~~~~~~~~~~~~~~~
+
+A violin auxiliary plot adds a small plot to the side of the main plot that shows the distribution of the 
+*y*-variable of the main plot in some standard good-quality data. Note that this is separate from the 
+normal reference file. 
+
+**Required keys**
+
+* ``violin_data_file``: a path to the netCDF file to use to create the violin plots.
+
+**Optional keys**
+
+* ``violin_plot_side`` (default = "right"): which side of the main plot axes to put the violin plot on.
+  Can be "right", "left", "bottom", or "top" (though only "left" or "right" are recommended).
+* ``violin_plot_size`` (default = "10%"): how big to make the violin plot horizontally (if the side is 
+  "left" or "right") or vertically (if the side is "bottom" or "top"). To give as a percentage of 
+  the original plot size (easiest), make this a string ending in the percent sign, as the default is. 
+* ``violin_plot_pad`` (default = 0.5): space to reserve between the original axes and the new violin plot 
+  axes. 
+* ``violin_plot_hide_yticks`` (default = ``false``): set to ``true`` to hide the *y*-tick labels on the 
+  violin plot axes.
+
+**Style**
+
+Style for the violin plots is read exclusively from the ``[style.extra.aux-violin]`` section. While this can 
+have all the usual data subsets as keys (``flag0``, ``flagged``, ``all``), usually only the ``flag0`` style 
+matters since violin plots use flag = 0 exclusively. This can accept any keywords that 
+:py:func:`matplotlib.pyplot.violinplot` does except for ``dataset`` and ``positions`` (they are already used),
+plus two additional keywords:
+
+* ``fill_color``: color to make the violin density kernel.
+* ``line_color``: color to make any lines (medians, extrema, etc.) on the plot.
+
+An example style section is::
+
+    [style.extra.aux-violin]
+    flag0 = {showmedians = true, showextrema = false, fill_color = "silver", line_color = "dimgray"}
+
 
 .. _Limits:
 

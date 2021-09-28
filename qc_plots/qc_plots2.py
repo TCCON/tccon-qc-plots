@@ -2218,7 +2218,7 @@ class Timeseries2PanelPlot(TimeseriesPlot):
 class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
     """Concrete plotting class for a two-panel plot, with a second time series in a smaller upper plot and violin plots to the side
 
-    Configuration plot kind = ``"timeseries-2panel"``
+    Configuration plot kind = ``"timeseries-2panel+violin"``
 
     For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
 
@@ -2363,7 +2363,7 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
 class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMixin):
     """Concrete plotting class to plot a timeseries of data resampled to a coarser temporal frequency.
 
-    Configuration plot kind = ``"resampled-timeseries"``
+    Configuration plot kind = ``"resampled-timeseries+violin"``
 
     For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
 
@@ -2577,7 +2577,7 @@ class RollingDerivativePlot(TimeseriesPlot):
 class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin):
     """Concrete plotting class to plot a derivative of one variable vs. another over a rolling window.
 
-    Configuration plot kind = ``"rolling-derivative"``
+    Configuration plot kind = ``"rolling-derivative+violin"``
 
     For parameters not listed here, see :py:class:`AbstractPlot`.
 
@@ -2822,7 +2822,7 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin):
     """Concrete plotting class to plot a rolling mean/median/etc timeseries.
 
-    Configuration plot kind = ``"rolling-timeseries"``
+    Configuration plot kind = ``"rolling-timeseries+violin"``
 
     For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
 
@@ -3032,7 +3032,7 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
 class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAuxPlotMixin):
     """Concrete plotting class for time series that plots the difference of two variables with rolling operations.
 
-    Configuration plot kind = ``"delta-rolling-timeseries"``
+    Configuration plot kind = ``"delta-rolling-timeseries+violin"``
 
     For parameters not listed here, see :py:class:`AbstractPlot`.
 

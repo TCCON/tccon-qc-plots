@@ -127,3 +127,77 @@ any plot-specific legend keywords are stored on that instance. The ``get_legend_
 default style legend keywords and merge them with the instance-specific keywords. It also relies on the ``_get_style``
 method to retrieve the default legend style, in order to allow legend keywords to be cloned just like the plot styles 
 themselves. 
+
+
+Auxiliary plots
+---------------
+
+Auxiliary plots are currently implemented as mixin-type classes that inherit from the abstract class 
+:py:class:`qc_plots.qc_plots2.AuxPlotMixin`. For an example, see the :py:class:`qc_plots.qc_plots2.ViolinAuxPlot`
+class and its usage. Note how it is always the *second* parent class of classes that inherit from it. These classes 
+can assume they will have access through ``self`` to any methods defined on :py:class:`~qc_plots.qc_plots2.AbstractPlot`.
+
+To enable a main plot + auxiliary plot combination, you will need to implement a class that inherits from both the main plot 
+class and the auxiliary plot mixin class. The ``__init__`` method of the combined class will need to accept arguments required by 
+both and distribute them to the parent classes appropriately. For this reason, it is best if the auxiliary plot mixin class 
+does its initialization in a method *other* than ``__init__``, so that the combined class can easily call it explicitly.
+
+.. note::
+   It will make things much easier on users if you keep the auxiliary input parameter names the same for all combined classes using 
+   a particular auxiliary mixin. For example, all of the classes that inherit from :py:class:`~qc_plots.qc_plots2.ViolinAuxPlot`
+   use ``violin_data_file`` as the parameter to accept the path to the file to plot data from. This way the user can always 
+   use the same line in their config file, and won't have to change the parameter key across main plot types.
+
+Since the auxiliary plot has the potential to be inherited by many child classes, it will be helpful if you can encapsulate most 
+of the functionality needed to plot both the main and auxiliary plots on the auxiliary mixin class. In 
+:py:class:`qc_plots.qc_plots2.ViolinAuxPlot`, this is accomplished by having alternatively-named versions of key methods 
+(such as ``setup_figure_with_violins`` in lieu of ``setup_figure`` or ``get_save_name_with_violins`` in lieu of 
+``get_save_name``). These call their normal versions as needed internally. The overall behavior is wrapped up in 
+``make_plot_with_violins``, which combines calls to the alternative and regular methods as needed. In most classes that inherit
+from :py:class:`qc_plots.qc_plots2.ViolinAuxPlot`, all that is needed is to call ``make_plot_with_violins`` from inside the 
+``make_plot`` method, and everything is taken care of with minimal code duplication. 
+
+As each main + auxiliary plot combination is its own child of :py:class:`~qc_plots.qc_plots2.AbstractPlot`, each must have 
+a unique ``plot_kind`` attribute. This should have the form of "main_plot+aux_plot", e.g. "timeseries+violin". Being consistent 
+about the auxiliary plot component of the name across all implementations will make it easier for users to remember the correct 
+name when writing their configuration files.
+
+.. note::
+   It is **critical** that the part before the ``+`` matches the main plot's ``plot_kind`` value exactly. Both 
+   :py:meth:`~qc_plots.qc_plots2.AbstractPlot._get_style` and :py:class:`~qc_plots.qc_plots2.Limits` rely on this 
+   to fall back on the proper main plot style/limits if needed.
+
+
+Loading extra data
+******************
+
+Each auxiliary mixin must define the method ``get_extra_data_files_required`` that returns a sequence of paths to netCDF files 
+to load. The main function will load each unique file once and store it in a dictionary. The mixin will receive this dictionary 
+to its ``make_plot`` method and will be responsible for pulling out the correct dataset. Since converting the time dimensions
+in each of the input files is one of the slower parts of this code, this approach avoids doing that more than necessary.
+
+
+Pros and cons this auxiliary plot design
+****************************************
+
+In theory, this approach of having combination plot classes that inherit from both the main and auxiliary plot class provides 
+flexibility in implementation. The combination class can override whatever methods from its parents it needs to make that specific 
+combination work. 
+
+The main downside is that it still requires quite a bit of manual work to implement each combination class; the custom ``__init__``
+method that divides up the various inputs must be created, and at the very least, the ``make_plot`` method needs overridden to 
+correctly make both the main and auxiliary plots. This puts a severe limit on the possibility of combining more than one auxiliary
+plot with any given main plot, as a unique class would have to be created for each possible combination.
+
+A cleaner approach would be to compose a master plotting class out of one main and zero or more auxiliary plotting classes. This 
+master class would need to deduce how to set up the figure based on the requirements of all the component plots, then distribute
+the correct axes and data to each component. If those problems could be solved, this code could be significantly simplified.
+A related redesign could separate data extraction from plotting, thus each master plot would have components:
+
+* a data loader that extracts variables from each of the input datasets 
+* one or more plotters that take the data provided by the loader and its axes and creates the desired plots 
+
+Separating the data loader from the plotter should reduce the complexity of the inheritance in this code (ideally to only 
+a single layer: ``AbstractDataLoader -> ConcreteDataLoaders``, etc.). This would be a prime example of using 
+`composition over inheritance <https://realpython.com/inheritance-composition-python/#the-class-explosion-problem>`_,
+but needs a not-insignificant rebuild to implement.
