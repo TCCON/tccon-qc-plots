@@ -2535,6 +2535,10 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
         
         self.plot_violins(extra_data, 'y', axs['violin']['main'])
         self.plot_violins(extra_data, 'yerr', axs['violin']['error'])
+        if axs['violin']['main'].get_ylabel() != axs['violin']['error'].get_ylabel():
+            print(f'WARNING: the two violin plots for timeseries 2-panel {self.name} have different values, but only the lower axis label will be kept!')
+        axs['violin']['main'].yaxis.set_label_coords(1.1, 0.75)
+        axs['violin']['error'].set_ylabel('')
 
         fig_path = img_path / self.get_save_name_with_violins()
         if tight:
