@@ -6,6 +6,8 @@ from pathlib import Path
 import tempfile
 from PIL import Image, ImageDraw, ImageFont
 from PyPDF2 import PdfFileWriter, PdfFileReader
+import re
+from string import Template
 import sys
 import tempfile
 import tomli
@@ -118,6 +120,45 @@ def send_email(pdf_path, email_pdf_path, nc_file, emails=(None, None), email_con
         print('Email sent.')
 
 
+def load_config(config_file):
+    with open(config_file) as f:
+        config = tomli.load(f)
+
+    variables = config.pop('variables', dict())
+    _replace_config_variables(config, variables)
+    return config
+
+
+def _replace_config_variables(config: dict, variables: dict, section: str = ''):
+    if not isinstance(config, dict):
+        return
+
+    for k, v in config.items():
+        if isinstance(v, dict):
+            inner_section = f'[{k}]' if section == '' else f'{section}.[{k}]'
+            _replace_config_variables(v, variables, section=inner_section)
+        elif isinstance(v, (tuple, list)):
+            for i, el in enumerate(v, start=1):
+                inner_section = f'[[{k} ({i})]]' if section == '' else f'{section}.[[{k} ({i})]]'
+                _replace_config_variables(el, variables, section=inner_section)
+        elif isinstance(v, str) and '$' in v:
+            # First we need to see if the entire value is just one variable. If so, we want to directly
+            # substitute its value to preserve type. If not, we'll do string template substitution.
+            regex = r'\$({})$'.format('|'.join(variables.keys()))
+            if re.match(regex, v):
+                varkey = v[1:]
+                if varkey in variables:
+                    config[k] = variables[varkey]
+                else:
+                    print(f'WARNING: setting "{k}" in "{section}" section references unknown variable "{v}"')
+            else:
+                try:
+                    config[k] = Template(v).substitute(**variables)
+                except KeyError as err:
+                    print(f'WARNING: setting "{k}" in "{section}" section references unknown variable {err}')
+            
+
+
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('nc_in', help='full path to the netCDF file from which plots should be made, or a path to a '
@@ -183,8 +224,7 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
     print(f'Using {config} as plots configuration file')
     print(f'Using {limits} as plots limits file')
 
-    with open(config) as f:
-        config = tomli.load(f)
+    config = load_config(config)
 
     with ExitStack() as stack:
         if use_tmp_img_dir:

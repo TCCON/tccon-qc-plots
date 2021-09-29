@@ -15,7 +15,87 @@ look for these.
 Primary file
 ------------
 
-The primary configuration file is broken down into three main parts: image postprocessing, styles, and plots.
+The primary configuration file is broken down into several main parts: variables, image postprocessing, styles, and plots.
+
+.. _Variables:
+
+Variables
+*********
+
+The ``[variables]`` section of the configuration allows you to define strings to replace with other values elsewhere
+in the configuration. For example, if my configuration file included::
+
+  [variables]
+  static_ref_file = "/data/tccon/static/standard_network_data.nc"
+
+then I could have a plots subsection like::
+
+  [[plots]]
+  kind = "timeseries-2panel+violin"
+  name = "XCO2 timeseries"
+  yvar = "xco2"
+  yerror_var = "xco2_error"
+  violin_data_file = "$static_ref_file"
+
+This will see ``"$static_ref_file"`` in the ``[[plots]]`` section replaced with "/data/tccon/static/standard_network_data.nc".
+In other words, QC plots interprets the plotting section as::
+
+  [[plots]]
+  kind = "timeseries-2panel+violin"
+  name = "XCO2 timeseries"
+  yvar = "xco2"
+  yerror_var = "xco2_error"
+  violin_data_file = "/data/tccon/static/standard_network_data.nc"
+
+
+Substitutions obey the following rules:
+
+* Variables must be references with a leading dollar sign. Variable names may contain letters, numbers, and/or underscores,
+  but may not start with a number. 
+* If the variable makes up the entire value, as in the above example, type is preserved. That is, if you have a configuration
+  file such as::
+
+    [variables]
+    custom_width = 16
+    custom_height = 8
+
+    [[plots]]
+    kind = "flag-analysis"
+    width = "$custom_width"
+    height = "$custom_height"
+
+  then ``width`` and ``height`` would be integers. This is important as some of the inputs are expected to be actual numeric or
+  boolean types.
+
+* If the variable is inserted in the middle of a longer string, it is expanded using Bash-like rules: a variable begins with a 
+  dollar sign and ends with the first non-alphanumeric or underscore character, or curly braces can be used to disambiguate where 
+  the variable ends if it must abut an alphanumeric or underscore character. For example, you could do this::
+
+    [variables]
+    ref_path = "/data/tccon/static"
+    ref_site = "oc"
+
+    [[plots]]
+    kind = "timeseries+violin"
+    yvar = "xluft"
+    violin_data_file = "$ref_path/${site}_static.nc"
+
+  In this example, ``$ref_path`` does not need curly braces because the next character (``/``) cannot be part of a variable name.
+  ``$site`` *does* need curly braces; it this were written as ``$site_static.nc``, it would look for a variable named ``site_static``.
+  Any case where the value on the right hand side is not exactly one variable name, with no extra character, will always result in a 
+  string. That is, something like::
+
+    [variables]
+    custom_width = 16
+
+    [[plots]]
+    ...
+    width = "$width "  # note the extra space at the end!
+
+  will cause ``width`` for this plot to be a string, not an integer.
+
+.. note::
+   When writing references to variables, they must be quoted as shown above. TOML syntax does not allow dollar signs in bare strings.
 
 .. _ImagePostProc:
 
