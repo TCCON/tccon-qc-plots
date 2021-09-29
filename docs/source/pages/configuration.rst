@@ -318,6 +318,16 @@ All plot types accept the following as optional keys:
   that case, the value of ``bookmark`` is used if available, then QC plots falls back on ``name``.
 * ``legend_kws`` (default = ``{}``): keyword to pass to the `legend <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html>`_
   call for this plot only. Will be merged with legend keywords defined in the default style for this plot type.
+* ``extra_qc_lines`` (default = ``[]``): a list of dictionaries specifying extra horizontal or vertical lines to 
+  plot as a guide for whether data is in family or not. An example::
+
+    extra_qc_lines = [{value = 0.996, axis="y", linestyle = "--", color = "darkorange", label="Expected range"},
+                      {value = 1.002, axis="y", linestyle = "--", color = "darkorange"}]
+
+  Each dictionary *must* have the key ``value``, which gives the position of the line. The ``axis`` key is optional;
+  it specifies on which axis the lines are positioned on ("y" = horizontal lines, "x" = vertical) and defaults to "y"
+  if absent. Any other key-value pairs must be valid keyword arguments to :py:func:`~matplotlib.pyplot.axvline` or 
+  :py:func:`~matplotlib.pyplot.axhline`.
 * ``width`` (default = ``20``): initial width of the plot in centimeters
 * ``height`` (default = ``10``): initial height of the plot in centimeters
 

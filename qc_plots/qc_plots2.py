@@ -72,6 +72,12 @@ class PlotClassError(Exception):
     pass
 
 
+class PlottingError(Exception):
+    """An exception to raise if there is an issue with plotting due to incorrect configuration
+    """
+    pass
+
+
 class TcconData:
     """A wrapper class around a TCCON netCDF dataset 
     
@@ -497,7 +503,8 @@ class AbstractPlot(ABC):
     plot_kind = None
 
     def __init__(self, other_plots, default_style: dict, limits: Limits, key: Optional[str] = None, name: Optional[str] = None,
-                 bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None):
+                 bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None):
         self.key = key
         self._other_plots = other_plots
         self._default_style = default_style
@@ -507,6 +514,7 @@ class AbstractPlot(ABC):
         self._width = width
         self._height = height
         self._legend_kws = dict() if legend_kws is None else legend_kws
+        self._extra_qc_lines = [] if extra_qc_lines is None else extra_qc_lines
 
     @classmethod
     def from_config_section(cls, section: dict, other_plots, full_config: dict, limits_file):
@@ -807,6 +815,18 @@ class AbstractPlot(ABC):
         vmax = getattr(nc_var, 'vmax', None)
         if vmax is not None:
             axline_fxn(vmax, linestyle='--', color='black')
+
+        for line in self._extra_qc_lines:
+            line_style = deepcopy(line)
+            try:
+                value = line_style.pop('value')
+            except KeyError:
+                raise PlottingError(f'Error added extra qc lines in plot "{self.name}": an extra QC line did not specify a value')
+
+            this_axis = line_style.pop('axis', 'y')
+            axline_fxn = ax.axvline if this_axis == 'x' else ax.axhline
+            axline_fxn(value, **line_style)
+
 
     @staticmethod
     def _get_data_for_limits(data: Sequence[TcconData]) -> Sequence[TcconData]:
@@ -1261,9 +1281,10 @@ class FlagAnalysisPlot(AbstractPlot):
     plot_kind = 'flag-analysis'
 
     def __init__(self, other_plots, default_style: dict, limits: Limits, key=None, min_percent: float = 1.0, name: Optional[str] = None,
-                 bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None):
+                 bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None, 
+                 extra_qc_lines: Optional[Sequence[dict]] = None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
-                         name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws)
+                         name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws, extra_qc_lines=extra_qc_lines)
         self.min_percent = min_percent
 
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
@@ -1376,14 +1397,15 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
     def __init__(self, other_plots, default_style: dict, sza_ranges: Sequence[Sequence[float]], limits: Limits,
                  yvar: str = 'xluft', freq: str = 'W', op: str = 'median', time_buffer_days: int = 2, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, 
-                 width=20, height=10, legend_kws: Optional[dict] = None):
+                 width=20, height=10, legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None):
         if any(len(r) != 2 for r in sza_ranges):
             raise TypeError('Each SZA range must be a two-element sequence')
         if any(r[1] < r[0] for r in sza_ranges):
             raise TypeError('Each SZA range must have the smaller value first')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key, 
-                         name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws)
+                         name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines)
         self.sza_ranges = sza_ranges
         self.yvar = yvar
         self.freq = freq
@@ -1481,13 +1503,13 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
     def __init__(self, other_plots, default_style: dict, sza_range: Sequence[float], limits: Limits,
                  yvar: str = 'xluft', freq: str = 'W', op: str = 'median', time_buffer_days: int = 2, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
-                 legend_kws: Optional[dict] = None):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None):
         if len(sza_range) != 2:
             raise TypeError('SZA range must have two elements (min, max)')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
                          width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws, sza_ranges=[sza_range], yvar=yvar,
-                         freq=freq, op=op, time_buffer_days=time_buffer_days)
+                         freq=freq, op=op, time_buffer_days=time_buffer_days, extra_qc_lines=extra_qc_lines)
 
     def get_save_name(self):
         return 'timing_error_check_{y}_{freq}_{op}_AM_PM_sza_{ll}_to_{ul}_VS_time.png'.format(
@@ -1612,6 +1634,7 @@ class TimingErrorAMvsPMWithViolin(TimingErrorAMvsPM, ViolinAuxPlotMixin):
                  width=20, 
                  height=10, 
                  legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -1631,7 +1654,8 @@ class TimingErrorAMvsPMWithViolin(TimingErrorAMvsPM, ViolinAuxPlotMixin):
             bookmark=bookmark,
             width=width, 
             height=height, 
-            legend_kws=legend_kws
+            legend_kws=legend_kws,
+            extra_qc_lines=extra_qc_lines
         )
 
         self.init_violins(
@@ -1711,14 +1735,15 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
     def __init__(self, other_plots, default_style: dict, sza_ranges: Sequence[Sequence[float]], limits: Limits,
                  am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days: int = 2, key=None,
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
-                 legend_kws: Optional[dict] = None):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None):
 
         if am_or_pm.lower() not in {'am', 'pm'}:
             raise TypeError('Allows values for am_or_pm are "am" or "pm" only')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
                          width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws, 
-                         sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op, time_buffer_days=time_buffer_days)
+                         sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op, time_buffer_days=time_buffer_days,
+                         extra_qc_lines=extra_qc_lines)
         self.am_or_pm = am_or_pm
 
     def get_save_name(self):
@@ -1862,6 +1887,7 @@ class TimingErrorMultipleSZAsWithViolin(TimingErrorMultipleSZAs, ViolinAuxPlotMi
                  width=20, 
                  height=10, 
                  legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -1882,7 +1908,8 @@ class TimingErrorMultipleSZAsWithViolin(TimingErrorMultipleSZAs, ViolinAuxPlotMi
             bookmark=bookmark,
             width=width, 
             height=height, 
-            legend_kws=legend_kws
+            legend_kws=legend_kws,
+            extra_qc_lines=extra_qc_lines
         )
 
         self.init_violins(
@@ -1955,10 +1982,11 @@ class ScatterPlot(AbstractPlot):
 
     def __init__(self, other_plots, xvar: str, yvar: str, default_style: dict, limits: Limits, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
-                 legend_kws: Optional[dict] = None,
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
                  add_fit: bool = True, fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
-                         name=name, width=width, height=height, bookmark=bookmark, legend_kws=legend_kws)
+                         name=name, width=width, height=height, bookmark=bookmark, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines)
         self.xvar = xvar
         self.yvar = yvar
         self._do_add_fit = add_fit
@@ -2090,13 +2118,13 @@ class HexbinPlot(ScatterPlot):
 
     def __init__(self, other_plots, xvar: str, yvar: str, default_style: dict, limits: Limits, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
-                 legend_kws: Optional[dict] = None,
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
                  hexbin_flag_category: Optional[FlagCategory] = None, 
                  fit_flag_category: Optional[FlagCategory] = None, 
                  show_reference=False, show_context=True):
         super().__init__(other_plots=other_plots, xvar=xvar, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, fit_flag_category=fit_flag_category, key=key,
-                         name=name, bookmark=bookmark, width=width, height=height)
+                         name=name, bookmark=bookmark, width=width, height=height, extra_qc_lines=extra_qc_lines)
         self._hexbin_flag_category = None if hexbin_flag_category is None else FlagCategory(hexbin_flag_category)
         self._show_ref = show_reference
         self._show_context = show_context
@@ -2215,9 +2243,10 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
 
     def __init__(self, other_plots, yvar: str, default_style: dict, limits: Limits, name: Optional[str] = None, 
                  bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None, 
-                 key=None, time_buffer_days=2):
+                 key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None):
         super().__init__(other_plots=other_plots, xvar='time', yvar=yvar, default_style=default_style, limits=limits,
-                         key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws, add_fit=False)
+                         key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines, add_fit=False)
         self._time_buffer_days = time_buffer_days
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -2258,13 +2287,14 @@ class TimeseriesPlusViolinPlot(TimeseriesPlot, ViolinAuxPlotMixin):
                  legend_kws: Optional[dict] = None, 
                  key=None, 
                  time_buffer_days=2,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
                  violin_plot_hide_yticks=False):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
-                         time_buffer_days=time_buffer_days)
+                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days)
         self.init_violins(data_file=violin_data_file,
                           aux_plot_side=violin_plot_side,
                           aux_plot_size=violin_plot_size,
@@ -2297,9 +2327,11 @@ class TimeseriesDeltaPlot(TimeseriesPlot):
 
     def __init__(self, other_plots, yvar1: str, yvar2: str, default_style: dict, limits: Limits,
                  name: Optional[str] = None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, key=None, time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
+                 key=None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar1, default_style=default_style, limits=limits,
-                         key=key, width=width, height=height, name=name, legend_kws=legend_kws, time_buffer_days=time_buffer_days)
+                         key=key, width=width, height=height, name=name, legend_kws=legend_kws, extra_qc_lines=extra_qc_lines,
+                         time_buffer_days=time_buffer_days)
         self.yvar2 = yvar2
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -2346,6 +2378,7 @@ class TimeseriesDeltaPlusViolinsPlot(TimeseriesDeltaPlot, ViolinAuxPlotMixin):
                  legend_kws: Optional[dict] = None, 
                  key=None, 
                  time_buffer_days=2,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -2362,7 +2395,8 @@ class TimeseriesDeltaPlusViolinsPlot(TimeseriesDeltaPlot, ViolinAuxPlotMixin):
                  height=height,
                  legend_kws=legend_kws, 
                  key=key, 
-                 time_buffer_days=time_buffer_days
+                 time_buffer_days=time_buffer_days,
+                 extra_qc_lines=extra_qc_lines
             )
 
         self.init_violins(data_file=violin_data_file,
@@ -2400,10 +2434,10 @@ class Timeseries2PanelPlot(TimeseriesPlot):
 
     def __init__(self, other_plots, yvar: str, yerror_var: str, default_style: dict, limits: Limits, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, name=name, bookmark=bookmark, time_buffer_days=time_buffer_days,
-                         legend_kws=legend_kws)
+                         legend_kws=legend_kws, extra_qc_lines=extra_qc_lines)
         self.yerror_var = yerror_var
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False):
@@ -2499,6 +2533,7 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
                  width=20, 
                  height=10,
                  legend_kws: Optional[dict] = None, 
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  time_buffer_days=2,
                  violin_plot_side='right',
                  violin_plot_size='10%',
@@ -2516,6 +2551,7 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
             width=width, 
             height=height,
             legend_kws=legend_kws, 
+            extra_qc_lines=extra_qc_lines,
             time_buffer_days=time_buffer_days
         )
 
@@ -2586,10 +2622,10 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
 
     def __init__(self, other_plots, yvar: str, freq: str, op: str, default_style: dict, limits: Limits, key=None,
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, time_buffer_days=2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws, 
-                         time_buffer_days=time_buffer_days)
+                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days)
         self.freq = freq
         self.op = op
 
@@ -2655,6 +2691,7 @@ class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMi
                  width=20, 
                  height=10,
                  legend_kws: Optional[dict] = None, 
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  time_buffer_days=2,
                  violin_plot_side='right',
                  violin_plot_size='10%',
@@ -2674,6 +2711,7 @@ class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMi
             width=width, 
             height=height,
             legend_kws=legend_kws,
+            extra_qc_lines=extra_qc_lines,
             time_buffer_days=time_buffer_days
         )
 
@@ -2728,12 +2766,12 @@ class RollingDerivativePlot(TimeseriesPlot):
 
     def __init__(self, other_plots, yvar: str, dvar: str, default_style: dict, limits: Limits, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, derivative_order: int = 1,
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, derivative_order: int = 1,
                  gap: str = '20000 days', rolling_window: int = 500, flag_category: Optional[FlagCategory] = None, 
                  time_buffer_days: int = 2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
-                         legend_kws=legend_kws, key=key, width=width, height=height, name=name, bookmark=bookmark,
-                         time_buffer_days=time_buffer_days)
+                         legend_kws=legend_kws, extra_qc_lines=extra_qc_lines, key=key, width=width, height=height, 
+                         name=name, bookmark=bookmark, time_buffer_days=time_buffer_days)
 
         self.dvar = dvar
         self.derivative_order = derivative_order
@@ -2879,6 +2917,7 @@ class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin
                  width=20, 
                  height=10,
                  legend_kws: Optional[dict] = None, 
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  derivative_order: int = 1,
                  gap: str = '20000 days', 
                  rolling_window: int = 500, 
@@ -2901,6 +2940,7 @@ class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin
             width=width, 
             height=height,
             legend_kws=legend_kws, 
+            extra_qc_lines=extra_qc_lines,
             derivative_order=derivative_order,
             gap=gap, 
             rolling_window=rolling_window, 
@@ -2968,11 +3008,11 @@ class RollingTimeseriesPlot(TimeseriesPlot):
 
     def __init__(self, other_plots, yvar: str, ops: Union[str, Sequence[str]], default_style: dict, 
                  limits: Limits, key=None, name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, 
-                 width=20, height=10, legend_kws: Optional[dict] = None,
+                 width=20, height=10, legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
                  gap: str = '20000 days', rolling_window: int = 500, uncertainty: bool = False, 
                  flag_category: Optional[FlagCategory] = None, time_buffer_days: int = 2):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
-                         legend_kws=legend_kws, key=key, width=width, height=height, name=name, bookmark=bookmark,
+                         legend_kws=legend_kws, extra_qc_lines=extra_qc_lines, key=key, width=width, height=height, name=name, bookmark=bookmark,
                          time_buffer_days=time_buffer_days)
         self.ops = [ops] if isinstance(ops, str) else ops
         self.gap = gap
@@ -3129,6 +3169,7 @@ class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin)
                  width=20, 
                  height=10, 
                  legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  gap: str = '20000 days', 
                  rolling_window: int = 500, 
                  uncertainty: bool = False, 
@@ -3151,6 +3192,7 @@ class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin)
             width=width, 
             height=height, 
             legend_kws=legend_kws,
+            extra_qc_lines=extra_qc_lines,
             gap=gap, 
             rolling_window=rolling_window, 
             uncertainty=uncertainty, 
@@ -3227,6 +3269,7 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
                  width=20, 
                  height=10, 
                  legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  gap: str = '20000 days', 
                  rolling_window: int = 500, 
                  uncertainty: bool = False, 
@@ -3244,6 +3287,7 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
                          width=width, 
                          height=height, 
                          legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines,
                          gap=gap, 
                          rolling_window=rolling_window,
                          uncertainty=uncertainty, 
@@ -3341,6 +3385,7 @@ class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAux
                  width=20, 
                  height=10, 
                  legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
                  gap: str = '20000 days', 
                  rolling_window: int = 500, 
                  uncertainty: bool = False, 
@@ -3363,6 +3408,7 @@ class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAux
                          width=width, 
                          height=height, 
                          legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines,
                          gap=gap, 
                          rolling_window=rolling_window,
                          uncertainty=uncertainty, 
