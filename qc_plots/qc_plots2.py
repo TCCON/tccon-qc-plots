@@ -3,9 +3,11 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 from fnmatch import fnmatch
+from pdb import set_trace
 from PyPDF2.generic import Bookmark
 from matplotlib.axes import Axes
 import matplotlib.dates as mdates
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from math import ceil
@@ -13,6 +15,7 @@ import netCDF4 as ncdf
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import re
 import sys
 from typing import Optional, Sequence, Tuple, Union
 import warnings
@@ -956,12 +959,12 @@ class AuxPlotMixin(ABC):
 
 class ViolinAuxPlotMixin(AuxPlotMixin):
     def init_violins(self, data_file, aux_plot_side='right', aux_plot_size='10%', aux_plot_pad=0.5, aux_plot_hide_yticks=False,
-                     data_args_index=None):
+                     aux_flag_category=FlagCategory.FLAG0, data_args_index=None):
         self._side_plot_data_file = Path(data_file)
         self._aux_plot_side = aux_plot_side
         self._aux_plot_size = aux_plot_size
         self._aux_plot_pad = aux_plot_pad
-        self._aux_flag_category = FlagCategory.FLAG0
+        self._aux_flag_category = aux_flag_category
         self._aux_plot_hide_yticks = aux_plot_hide_yticks
         self._data_args_index = data_args_index
 
@@ -987,10 +990,13 @@ class ViolinAuxPlotMixin(AuxPlotMixin):
 
         style_fc = extra_data.default_category if self._aux_flag_category is None else self._aux_flag_category
         violin_style = deepcopy(self._get_style(violin_data.styles, 'aux-violin', style_fc))
+        self._plot_one_violin(yvals=yvals, violin_data=violin_data, violin_style=violin_style, side_ax=side_ax)
+
+    def _plot_one_violin(self, yvals, violin_data, violin_style, side_ax, position=0):
         fill_color = violin_style.pop('fill_color', None)
         line_color = violin_style.pop('line_color', None)
 
-        violin_parts = side_ax.violinplot(yvals, [0], **violin_style)
+        violin_parts = side_ax.violinplot(yvals, [position], **violin_style)
         for key, part in violin_parts.items():
             if key == 'bodies' and fill_color is not None:
                 plt.setp(part, color=fill_color)
@@ -1561,6 +1567,114 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         axs.legend(**plot_args['legend_kws'])
 
 
+class TimingErrorAMvsPMWithViolin(TimingErrorAMvsPM, ViolinAuxPlotMixin):
+    """Concrete plotting class that creates plots to detect timing error by morning/afternoon differences
+
+    Configuration plot kind = ``"timing-error-am-pm+violin"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
+
+    Parameters
+    ----------
+    sza_range
+        Two element list giving the lower and upper SZA limits to average morning and afternoon data
+        between. Data outside these SZA limits are not used.
+
+    yvar
+        Variable to average for morning and afternoon to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that specifies the temporal resolution to average to.
+
+    op
+        What operation to apply to the morning & afternoon data. Usually "median", "mean", etc.
+
+    time_buffer_days
+        How many days before the first and after the last data point to push the axis x-limits to make the plot
+        nicer to read.
+    """
+    plot_kind = 'timing-error-am-pm+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 violin_data_file,
+                 default_style: dict, 
+                 sza_range: Sequence[float], 
+                 limits: Limits,
+                 yvar: str = 'xluft', 
+                 freq: str = 'W', 
+                 op: str = 'median', 
+                 time_buffer_days: int = 2, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None,
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(
+            other_plots=other_plots, 
+            default_style=default_style, 
+            sza_range=sza_range, 
+            limits=limits,
+            yvar=yvar, 
+            freq=freq, 
+            op=op, 
+            time_buffer_days=time_buffer_days, 
+            key=key, 
+            name=name, 
+            bookmark=bookmark,
+            width=width, 
+            height=height, 
+            legend_kws=legend_kws
+        )
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_pad=violin_plot_pad,
+            aux_plot_hide_yticks=violin_plot_hide_yticks
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True):
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+
+    def plot_violins(self, extra_data, yvar_key, side_ax):
+        violin_data = extra_data[self._side_plot_data_file]
+        plot_data = self.get_plot_data(violin_data, self._aux_flag_category)
+        plot_styles = self.get_plot_kws(violin_data, self._aux_flag_category)
+
+        style_fc = extra_data.default_category if self._aux_flag_category is None else self._aux_flag_category
+        violin_style_am = deepcopy(self._get_style(violin_data.styles, 'aux-violin', style_fc))
+        violin_style_pm = deepcopy(violin_style_am)
+
+        if 'color' in plot_styles['am']:
+            violin_style_am['fill_color'] = plot_styles['am']['color']
+            violin_style_am['line_color'] = plot_styles['am']['color']
+
+        if 'color' in plot_styles['pm']:
+            violin_style_pm['fill_color'] = plot_styles['pm']['color']
+            violin_style_pm['line_color'] = plot_styles['pm']['color']
+
+        df_am, df_pm = self._resample_data(plot_data)
+        # Create proxy artists for the violin plot. Need to do this before plotting, or the
+        # violin style's color gets popped
+        proxy_am = mpatches.Patch(color=violin_style_am.get('fill_color'), alpha=0.75, label='AM')
+        proxy_pm = mpatches.Patch(color=violin_style_pm.get('fill_color'), alpha=0.75, label='PM')
+
+        self._plot_one_violin(df_am['y'].dropna().to_numpy(), violin_data, violin_style_am, side_ax, position=-0.25)
+        self._plot_one_violin(df_pm['y'].dropna().to_numpy(), violin_data, violin_style_pm, side_ax, position=+0.25)
+
+        legend_kws = self.get_legend_kws()
+        side_ax.legend(handles=[proxy_am, proxy_pm], **legend_kws)
+
+
 class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
     """Concrete plot to identify timing errors from averages in different SZA ranges.
 
@@ -1625,10 +1739,31 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
         return dfs_out
 
+    def _get_style(self, styles, plot_kind, sub_category: Union[FlagCategory, str] = None):
+        plot_styles = styles.get(plot_kind, dict())
+
+        # For plots with an extra kind added on, if we can't find a style for the
+        # specific plot that we're making, try the base plot kind with nothing added.
+        if len(plot_styles) == 0 and '+' in plot_kind:
+            base_plot_kind = plot_kind.split('+')[0]
+            plot_styles = styles.get(base_plot_kind, dict())
+
+        return plot_styles
+
+    def get_legend_kws(self) -> dict:
+        kws = self._get_style(self._default_style, self.plot_kind)
+        kws = deepcopy(kws.get('legend_kws', dict()))
+        kws.update(self._legend_kws)
+        kws.setdefault('fontsize', 7)
+        return kws
+        
+
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory],  _format_label: bool = True) -> list:
         # This
-        style = deepcopy(self._default_style.get(self.plot_kind, dict()))
-        style.update(data.styles.get(self.plot_kind, dict()))
+        style = self._get_style(self._default_style, self.plot_kind)
+        style.update(self._get_style(data.styles, self.plot_kind))
+        # style = deepcopy(self._default_style.get(self.plot_kind, dict()))
+        # style.update(data.styles.get(self.plot_kind, dict()))
 
         # Now check that every style option is either a scalar value (which should be used for
         # every SZA range) or a list/tuple with sufficient length. If it is too short, repeat it
@@ -1676,6 +1811,122 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
             axs.plot(df.index, df['y'], **kw)
 
         axs.legend(**plot_args['legend_kws'])
+
+
+class TimingErrorMultipleSZAsWithViolin(TimingErrorMultipleSZAs, ViolinAuxPlotMixin):
+    """Concrete plot to identify timing errors from averages in different SZA ranges.
+
+    Configuration plot kind = ``"timing-error-szas+violin"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
+
+    Parameters
+    ----------
+    sza_ranges
+        List of two element lists giving the lower and upper SZA limits to average data
+        between. Data outside these SZA limits are not used.
+
+    am_or_pm
+        Whether to look at morning ("am") or afternoon ("pm") data.
+
+    yvar
+        Variable to average for morning and afternoon to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that specifies the temporal resolution to average to.
+
+    op
+        What operation to apply to the morning & afternoon data. Usually "median", "mean", etc.
+
+    time_buffer_days
+        How many days before the first and after the last data point to push the axis x-limits to make the plot
+        nicer to read.
+    """
+    plot_kind = 'timing-error-szas+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 default_style: dict, 
+                 sza_ranges: Sequence[Sequence[float]], 
+                 limits: Limits,
+                 am_or_pm, 
+                 violin_data_file,
+                 yvar='xluft', 
+                 freq='W', 
+                 op='median', 
+                 time_buffer_days: int = 2, 
+                 key=None,
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None,
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(
+            other_plots=other_plots, 
+            default_style=default_style, 
+            sza_ranges=sza_ranges, 
+            limits=limits,
+            am_or_pm=am_or_pm, 
+            yvar=yvar, 
+            freq=freq, 
+            op=op, 
+            time_buffer_days=time_buffer_days, 
+            key=key,
+            name=name, 
+            bookmark=bookmark,
+            width=width, 
+            height=height, 
+            legend_kws=legend_kws
+        )
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_pad=violin_plot_pad,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True):
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+
+    def plot_violins(self, extra_data, yvar_key, side_ax):
+        violin_data = extra_data[self._side_plot_data_file]
+        plot_data = self.get_plot_data(violin_data, self._aux_flag_category)
+        plot_styles = self.get_plot_kws(violin_data, self._aux_flag_category)
+
+        style_fc = extra_data.default_category if self._aux_flag_category is None else self._aux_flag_category
+        violin_base_style = self._get_style(violin_data.styles, 'aux-violin')[style_fc.value]
+
+
+        dfs = self._resample_data(plot_data)
+        proxies = []
+
+        for df, style in zip(dfs, plot_styles):
+            if df.shape[0] == 0:
+                # We may have no data for a particular SZA range
+                continue
+
+            this_violin_style = deepcopy(violin_base_style)
+            if 'color' in style:
+                this_violin_style['fill_color'] = style['color']
+                this_violin_style['line_color'] = style['color']
+            
+            match = re.search(r'\[.+\]', style.get('label', ''))
+            if match is not None:
+                proxies.append(mpatches.Patch(color=this_violin_style.get('fill_color'), alpha=0.75, label=match.group()))
+            
+            self._plot_one_violin(df['y'].dropna().to_numpy(), violin_data, this_violin_style, side_ax)
+
+        legend_kws = self.get_legend_kws()
+        side_ax.legend(handles=proxies, **legend_kws)
+
 
 
 class ScatterPlot(AbstractPlot):
