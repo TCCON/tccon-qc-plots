@@ -1030,6 +1030,7 @@ class ViolinAuxPlotMixin(AuxPlotMixin):
             # If the extra axis is left, we just keep the label on the left
             # If it is above/below, same.
             side_ax.yaxis.set_label_position('right')
+        side_ax.grid(True, axis='y')
 
     def get_extra_data_files_required(self) -> Sequence[Path]:
         return [self._side_plot_data_file]
@@ -2210,7 +2211,7 @@ class HexbinPlot(ScatterPlot):
         def get_limits_inner(varname, xy):
             # autoscaling is irrelevant for the hexbin plots - if we don't have a priori
             # limits, we calculate them from the data
-            limmin, limmax, _ = self._limits.get_limit(varname, data)
+            limmin, limmax, _ = self._limits.get_limit(varname, data, self.plot_kind)
             lims = [limmin, limmax]
             if None in lims:
                 if isinstance(xy, np.ma.masked_array):

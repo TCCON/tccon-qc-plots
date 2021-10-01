@@ -118,6 +118,9 @@ def send_email(pdf_path, email_pdf_path, nc_file, emails=(None, None), email_con
             plot_url=urljoin(plot_url, Path(pdf_path).name) if plot_url is not None else None
         )
         print('Email sent.')
+        if attach_plots:
+            attachment_size_mb = email_pdf_path.stat().st_size / 1024**2
+            print(f'Attachment size was {attachment_size_mb:.2f} MB.')
 
 
 def load_config(config_file):
