@@ -395,6 +395,13 @@ passed through a format call where three keyword values are available:
 * ``data`` will be replaced with a short description of the data (site name and whether flag == 0, flag > 0, etc)
 * ``ll`` and ``ul`` will be replace with the lower and upper SZA limits, respectively.
 
+delta-timing-error-am-pm
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is the same as :ref:`timing-error-am-pm <PT_timing_error_am_pm>` except that the value plotted on the y-axis
+is the difference (afternoon - morning) instead of plotting them separately. All the required and optional keys are
+the same.
+
 timing-error-szas
 ~~~~~~~~~~~~~~~~~
 

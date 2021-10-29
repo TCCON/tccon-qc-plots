@@ -1,7 +1,8 @@
 Kind,Required keys,Optional keys,Style keywords,Cloning supported,Aux plots
 flag-analysis,,"min_percent","MPL ``bar`` kws",No,
-timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days","MPL ``plot`` kws",Yes,
-timing-error-szas,"sza_ranges, am_or_pm","yvar, freq, op, time_buffer_days","MPL ``plot`` kws",No,
+timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days","MPL ``plot`` kws",Yes,``violin``
+delta-timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days","MPL ``plot`` kws",Yes,``violin``
+timing-error-szas,"sza_ranges, am_or_pm","yvar, freq, op, time_buffer_days","MPL ``plot`` kws",No,``violin``
 scatter,"xvar, yvar","match_axes_size","MPL ``plot`` kws",Yes,
 hexbin,"xvar, yvar", "show_reference, show_context", "MPL ``hexbin`` kws", Yes,
 timeseries,"yvar","time_buffer_days","MPL ``plot`` kws",Yes,``violin``

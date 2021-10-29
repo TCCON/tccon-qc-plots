@@ -3,7 +3,6 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 from fnmatch import fnmatch
-from pdb import set_trace
 from PyPDF2.generic import Bookmark
 from matplotlib.axes import Axes
 import matplotlib.dates as mdates
@@ -1698,6 +1697,133 @@ class TimingErrorAMvsPMWithViolin(TimingErrorAMvsPM, ViolinAuxPlotMixin):
 
         legend_kws = self.get_legend_kws()
         side_ax.legend(handles=[proxy_am, proxy_pm], **legend_kws)
+
+
+class TimingErrorAMvsPMDelta(TimingErrorAMvsPM):
+    """Concrete plotting class that creates plots to detect timing error by morning/afternoon differences
+
+    Configuration plot kind = ``"delta-timing-error-am-pm"``
+
+    Unlike :py:class:`TimingErrorAMvsPM`, which plots both morning and afternoon values, this class plots a
+    difference (afternoon - morning).
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    sza_range
+        Two element list giving the lower and upper SZA limits to average morning and afternoon data
+        between. Data outside these SZA limits are not used.
+
+    yvar
+        Variable to average for morning and afternoon to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that specifies the temporal resolution to average to.
+
+    op
+        What operation to apply to the morning & afternoon data. Usually "median", "mean", etc.
+
+    time_buffer_days
+        How many days before the first and after the last data point to push the axis x-limits to make the plot
+        nicer to read.
+    """
+
+    plot_kind = 'delta-timing-error-am-pm'
+    _title_prefix = 'Timing check PM minus AM'
+
+    def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory],  _format_label: bool = True) -> dict:
+        # We don't want to use the TimingErrorAMvsPM keywords because those have AM and PM separately
+        # so use the default get_plot_kws implementation
+        style = AbstractPlot.get_plot_kws(self, data=data, flag_category=flag_category, _format_label=False)
+        if _format_label:
+            data_label = data.get_flag0_or_all_label() if flag_category is None else data.get_label(flag_category)
+            sza_min, sza_max = self.sza_ranges[0]
+            am_label_spec = style.get('label', r'{data} PM-AM SZA $\in [{ll}, {ul}]$')
+            style['label'] = am_label_spec.format(data=data_label, ll=sza_min, ul=sza_max)
+        return style
+
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
+        fig, ax = super().setup_figure(data=data, show_all=show_all, fig=fig, axs=axs)
+        main_data = self._get_main_data(data)
+        ystr = self.get_label_string(main_data, self.yvar)
+        ax.set_ylabel(f'Afternoon - morning {ystr}')
+        return fig, ax
+
+    def get_save_name(self):
+        return 'timing_error_check_{y}_{freq}_{op}_PM_minus_AM_sza_{ll}_to_{ul}_VS_time.png'.format(
+            y=self.yvar, freq=self.freq, op=self.op, ll=self.sza_ranges[0][0], ul=self.sza_ranges[0][1]
+        )
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        assert len(plot_args) == 1
+        plot_args = plot_args[0]
+
+        df = plot_args['data']
+
+        _df_am, _df_pm = self._resample_data(df)
+        df = _df_pm - _df_am
+        xmin = df.index.min() - pd.Timedelta(days=self._time_buffer_days)
+        xmax = df.index.max() + pd.Timedelta(days=self._time_buffer_days)
+        axs.set_xlim(xmin, xmax)
+
+        # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
+        # Calling the matplotlib plotting methods seems to avoid that behavior
+        axs.plot(df.index, df['y'], **plot_args['kws'])
+        axs.set_ylabel('')
+        axs.legend(**plot_args['legend_kws'])
+
+
+class TimingErrorAMvsPMDeltaWithViolin(TimingErrorAMvsPMDelta, TimingErrorAMvsPMWithViolin):
+    """Concrete plotting class that creates plots to detect timing error by morning/afternoon differences
+
+    Configuration plot kind = ``"delta-timing-error-am-pm+violin"``
+
+    Unlike :py:class:`TimingErrorAMvsPMWithViolin`, which plots both morning and afternoon values, this class plots a
+    difference (afternoon - morning).
+
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
+
+    Parameters
+    ----------
+    sza_range
+        Two element list giving the lower and upper SZA limits to average morning and afternoon data
+        between. Data outside these SZA limits are not used.
+
+    yvar
+        Variable to average for morning and afternoon to plot on the y-axis.
+
+    freq
+        `Frequency string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        that specifies the temporal resolution to average to.
+
+    op
+        What operation to apply to the morning & afternoon data. Usually "median", "mean", etc.
+
+    time_buffer_days
+        How many days before the first and after the last data point to push the axis x-limits to make the plot
+        nicer to read.
+    """
+    plot_kind = 'delta-timing-error-am-pm+violin'
+
+    def plot_violins(self, extra_data, yvar_key, side_ax):
+        violin_data = extra_data[self._side_plot_data_file]
+        plot_data = self.get_plot_data(violin_data, self._aux_flag_category)
+        plot_styles = self.get_plot_kws(violin_data, self._aux_flag_category)
+
+        style_fc = extra_data.default_category if self._aux_flag_category is None else self._aux_flag_category
+        violin_style = deepcopy(self._get_style(violin_data.styles, 'aux-violin', style_fc))
+
+        if 'color' in plot_styles:
+            violin_style['fill_color'] = plot_styles['color']
+            violin_style['line_color'] = plot_styles['color']
+
+        _df_am, _df_pm = self._resample_data(plot_data)
+        df = _df_pm - _df_am
+
+        self._plot_one_violin(df['y'].dropna().to_numpy(), violin_data, violin_style, side_ax)
 
 
 class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
