@@ -1396,7 +1396,8 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
 
     def __init__(self, other_plots, default_style: dict, sza_ranges: Sequence[Sequence[float]], limits: Limits,
                  yvar: str = 'xluft', freq: str = 'W', op: str = 'median', time_buffer_days: int = 2, key=None, 
-                 name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, 
+                 name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None,
+                 flag_cat_override: Optional[Union[str,FlagCategory]] = None,
                  width=20, height=10, legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None):
         if any(len(r) != 2 for r in sza_ranges):
             raise TypeError('Each SZA range must be a two-element sequence')
@@ -1411,6 +1412,7 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         self.freq = freq
         self.op = op
         self._time_buffer_days = time_buffer_days
+        self._flag_cat_override = None if flag_cat_override is None else FlagCategory(flag_cat_override)
 
     def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
@@ -1436,7 +1438,13 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         return fig, ax
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
-        if flag0_only:
+        if self._flag_cat_override is not None:
+            return [{
+                'data': self.get_plot_data(data, self._flag_cat_override),
+                'kws': self.get_plot_kws(data, self._flag_cat_override),
+                'legend_kws': self.get_legend_kws()
+            }]
+        elif flag0_only:
             return [{
                 'data': self.get_plot_data(data, FlagCategory.FLAG0),
                 'kws': self.get_plot_kws(data, FlagCategory.FLAG0),
@@ -1452,6 +1460,7 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
     def get_plot_data(self, data: TcconData, flag_category: FlagCategory):
         # NB: unlike other plots, we need actual datetime types for time to
         # permit resampling to work.
+        print(f' (get_plot_data flag_category = {flag_category}) ', end='')
         if flag_category is None:
             data = {
                 'time': data.get_flag0_or_all_data('datetime'),
@@ -1502,13 +1511,15 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
 
     def __init__(self, other_plots, default_style: dict, sza_range: Sequence[float], limits: Limits,
                  yvar: str = 'xluft', freq: str = 'W', op: str = 'median', time_buffer_days: int = 2, key=None, 
-                 name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
+                 name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
+                 flag_cat_override: Optional[Union[str, FlagCategory]] = None,
                  legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None):
         if len(sza_range) != 2:
             raise TypeError('SZA range must have two elements (min, max)')
 
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
-                         width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws, sza_ranges=[sza_range], yvar=yvar,
+                         width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws,
+                         sza_ranges=[sza_range], yvar=yvar, flag_cat_override=flag_cat_override,
                          freq=freq, op=op, time_buffer_days=time_buffer_days, extra_qc_lines=extra_qc_lines)
 
     def get_save_name(self):
@@ -1632,7 +1643,8 @@ class TimingErrorAMvsPMWithViolin(TimingErrorAMvsPM, ViolinAuxPlotMixin):
                  name: Optional[str] = None, 
                  bookmark: Optional[Union[str,bool]] = None,
                  width=20, 
-                 height=10, 
+                 height=10,
+                 flag_cat_override: Optional[Union[str, FlagCategory]] = None,
                  legend_kws: Optional[dict] = None,
                  extra_qc_lines: Optional[Sequence[dict]] = None,
                  violin_plot_side='right',
@@ -1653,7 +1665,8 @@ class TimingErrorAMvsPMWithViolin(TimingErrorAMvsPM, ViolinAuxPlotMixin):
             name=name, 
             bookmark=bookmark,
             width=width, 
-            height=height, 
+            height=height,
+            flag_cat_override=flag_cat_override,
             legend_kws=legend_kws,
             extra_qc_lines=extra_qc_lines
         )
@@ -1861,7 +1874,8 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
     def __init__(self, other_plots, default_style: dict, sza_ranges: Sequence[Sequence[float]], limits: Limits,
                  am_or_pm, yvar='xluft', freq='W', op='median', time_buffer_days: int = 2, key=None,
-                 name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
+                 name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
+                 flag_cat_override: Optional[Union[str, FlagCategory]] = None,
                  legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None):
 
         if am_or_pm.lower() not in {'am', 'pm'}:
@@ -1870,7 +1884,7 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
         super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
                          width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws, 
                          sza_ranges=sza_ranges, yvar=yvar, freq=freq, op=op, time_buffer_days=time_buffer_days,
-                         extra_qc_lines=extra_qc_lines)
+                         extra_qc_lines=extra_qc_lines, flag_cat_override=flag_cat_override)
         self.am_or_pm = am_or_pm
 
     def get_save_name(self):
@@ -1908,7 +1922,6 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
         kws.update(self._legend_kws)
         kws.setdefault('fontsize', 7)
         return kws
-        
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory],  _format_label: bool = True) -> list:
         # This
@@ -2012,7 +2025,8 @@ class TimingErrorMultipleSZAsWithViolin(TimingErrorMultipleSZAs, ViolinAuxPlotMi
                  name: Optional[str] = None, 
                  bookmark: Optional[Union[str,bool]] = None,
                  width=20, 
-                 height=10, 
+                 height=10,
+                 flag_cat_override: Optional[Union[str, FlagCategory]] = None,
                  legend_kws: Optional[dict] = None,
                  extra_qc_lines: Optional[Sequence[dict]] = None,
                  violin_plot_side='right',
@@ -2034,7 +2048,8 @@ class TimingErrorMultipleSZAsWithViolin(TimingErrorMultipleSZAs, ViolinAuxPlotMi
             name=name, 
             bookmark=bookmark,
             width=width, 
-            height=height, 
+            height=height,
+            flag_cat_override=flag_cat_override,
             legend_kws=legend_kws,
             extra_qc_lines=extra_qc_lines
         )

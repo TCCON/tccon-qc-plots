@@ -381,6 +381,10 @@ This is an experimental plot type to try to detect timing errors from difference
 * ``freq`` (default = ``"W"``): the temporal frequency to bin the data to. Any `Pandas frequency interval <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_ is supported
 * ``op`` (default = ``"median"``): what operation to use in the binning, usually "median" or "mean", but any operation supported on a Pandas resampled data frame is supported.
 * ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+* ``flag_cat_override`` (default = ``None``): whether to override the default flag category that the data is drawn from for the medians.
+  If this option is not present, the all data (flag = 0 and flag > 0) is used unless the command line argument ``--flag0`` is given, in which
+  case only flag = 0 data is used. If given, this option must be one of the strings "all", "flag0", or "flagged", and that category of data will
+  always be used.
 
 **Style**
 
