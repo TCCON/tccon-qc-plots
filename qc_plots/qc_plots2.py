@@ -1386,6 +1386,110 @@ class FlagAnalysisPlot(AbstractPlot):
         axs[0].legend(**plot_args['legend_kws'])
         # Plotting with Pandas automatically adds a legend, so we need to remove it from the second axes
         axs[1].get_legend().remove()
+
+
+class NanCheckPlot(AbstractPlot):
+    def __init__(self, other_plots, default_style: dict, limits: Limits, vsw_windows: Optional[Sequence[str]] = None,
+                 groups: Optional[Sequence[str]] = None, key: Optional[str] = None,
+                 name: Optional[str] = None, bookmark: Optional[Union[str, bool]] = None,
+                 width=20, height=10, legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None):
+        super().__init__(other_plots=other_plots, default_style=default_style, limits=limits, key=key,
+                         name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines)
+
+        self._vsw_windows = vsw_windows
+        self._groups = groups
+
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
+        nrow = 1 if self._groups is None else len(self._groups)
+        fig, axs = self._make_or_check_fig_ax_args(fig, axs, nrow=nrow, ax_ndim=1, ax_size=nrow)
+        if not isinstance(axs, np.ndarray):
+            axs = np.array([axs])
+
+        fig.suptitle('NaNs/fills in VSW variables')
+        for ax in axs:
+            ax.set_ylabel('# NaNs or fills in\nVSW columns or errors (all data)')
+
+        return fig, axs
+
+    def get_plot_data(self, data: TcconData, flagged_category: FlagCategory):
+        if flagged_category != FlagCategory.ALL_DATA:
+            print('\nWARNING: NaN check plots always use all data')
+
+        if self._vsw_windows is None:
+            vsw_vars = [v for v in data.nc_dset.variables.keys() if re.match(r'vsw_[a-z0-9]+_\d{4}$', v)]
+        else:
+            vsw_vars = [f'vsw_{v}' for v in self._vsw_windows]
+
+        grouped_vars = dict()
+        for i, v in enumerate(vsw_vars):
+            m = re.search(r'_([a-z0-9]+)_(\d+)', v)
+            gas, window = m.group(1), int(m.group(2))
+            gvars = grouped_vars.setdefault(gas, {'window': [], 'num_nans': []})
+
+            # Check both the column value and its error. Often when GFIT has a problem, it will generate a NaN in the
+            # error value, but leave the column value equal to the OVC.
+            num_nans_column = np.sum(~np.isfinite(data.get_data(v, FlagCategory.ALL_DATA).filled(np.nan)))
+            num_nans_error = np.sum(~np.isfinite(data.get_data(f'{v}_error', FlagCategory.ALL_DATA).filled(np.nan)))
+            gvars['num_nans'].append(max(num_nans_column, num_nans_error))
+            gvars['window'].append(window)
+
+        for k, v in grouped_vars.items():
+            grouped_vars[k] = pd.DataFrame(v)
+        return grouped_vars
+
+    def get_save_name(self):
+        return 'nans_check_{vars}.png'.format(vars='all' if self._vsw_windows is None else '_'.join(self._vsw_windows))
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        grouped_counts = self.get_plot_data(data, FlagCategory.ALL_DATA)
+        style = self.get_plot_kws(data, FlagCategory.ALL_DATA)
+
+        if self._groups is None:
+            self.plot_number_nans(axs[0], grouped_counts, **style)
+        else:
+            for grp, ax in zip(self._groups, axs):
+                includes = {f'vsw_{v}' for v in grp if not v.startswith('!')}
+                excludes = {f'vsw_{v[1:]}' for v in grp if v.startswith('!')}
+                these_counts = {k: v for k, v in grouped_counts.items() if k in includes and k not in excludes}
+                self.plot_number_nans(ax, these_counts, **style)
+
+    @staticmethod
+    def plot_number_nans(ax, grouped_counts, width=0.8, zero_color='b', color_map='autumn_r'):
+        tick_labels = []
+        for xi, (gas, df_nans) in enumerate(grouped_counts.items()):
+            tick_labels.append(gas)
+
+            nbars = df_nans.shape[0]
+            wb = width / (nbars + 1)
+            if df_nans.shape[0] == 1:
+                centers = np.array([xi])
+            else:
+                centers = np.linspace(xi - width / 2 + wb / 2, xi + width / 2 - wb / 2, nbars)
+
+            # min_nans = df_nans['num_nans'].min()
+            max_nans = df_nans['num_nans'].max()
+            space = 0.05 * max(1, max_nans)
+            cmap = utils.ColorMapper(1, max_nans, color_map)
+
+            for n, windows in df_nans.groupby('num_nans'):
+                color = zero_color if n == 0 else cmap(n)
+                if n == 0:
+                    ax.bar(centers[windows.index], 0.01 * np.ones(windows.shape[0]), color=color, width=wb)
+                else:
+                    ax.bar(centers[windows.index], windows['num_nans'], color=color, width=wb)
+
+                for irow, row in windows.iterrows():
+                    y = row['num_nans'] if row['num_nans'] > 0 else 0.01
+                    ax.text(centers[irow], y + space, f'{gas} {row["window"]}', rotation=90, ha='center', va='bottom')
+
+        y1, y2 = ax.get_ylim()
+        ax.set_ylim(y1, max(y2 + 1, y2 * 1.2))
+        ax.set_xticks(np.arange(xi + 1))
+        ax.set_xticklabels(tick_labels)
+        ax.set_ylabel('# NaNs or fills in\nVSW columns or errors')
+        ax.grid()
         
         
 class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):

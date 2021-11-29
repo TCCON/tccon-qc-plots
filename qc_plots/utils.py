@@ -1,4 +1,5 @@
 import froll
+import matplotlib as mpl
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
@@ -109,7 +110,6 @@ def fortran_rolling_derivatives(x, y, window, min_periods=1):
     return slopes
 
 
-
 def freq_op_str(freq, op):
     if freq in _FREQ_FULL_NAMES:
         freq_name = _FREQ_FULL_NAMES[freq]
@@ -129,3 +129,67 @@ def ordinal_str(i):
         return f'{i}rd'
     else:
         return f'{i}th'
+
+
+class ColorMapper(mpl.cm.ScalarMappable):
+    """
+    Map different values to colors in a colormap.
+
+    This is useful when you wish to plot multiple series whose color corresponds to a data value, but do not want to
+    use a scatter plot. This class can be instantiated in two ways:
+
+    1. Call the class directly, providing a min and max value and (optionally) a colormap to use, e.g.::
+
+        cm = ColorMapper(0, 10, cmap='viridis')
+
+    2. Use the ``from_data`` method to automatically set the min and max values to those of some sort of data array,
+       e.g.::
+
+        cm = ColorMapper.from_data(np.arange(10))
+
+    Either method accepts all keywords for :class:`matplotlib.cm.ScalarMappable` except ``norm`` which is set
+    automatically. Calling the instance will return an RGBA tuple that can be given to the ``color`` keyword of a
+    matplotlib plotting function::
+
+        pyplot.plot(np.arange(10), color=cm(5))
+
+    The instance of this class would then be used as the mappable for a colorbar, e.g.::
+
+        pyplot.colorbar(cm)
+
+    Init parameters:
+
+    :param vmin: the bottom value for the color map.
+    :type vmin: int or float
+
+    :param vmax: the top value for the color map
+    :type vmax: int or float
+
+    :param cmap: the color map to use. May be a string that gives the name of the colormap or a Colormap instance.
+    :type cmap: str or :class:`matplotlib.colors.Colormap`
+
+    :param **kwargs: additional keyword arguments passed through to :class:`matplotlib.cm.ScalarMappable`
+    """
+    def __init__(self, vmin, vmax, cmap=mpl.cm.jet, **kwargs):
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        super(ColorMapper, self).__init__(norm=norm, cmap=cmap, **kwargs)
+        # This is a necessary step for some reason. Not sure why
+        self.set_array([])
+
+    def __call__(self, value):
+        return self.to_rgba(value)
+
+    @classmethod
+    def from_data(cls, data, **kwargs):
+        """
+        Create a :class:`ColorMapper` instance from a data array, with min and max values set to those of the data.
+
+        :param data: the data array. May be any type that ``numpy.min()`` and ``numpy.max()`` will correctly return a
+         scalar value for.
+
+        :param **kwargs: additional keyword args passed through to the class __init__ method.
+
+        :return: a new class instance
+        :rtype: :class:`ColorMapper`
+        """
+        return cls(vmin=np.nanmin(data), vmax=np.nanmax(data), **kwargs)
