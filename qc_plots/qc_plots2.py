@@ -1616,7 +1616,6 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
     def get_plot_data(self, data: TcconData, flag_category: FlagCategory):
         # NB: unlike other plots, we need actual datetime types for time to
         # permit resampling to work.
-        print(f' (get_plot_data flag_category = {flag_category}) ', end='')
         if flag_category is None:
             data = {
                 'time': data.get_flag0_or_all_data('datetime'),
@@ -2357,6 +2356,14 @@ class ScatterPlot(AbstractPlot):
             args['kws'].pop('legend_fontsize', None)  # use a small default so the text fits on the plot
 
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
+
+        # Assume that the limits are fixed by now; plot each separately because
+        # we needed slightly different logic in each case to put the markers in the right place.
+        for args in plot_args:
+            self.plot_outside_xlimits(axs, args['data'], args['kws'])
+            self.plot_outside_ylimits(axs, args['data'], args['kws'])
+            self.plot_outside_both_limits(axs, args['data'], args['kws'])
+
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
 
@@ -2365,6 +2372,88 @@ class ScatterPlot(AbstractPlot):
 
         # legend keywords are only ever in the first set of plot args
         axs.legend(**plot_args[0]['legend_kws'])
+
+    @classmethod
+    def plot_outside_xlimits(cls, ax, data, kws, limit_by_y=True):
+        xlims = ax.get_xlim()
+        ylims = ax.get_ylim()
+        markers = ['<', '>']
+
+        under = (data['x'] < xlims[0])
+        over = (data['x'] > xlims[1])
+        if limit_by_y:
+            inside_y = (data['y'] >= ylims[0]) & (data['y'] <= ylims[1])
+            under &= inside_y
+            over &= inside_y
+        subsets = [under, over]
+
+        for x, idx, mkr in zip(xlims, subsets, markers):
+            if np.sum(idx) == 0:
+                continue
+
+            this_style = cls._set_outside_style(kws, mkr)
+            xarr = np.full(np.sum(idx), x)
+            ax.plot(xarr, data['y'][idx], clip_on=False, **this_style)
+
+    @classmethod
+    def plot_outside_ylimits(cls, ax, data, kws, limit_by_x=True):
+        xlims = ax.get_xlim()
+        ylims = ax.get_ylim()
+        markers = ['v', '^']
+
+        under = (data['y'] < ylims[0])
+        over = (data['y'] > ylims[1])
+        if limit_by_x:
+            inside_x = (data['x'] >= xlims[0]) & (data['x'] <= xlims[1])
+            under &= inside_x
+            over &= inside_x
+        
+        subsets = [under, over]
+
+        for y, idx, mkr in zip(ylims, subsets, markers):
+            if np.sum(idx) == 0:
+                continue
+
+            this_style = cls._set_outside_style(kws, mkr)
+            yarr = np.full(np.sum(idx), y)
+            ax.plot(data['x'][idx], yarr, clip_on=False, **this_style)
+
+    @classmethod
+    def plot_outside_both_limits(cls, ax, data, kws):
+        xlims = ax.get_xlim()
+        ylims = ax.get_ylim()
+        markers = ['X', 'X', 'X', 'X']
+
+        under_x = data['x'] < xlims[0]
+        over_x = data['x'] > xlims[1]
+        under_y = data['y'] < ylims[0]
+        over_y = data['y'] > ylims[1]
+        subsets = [under_x & under_y,
+                   under_x & over_y,
+                   over_x & under_y,
+                   over_x & over_y]
+        values = [(xlims[0], ylims[0]),
+                  (xlims[0], ylims[1]),
+                  (xlims[1], ylims[0]),
+                  (xlims[1], ylims[1])]
+
+        for (x,y), idx, mkr in zip(values, subsets, markers):
+            n = np.sum(idx)
+            if n == 0:
+                continue
+
+            this_style = cls._set_outside_style(kws, mkr)
+            xarr = np.full(n, x)
+            yarr = np.full(n, y)
+            ax.plot(xarr, yarr, clip_on=False, **this_style)
+
+    @staticmethod
+    def _set_outside_style(kws, mkr):
+        this_style = deepcopy(kws)
+        this_style['marker'] = mkr
+        this_style['zorder'] = 100
+        this_style.pop('label', '')  # do not pollute the legend with extra series
+        return this_style
 
     def _add_linfit(self, ax, data: TcconData, flag0_only: bool = False):
         fit_flag_category = self._get_flag_category(self._fit_flag_category, flag0_only)
@@ -2563,6 +2652,13 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
         for args in plot_args:
             args['kws'].pop('fit_style', None)
             axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
+
+        # Assume at this point that the y-limits have been fixed
+        # Do not limit to values in the x-direction as this can cause issues
+        # when the x-data are timestamps and the x-limits are datenums.
+        for args in plot_args:
+            self.plot_outside_ylimits(axs, args['data'], args['kws'], limit_by_x=False)
+
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
 
         # legend kws are always in the first set of plot argument
@@ -2790,6 +2886,13 @@ class Timeseries2PanelPlot(TimeseriesPlot):
             args['kws'].pop('fit_style', None)  # can't leave fit style in if present
             axs['main'].plot(args['data']['x'], args['data']['y'], **args['kws'])
             axs['error'].plot(args['data']['x'], args['data']['yerr'], **args['kws'])
+
+        # Assume the y-limits have been fixed by now
+        # Do not limit to values in the x-direction as this can cause issues
+        # when the x-data are timestamps and the x-limits are datenums.
+        for args in plot_args:
+            self.plot_outside_ylimits(axs['main'], args['data'], args['kws'], limit_by_x=False)
+            self.plot_outside_ylimits(axs['error'], {'x': args['data']['x'], 'y': args['data']['yerr']}, args['kws'], limit_by_x=False)
 
         self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
         self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
