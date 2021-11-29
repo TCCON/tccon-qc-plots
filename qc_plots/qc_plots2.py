@@ -777,12 +777,12 @@ class AbstractPlot(ABC):
         plt.close(fig)
         return fig_path
     
-    def _make_or_check_fig_ax_args(self, fig, axs, nrow=1, ncol=1, ax_ndim=None, ax_size=None, ax_shape=None):
+    def _make_or_check_fig_ax_args(self, fig, axs, nrow=1, ncol=1, ax_ndim=None, ax_size=None, ax_shape=None, sharey=False):
         if (fig is None) != (axs is None):
             raise TypeError('Must give both or neither of fig and axs')
         elif fig is None and axs is None:
             size = utils.cm2inch(self._width, self._height)
-            fig, axs = plt.subplots(nrow, ncol, figsize=size)
+            fig, axs = plt.subplots(nrow, ncol, figsize=size, sharey=sharey)
         elif ax_ndim is not None and np.ndim(axs) != ax_ndim:
             raise TypeError('axs must be a {} dimensional array'.format(ax_ndim))
         elif ax_size is not None and np.size(axs) != ax_size:
@@ -1389,8 +1389,47 @@ class FlagAnalysisPlot(AbstractPlot):
 
 
 class NanCheckPlot(AbstractPlot):
+    """Concrete plotting class that creates plots to check for NaNs for fill values by window
+
+    Configuration plot kind = ``"nan-check"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    vsw_windows
+        A list of the VSW column variables (e.g. ``["vsw_co2_6220", "vsw_co2_6339"]``) to include in the plot.
+        If not given, then all variables following the name pattern ``vsw_<gas>_<window>`` will be included.
+        Usually best to leave this as ``None`` and use ``groups`` to limit the gases plotted.
+
+    groups
+        If ``None``, all windows will be plotted on one axes. To split across multiple axes, pass a list of lists
+        to this argument. Each inner list must be a list of gas (e.g. "co2") or window (e.g. "co2_6220") names.
+        All gases listed in one inner list will be plotted on its own axes. To exclude a gas/window instead, start
+        the name with a "!". An example of this argument is ``[["!h2o", "!hdo"], ["h2o"], ["hdo"]]``. This would
+        make 3 axes, the first with all gases *except* H2O and HDO, the second with H2O only, and the third with
+        HDO only. 
+
+        .. note::
+           If you have a mix of excludes and includes, such as ``["ch4", "!ch4_6002"]``, then a window must be allowed
+           by the includes *and* not forbidden by the excludes. In this example, only CH4 windows other than 6002 will
+           be plotted. 
+
+    percentage
+        Whether to plot the amount of NaNs/fills as a percentage (``True``) or number of spectra (``False``).
+
+    window_font_size
+        The size of the font to use when labelling which window each bar refers to.
+
+    sharey
+        Whether the y-axes for every group should have the same limits or not.
+    """
+
+    plot_kind = 'nan-check'
+
     def __init__(self, other_plots, default_style: dict, limits: Limits, vsw_windows: Optional[Sequence[str]] = None,
-                 groups: Optional[Sequence[str]] = None, key: Optional[str] = None,
+                 groups: Optional[Sequence[Sequence[str]]] = None, percentage: bool = True, window_font_size: int = 6,
+                 sharey: bool = True, key: Optional[str] = None,
                  name: Optional[str] = None, bookmark: Optional[Union[str, bool]] = None,
                  width=20, height=10, legend_kws: Optional[dict] = None,
                  extra_qc_lines: Optional[Sequence[dict]] = None):
@@ -1400,22 +1439,25 @@ class NanCheckPlot(AbstractPlot):
 
         self._vsw_windows = vsw_windows
         self._groups = groups
+        self._percentage = percentage
+        self._window_font_size = window_font_size
+        self._sharey = sharey
 
     def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
         nrow = 1 if self._groups is None else len(self._groups)
-        fig, axs = self._make_or_check_fig_ax_args(fig, axs, nrow=nrow, ax_ndim=1, ax_size=nrow)
+        fig, axs = self._make_or_check_fig_ax_args(fig, axs, nrow=nrow, ax_ndim=1, ax_size=nrow, sharey=self._sharey)
         if not isinstance(axs, np.ndarray):
             axs = np.array([axs])
 
         fig.suptitle('NaNs/fills in VSW variables')
-        for ax in axs:
-            ax.set_ylabel('# NaNs or fills in\nVSW columns or errors (all data)')
+        ilabel = np.size(axs) // 2 - 1  # Put the label on the middle plot, or the upper middle if an even number
+        axs[ilabel].set_ylabel(f'{"%" if self._percentage else "#"} NaNs or fills in\nVSW columns or errors (all data)')
 
         return fig, axs
 
     def get_plot_data(self, data: TcconData, flagged_category: FlagCategory):
         if flagged_category != FlagCategory.ALL_DATA:
-            print('\nWARNING: NaN check plots always use all data')
+            print('\nWARNING: NaN check plots always use all data', file=sys.stderr)
 
         if self._vsw_windows is None:
             vsw_vars = [v for v in data.nc_dset.variables.keys() if re.match(r'vsw_[a-z0-9]+_\d{4}$', v)]
@@ -1432,7 +1474,11 @@ class NanCheckPlot(AbstractPlot):
             # error value, but leave the column value equal to the OVC.
             num_nans_column = np.sum(~np.isfinite(data.get_data(v, FlagCategory.ALL_DATA).filled(np.nan)))
             num_nans_error = np.sum(~np.isfinite(data.get_data(f'{v}_error', FlagCategory.ALL_DATA).filled(np.nan)))
-            gvars['num_nans'].append(max(num_nans_column, num_nans_error))
+            num_nans = max(num_nans_column, num_nans_error)
+            if self._percentage:
+                n_spec = np.size(data.get_data(v, FlagCategory.ALL_DATA))
+                num_nans *= 100 / n_spec
+            gvars['num_nans'].append(num_nans)
             gvars['window'].append(window)
 
         for k, v in grouped_vars.items():
@@ -1450,13 +1496,48 @@ class NanCheckPlot(AbstractPlot):
             self.plot_number_nans(axs[0], grouped_counts, **style)
         else:
             for grp, ax in zip(self._groups, axs):
-                includes = {f'vsw_{v}' for v in grp if not v.startswith('!')}
-                excludes = {f'vsw_{v[1:]}' for v in grp if v.startswith('!')}
-                these_counts = {k: v for k, v in grouped_counts.items() if k in includes and k not in excludes}
+                includes = {v for v in grp if not v.startswith('!')}
+                excludes = {v[1:] for v in grp if v.startswith('!')}
+                if len(includes) > 0 and len(excludes) > 0:
+                    these_counts = {k: v for k, v in grouped_counts.items() if k in includes and k not in excludes}
+                elif len(includes) > 0:
+                    these_counts = {k: v for k, v in grouped_counts.items() if k in includes}
+                elif len(excludes) > 0:
+                    these_counts = {k: v for k, v in grouped_counts.items() if k not in excludes}
+                else:
+                    these_counts = grouped_counts
                 self.plot_number_nans(ax, these_counts, **style)
 
     @staticmethod
-    def plot_number_nans(ax, grouped_counts, width=0.8, zero_color='b', color_map='autumn_r'):
+    def _match_vsw_var(varname, group_set):
+        for entry in group_set:
+            if re.match(r'[a-z0-9]+$', entry):
+                # User gave just a gas as the group entry (e.g. "ch4"), so search for the gas name
+                # in the variable, assuming a variable name like "vsw_ch4_6002".
+                gas = re.search(r'vsw_([a-z0-9]+)_', varname).group(1)
+                if gas == entry:
+                    return True
+            elif re.match(r'[a-z0-9]+_[0-9]$', entry):
+                # User gave a specific window (e.g. "ch4_6002"), so search for that window in the
+                # variable name
+                window = re.search(r'vsw_([a-z0-9]+_[0-9]+)', varname).group(1)
+                if window == entry:
+                    return True
+            elif re.match(r'vsw_[a-z0-9]+$', entry):
+                # User gave something like "vsw_ch4". In that case, assuming variable names like
+                # "vsw_ch4_6002", we can easily match whether this variables refers to the intended
+                # gas.
+                if varname.startswith(entry):
+                    return True
+            else:
+                # If the user gave something like "vsw_ch4_6002", that fully specifies the variable.
+                if varname == entry:
+                    return True
+
+        # Only if none of the group entries match the variable in any way do we return False
+        return False
+
+    def plot_number_nans(self, ax, grouped_counts, width=0.8, zero_color='b', color_map='autumn_r', **_):
         tick_labels = []
         for xi, (gas, df_nans) in enumerate(grouped_counts.items()):
             tick_labels.append(gas)
@@ -1482,13 +1563,13 @@ class NanCheckPlot(AbstractPlot):
 
                 for irow, row in windows.iterrows():
                     y = row['num_nans'] if row['num_nans'] > 0 else 0.01
-                    ax.text(centers[irow], y + space, f'{gas} {row["window"]}', rotation=90, ha='center', va='bottom')
+                    ax.text(centers[irow], y + space, f'{gas} {row["window"]:.0f}', fontsize=self._window_font_size,
+                            rotation=90, ha='center', va='bottom')
 
         y1, y2 = ax.get_ylim()
         ax.set_ylim(y1, max(y2 + 1, y2 * 1.2))
         ax.set_xticks(np.arange(xi + 1))
         ax.set_xticklabels(tick_labels)
-        ax.set_ylabel('# NaNs or fills in\nVSW columns or errors')
         ax.grid()
         
         
