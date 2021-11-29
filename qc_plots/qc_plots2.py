@@ -1404,16 +1404,16 @@ class NanCheckPlot(AbstractPlot):
 
     groups
         If ``None``, all windows will be plotted on one axes. To split across multiple axes, pass a list of lists
-        to this argument. Each inner list must be a list of gas (e.g. "co2") or window (e.g. "co2_6220") names.
+        to this argument. Each inner list must be a list of gas names (e.g. "co2").
         All gases listed in one inner list will be plotted on its own axes. To exclude a gas/window instead, start
         the name with a "!". An example of this argument is ``[["!h2o", "!hdo"], ["h2o"], ["hdo"]]``. This would
         make 3 axes, the first with all gases *except* H2O and HDO, the second with H2O only, and the third with
         HDO only. 
 
         .. note::
-           If you have a mix of excludes and includes, such as ``["ch4", "!ch4_6002"]``, then a window must be allowed
-           by the includes *and* not forbidden by the excludes. In this example, only CH4 windows other than 6002 will
-           be plotted. 
+           If you have a mix of excludes and includes, such as ``["ch4", "!h2o"]``, then a window must be allowed
+           by the includes *and* not forbidden by the excludes. This is effectively the same as giving only the
+           includes. 
 
     percentage
         Whether to plot the amount of NaNs/fills as a percentage (``True``) or number of spectra (``False``).
@@ -1507,35 +1507,6 @@ class NanCheckPlot(AbstractPlot):
                 else:
                     these_counts = grouped_counts
                 self.plot_number_nans(ax, these_counts, **style)
-
-    @staticmethod
-    def _match_vsw_var(varname, group_set):
-        for entry in group_set:
-            if re.match(r'[a-z0-9]+$', entry):
-                # User gave just a gas as the group entry (e.g. "ch4"), so search for the gas name
-                # in the variable, assuming a variable name like "vsw_ch4_6002".
-                gas = re.search(r'vsw_([a-z0-9]+)_', varname).group(1)
-                if gas == entry:
-                    return True
-            elif re.match(r'[a-z0-9]+_[0-9]$', entry):
-                # User gave a specific window (e.g. "ch4_6002"), so search for that window in the
-                # variable name
-                window = re.search(r'vsw_([a-z0-9]+_[0-9]+)', varname).group(1)
-                if window == entry:
-                    return True
-            elif re.match(r'vsw_[a-z0-9]+$', entry):
-                # User gave something like "vsw_ch4". In that case, assuming variable names like
-                # "vsw_ch4_6002", we can easily match whether this variables refers to the intended
-                # gas.
-                if varname.startswith(entry):
-                    return True
-            else:
-                # If the user gave something like "vsw_ch4_6002", that fully specifies the variable.
-                if varname == entry:
-                    return True
-
-        # Only if none of the group entries match the variable in any way do we return False
-        return False
 
     def plot_number_nans(self, ax, grouped_counts, width=0.8, zero_color='b', color_map='autumn_r', **_):
         tick_labels = []

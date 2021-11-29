@@ -361,6 +361,46 @@ text in the legend.
 
 .. _PT_timing_error_am_pm:
 
+nan-check
+~~~~~~~~~
+
+A plot that displays the number of percentage of data that is a NaN or fill value in each window. It uses the VSW
+variables, and shows the larger percentage/number for the VSW column amount and error amount for each window.
+
+**Required keys**
+
+None
+
+**Optional keys**
+
+* ``vsw_windows`` (default = ``None``): which windows from the VSW variables to include (e.g. ``["co2_6220", "ch4_6002"]``). 
+  Generally you will not use this input; use ``groups`` instead. Only use this if you need to limit to specific windows.
+  When this is ``None`` (the default), all vsw variables are available.
+* ``groups`` (default = ``None``): defines how to group the gases into axes. The default is to put all gases into one axes.
+  Otherwise, this value must be a list of lists of gas names, e.g. ``[["co2", "ch4"], ["!h2o", "!co2", "!ch4"], ["h2o"]]``. 
+  Each inner list corresponds to one axes; this example would plot CO2 and CH4 in the first, everything *except* CO2, CH4,
+  and H2O in the second, and only H2O in the third. Prefixing a name with exclamation points (as in the second inner list
+  of the example) will exclude that gas from the axes. Note that while it is allowed to mix excludes and includes 
+  (e.g. ``["co2", "!h2o"]``), this is identical to only providing the includes (e.g. ``["co2"]``). 
+* ``percentage`` (default = ``true``): whether to plot what percentage of the data in each window is a NaN or fill value 
+  (``true``) or a number of spectra (``false``).
+* ``window_font_size`` (default = 6): the font size to use for the label over each bar that indicates exactly what window 
+  it represents. 
+* ``sharey`` (default = ``false``): whether to force all axes in this plot to use the same y-limits.
+
+**Style**
+
+A nan-check style subsection must have the ``all`` key, this is the only one used. Keywords can be:
+
+* ``width`` (default = 0.8): the width of each window group. Since this scales all groups together, it isn't generally useful.
+* ``zero_color`` (default = "b"): the color to use for the bars for windows with no NaNs/fill values. May be any valid 
+  Matplotlib color specification.
+* ``color_map`` (default = "autumn_r"): the name of the color map to use to color bars with >0 NaNs/fill values. May be any 
+  recognized Matplotlib color map name.
+
+.. note::
+   These options have not been tested, please report if they do not work.
+
 timing-error-am-pm
 ~~~~~~~~~~~~~~~~~~
 
