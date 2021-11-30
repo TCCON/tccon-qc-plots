@@ -1486,7 +1486,10 @@ class NanCheckPlot(AbstractPlot):
         return grouped_vars
 
     def get_save_name(self):
-        return 'nans_check_{vars}.png'.format(vars='all' if self._vsw_windows is None else '_'.join(self._vsw_windows))
+        return 'nans_check_{y}_{variables}.png'.format(
+            variables='all' if self._vsw_windows is None else '_'.join(self._vsw_windows),
+            y='percent' if self._percentage else 'nspec'
+        )
 
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
         grouped_counts = self.get_plot_data(data, FlagCategory.ALL_DATA)
