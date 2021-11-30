@@ -1,15 +1,15 @@
 Kind,Required keys,Optional keys,Style keywords,Cloning supported,Aux plots
 flag-analysis,,"min_percent","MPL ``bar`` kws",No,
-nan-check,,"vsw_windows,groups,percentage,window_font_size,sharey",N/A,No,
+nan-check,,"vsw_windows, groups, percentage, window_font_size, sharey",N/A,No,
 timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days, flag_cat_override","MPL ``plot`` kws",Yes,``violin``
 delta-timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days, flag_cat_override","MPL ``plot`` kws",Yes,``violin``
 timing-error-szas,"sza_ranges, am_or_pm","yvar, freq, op, time_buffer_days, flag_cat_override","MPL ``plot`` kws",No,``violin``
-scatter,"xvar, yvar","match_axes_size","MPL ``plot`` kws",Yes,
+scatter,"xvar, yvar","match_axes_size, show_out_of_range_data","MPL ``plot`` kws",Yes,
 hexbin,"xvar, yvar", "show_reference, show_context", "MPL ``hexbin`` kws", Yes,
-timeseries,"yvar","time_buffer_days","MPL ``plot`` kws",Yes,``violin``
-delta-timeseries, "yvar1, yvar2", "time_buffer_days", "MPL ``plot`` kws", Yes, ``violin``
-timeseries-2panel,"yvar, yerror_var", "time_buffer_days", "MPL ``plot`` kws", Yes, ``violin``
-resampled-timeseries,"yvar, freq, op", "time_buffer_days", "MPL ``plot`` kws", Yes, ``violin``
-rolling-timeseries,"yvar, ops","gap, rolling_window, uncertainty, data_category, time_buffer_days", "MPL ``plot`` kws", Yes, ``violin``
-delta-rolling-timeseries, "yvar1, yvar2, ops", "gap, rolling_window, uncertainty, data_category, time_buffer_days", "MPL ``plot`` kws", Yes, ``violin``
-rolling-derivative, "yvar, dvar", "derivative_order, gap, rolling_window, flag_category, time_buffer_days", "MPL ``plot`` kws", Yes, ``violin``
+timeseries,"yvar","time_buffer_days, show_out_of_range_data","MPL ``plot`` kws",Yes,``violin``
+delta-timeseries, "yvar1, yvar2", "time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
+timeseries-2panel,"yvar, yerror_var", "time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
+resampled-timeseries,"yvar, freq, op", "time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
+rolling-timeseries,"yvar, ops","gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
+delta-rolling-timeseries, "yvar1, yvar2, ops", "gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
+rolling-derivative, "yvar, dvar", "derivative_order, gap, rolling_window, flag_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``

@@ -2274,13 +2274,19 @@ class ScatterPlot(AbstractPlot):
     fit_flag_category
         Which subset of data to calculate the linear fit to. If ``None``, then the "default" subset
         (flag = 0 if available, all data if not) is used for each data type.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Points outside the plot limits on two axes are marked with a diamond.
     """
     plot_kind = 'scatter'
 
     def __init__(self, other_plots, xvar: str, yvar: str, default_style: dict, limits: Limits, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10, 
                  legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
-                 add_fit: bool = True, fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None):
+                 add_fit: bool = True, fit_flag_category: Optional[FlagCategory] = None, match_axes_size=None,
+                 show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, default_style=default_style, key=key, limits=limits,
                          name=name, width=width, height=height, bookmark=bookmark, legend_kws=legend_kws,
                          extra_qc_lines=extra_qc_lines)
@@ -2289,6 +2295,7 @@ class ScatterPlot(AbstractPlot):
         self._do_add_fit = add_fit
         self._fit_flag_category = None if fit_flag_category is None else FlagCategory(fit_flag_category)
         self._match_axes_size = match_axes_size
+        self._show_out_of_range_data = show_out_of_range_data
 
     def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
         if flag_category is None:
@@ -2359,10 +2366,11 @@ class ScatterPlot(AbstractPlot):
 
         # Assume that the limits are fixed by now; plot each separately because
         # we needed slightly different logic in each case to put the markers in the right place.
-        for args in plot_args:
-            self.plot_outside_xlimits(axs, args['data'], args['kws'])
-            self.plot_outside_ylimits(axs, args['data'], args['kws'])
-            self.plot_outside_both_limits(axs, args['data'], args['kws'])
+        if self._show_out_of_range_data:
+            for args in plot_args:
+                self.plot_outside_xlimits(axs, args['data'], args['kws'])
+                self.plot_outside_ylimits(axs, args['data'], args['kws'])
+                self.plot_outside_both_limits(axs, args['data'], args['kws'])
 
         self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
@@ -2511,7 +2519,8 @@ class HexbinPlot(ScatterPlot):
                  show_reference=False, show_context=True):
         super().__init__(other_plots=other_plots, xvar=xvar, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, fit_flag_category=fit_flag_category, key=key,
-                         name=name, bookmark=bookmark, width=width, height=height, extra_qc_lines=extra_qc_lines)
+                         name=name, bookmark=bookmark, width=width, height=height, extra_qc_lines=extra_qc_lines,
+                         show_out_of_range_data=False)
         self._hexbin_flag_category = None if hexbin_flag_category is None else FlagCategory(hexbin_flag_category)
         self._show_ref = show_reference
         self._show_context = show_context
@@ -2625,15 +2634,22 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'timeseries'
 
     def __init__(self, other_plots, yvar: str, default_style: dict, limits: Limits, name: Optional[str] = None, 
                  bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None, 
-                 key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None):
+                 key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None, 
+                 show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, xvar='time', yvar=yvar, default_style=default_style, limits=limits,
                          key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
-                         extra_qc_lines=extra_qc_lines, add_fit=False)
+                         extra_qc_lines=extra_qc_lines, add_fit=False, show_out_of_range_data=show_out_of_range_data)
         self._time_buffer_days = time_buffer_days
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -2656,8 +2672,9 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
         # Assume at this point that the y-limits have been fixed
         # Do not limit to values in the x-direction as this can cause issues
         # when the x-data are timestamps and the x-limits are datenums.
-        for args in plot_args:
-            self.plot_outside_ylimits(axs, args['data'], args['kws'], limit_by_x=False)
+        if self._show_out_of_range_data:
+            for args in plot_args:
+                self.plot_outside_ylimits(axs, args['data'], args['kws'], limit_by_x=False)
 
         self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
 
@@ -2682,13 +2699,14 @@ class TimeseriesPlusViolinPlot(TimeseriesPlot, ViolinAuxPlotMixin):
                  key=None, 
                  time_buffer_days=2,
                  extra_qc_lines: Optional[Sequence[dict]] = None,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
                  violin_plot_hide_yticks=False):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
-                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days)
+                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
         self.init_violins(data_file=violin_data_file,
                           aux_plot_side=violin_plot_side,
                           aux_plot_size=violin_plot_size,
@@ -2716,16 +2734,22 @@ class TimeseriesDeltaPlot(TimeseriesPlot):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'delta-timeseries'
 
     def __init__(self, other_plots, yvar1: str, yvar2: str, default_style: dict, limits: Limits,
                  name: Optional[str] = None, width=20, height=10,
                  legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
-                 key=None, time_buffer_days=2):
+                 key=None, time_buffer_days=2, show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, yvar=yvar1, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, name=name, legend_kws=legend_kws, extra_qc_lines=extra_qc_lines,
-                         time_buffer_days=time_buffer_days)
+                         time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
         self.yvar2 = yvar2
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -2773,6 +2797,7 @@ class TimeseriesDeltaPlusViolinsPlot(TimeseriesDeltaPlot, ViolinAuxPlotMixin):
                  key=None, 
                  time_buffer_days=2,
                  extra_qc_lines: Optional[Sequence[dict]] = None,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -2790,7 +2815,8 @@ class TimeseriesDeltaPlusViolinsPlot(TimeseriesDeltaPlot, ViolinAuxPlotMixin):
                  legend_kws=legend_kws, 
                  key=key, 
                  time_buffer_days=time_buffer_days,
-                 extra_qc_lines=extra_qc_lines
+                 extra_qc_lines=extra_qc_lines,
+                 show_out_of_range_data=show_out_of_range_data
             )
 
         self.init_violins(data_file=violin_data_file,
@@ -2823,15 +2849,22 @@ class Timeseries2PanelPlot(TimeseriesPlot):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'timeseries-2panel'
 
     def __init__(self, other_plots, yvar: str, yerror_var: str, default_style: dict, limits: Limits, key=None, 
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, time_buffer_days=2,
+                 show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, name=name, bookmark=bookmark, time_buffer_days=time_buffer_days,
-                         legend_kws=legend_kws, extra_qc_lines=extra_qc_lines)
+                         legend_kws=legend_kws, extra_qc_lines=extra_qc_lines, show_out_of_range_data=show_out_of_range_data)
         self.yerror_var = yerror_var
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False):
@@ -2890,9 +2923,10 @@ class Timeseries2PanelPlot(TimeseriesPlot):
         # Assume the y-limits have been fixed by now
         # Do not limit to values in the x-direction as this can cause issues
         # when the x-data are timestamps and the x-limits are datenums.
-        for args in plot_args:
-            self.plot_outside_ylimits(axs['main'], args['data'], args['kws'], limit_by_x=False)
-            self.plot_outside_ylimits(axs['error'], {'x': args['data']['x'], 'y': args['data']['yerr']}, args['kws'], limit_by_x=False)
+        if self._show_out_of_range_data:
+            for args in plot_args:
+                self.plot_outside_ylimits(axs['main'], args['data'], args['kws'], limit_by_x=False)
+                self.plot_outside_ylimits(axs['error'], {'x': args['data']['x'], 'y': args['data']['yerr']}, args['kws'], limit_by_x=False)
 
         self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
         self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
@@ -2919,6 +2953,12 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'timeseries-2panel+violin'
 
@@ -2936,6 +2976,7 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
                  legend_kws: Optional[dict] = None, 
                  extra_qc_lines: Optional[Sequence[dict]] = None,
                  time_buffer_days=2,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -2953,7 +2994,8 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
             height=height,
             legend_kws=legend_kws, 
             extra_qc_lines=extra_qc_lines,
-            time_buffer_days=time_buffer_days
+            time_buffer_days=time_buffer_days,
+            show_out_of_range_data=show_out_of_range_data
         )
 
         self.init_violins(
@@ -3017,16 +3059,23 @@ class ResampledTimeseriesPlot(TimeseriesPlot):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
 
     plot_kind = 'resampled-timeseries'
 
     def __init__(self, other_plots, yvar: str, freq: str, op: str, default_style: dict, limits: Limits, key=None,
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
-                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, time_buffer_days=2):
+                 legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, time_buffer_days=2,
+                 show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws, 
-                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days)
+                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
         self.freq = freq
         self.op = op
 
@@ -3074,6 +3123,12 @@ class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMi
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
 
     plot_kind = 'resampled-timeseries+violin'
@@ -3094,6 +3149,7 @@ class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMi
                  legend_kws: Optional[dict] = None, 
                  extra_qc_lines: Optional[Sequence[dict]] = None,
                  time_buffer_days=2,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -3113,7 +3169,8 @@ class ResampledTimeseriesPlotWithViolin(ResampledTimeseriesPlot, ViolinAuxPlotMi
             height=height,
             legend_kws=legend_kws,
             extra_qc_lines=extra_qc_lines,
-            time_buffer_days=time_buffer_days
+            time_buffer_days=time_buffer_days,
+            show_out_of_range_data=show_out_of_range_data
         )
 
         self.init_violins(
@@ -3162,6 +3219,12 @@ class RollingDerivativePlot(TimeseriesPlot):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'rolling-derivative'
 
@@ -3169,10 +3232,10 @@ class RollingDerivativePlot(TimeseriesPlot):
                  name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, width=20, height=10,
                  legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None, derivative_order: int = 1,
                  gap: str = '20000 days', rolling_window: int = 500, flag_category: Optional[FlagCategory] = None, 
-                 time_buffer_days: int = 2):
+                 time_buffer_days: int = 2, show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, extra_qc_lines=extra_qc_lines, key=key, width=width, height=height, 
-                         name=name, bookmark=bookmark, time_buffer_days=time_buffer_days)
+                         name=name, bookmark=bookmark, time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
 
         self.dvar = dvar
         self.derivative_order = derivative_order
@@ -3302,6 +3365,12 @@ class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'rolling-derivative+violin'
 
@@ -3324,6 +3393,7 @@ class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin
                  rolling_window: int = 500, 
                  flag_category: Optional[FlagCategory] = None, 
                  time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -3346,7 +3416,8 @@ class RollingDerivativePlotWithViolins(RollingDerivativePlot, ViolinAuxPlotMixin
             gap=gap, 
             rolling_window=rolling_window, 
             flag_category=flag_category, 
-            time_buffer_days=time_buffer_days
+            time_buffer_days=time_buffer_days,
+            show_out_of_range_data=show_out_of_range_data
         )
 
         # To get the derivatives, we need the violin plots to call `get_plot_args` instead of `get_plot_data`
@@ -3404,6 +3475,12 @@ class RollingTimeseriesPlot(TimeseriesPlot):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'rolling-timeseries'
 
@@ -3411,10 +3488,10 @@ class RollingTimeseriesPlot(TimeseriesPlot):
                  limits: Limits, key=None, name: Optional[str] = None, bookmark: Optional[Union[str,bool]] = None, 
                  width=20, height=10, legend_kws: Optional[dict] = None, extra_qc_lines: Optional[Sequence[dict]] = None,
                  gap: str = '20000 days', rolling_window: int = 500, uncertainty: bool = False, 
-                 flag_category: Optional[FlagCategory] = None, time_buffer_days: int = 2):
+                 flag_category: Optional[FlagCategory] = None, time_buffer_days: int = 2, show_out_of_range_data: bool = True):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          legend_kws=legend_kws, extra_qc_lines=extra_qc_lines, key=key, width=width, height=height, name=name, bookmark=bookmark,
-                         time_buffer_days=time_buffer_days)
+                         time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
         self.ops = [ops] if isinstance(ops, str) else ops
         self.gap = gap
         self.rolling_window = rolling_window
@@ -3554,6 +3631,12 @@ class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin)
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'rolling-timeseries+violin'
 
@@ -3576,6 +3659,7 @@ class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin)
                  uncertainty: bool = False, 
                  flag_category: Optional[FlagCategory] = None, 
                  time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -3598,7 +3682,8 @@ class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin)
             rolling_window=rolling_window, 
             uncertainty=uncertainty, 
             flag_category=flag_category, 
-            time_buffer_days=time_buffer_days
+            time_buffer_days=time_buffer_days,
+            show_out_of_range_data=show_out_of_range_data
         )
 
         self.init_violins(
@@ -3654,6 +3739,12 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'delta-rolling-timeseries'
 
@@ -3675,7 +3766,8 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
                  rolling_window: int = 500, 
                  uncertainty: bool = False, 
                  flag_category: Optional[FlagCategory] = None, 
-                 time_buffer_days: int = 2):
+                 time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True):
 
         super().__init__(other_plots=other_plots, 
                          yvar=yvar1, 
@@ -3693,7 +3785,8 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
                          rolling_window=rolling_window,
                          uncertainty=uncertainty, 
                          flag_category=flag_category, 
-                         time_buffer_days=time_buffer_days)
+                         time_buffer_days=time_buffer_days,
+                         show_out_of_range_data=show_out_of_range_data)
         
         self.yvar2 = yvar2
 
@@ -3769,6 +3862,12 @@ class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAux
     time_buffer_days
         Number of days before the first and after the last time to push the 
         axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
     """
     plot_kind = 'delta-rolling-timeseries+violin'
 
@@ -3792,6 +3891,7 @@ class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAux
                  uncertainty: bool = False, 
                  flag_category: Optional[FlagCategory] = None, 
                  time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -3814,7 +3914,8 @@ class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAux
                          rolling_window=rolling_window,
                          uncertainty=uncertainty, 
                          flag_category=flag_category, 
-                         time_buffer_days=time_buffer_days)
+                         time_buffer_days=time_buffer_days,
+                         show_out_of_range_data=show_out_of_range_data)
 
         self.init_violins(
             data_file=violin_data_file,

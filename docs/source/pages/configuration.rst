@@ -507,6 +507,12 @@ A plot of one variable versus another.
 **Optional keys**
 
 * ``match_axes_size`` (default = ``None``): if given, this must be a valid hex to a "hexbin" plot. The scatter plot's axes will be compressed to match the width of the hexbin, allowing for colorbars.
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -568,6 +574,12 @@ A plot of a given variable vs. time.
 **Optional keys**
 
 * ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -585,6 +597,12 @@ A plot of the difference of two variables vs. time.
 **Optional keys**
 
 * ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -605,6 +623,12 @@ and its error.
 **Optional keys**
 
 * ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -627,6 +651,12 @@ summarized as a mean/median/etc.
 **Optional keys**
 
 * ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -662,6 +692,12 @@ overplotted.
   ``flag == 0`` data if the ``--flag0`` command line argument is set. Passing one of the strings "all", "flag0", or
   "flagged" will force the use of that subset (this may result in errors if one of the data files does not have the
   "flag" variable, which is required to figure out the latter two subsets).
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -723,6 +759,12 @@ A rolling timeseries plot of the difference between two quantities in the netCDF
   ``flag == 0`` data if the ``--flag0`` command line argument is set. Passing one of the strings "all", "flag0", or
   "flagged" will force the use of that subset (this may result in errors if one of the data files does not have the
   "flag" variable, which is required to figure out the latter two subsets).
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
+
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
 
 **Style**
 
@@ -756,7 +798,13 @@ rolling window of 500 spectra, this will take spectra 1 through 500 and fit a sl
   ``flag == 0`` data if the ``--flag0`` command line argument is set. Passing one of the strings "all", "flag0", or
   "flagged" will force the use of that subset (this may result in errors if one of the data files does not have the
   "flag" variable, which is required to figure out the latter two subsets).
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The 
+  default behavior is to plot them; set this to ``false`` to turn that feature off.
 
+.. note::
+   The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+   If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
+   
 .. _AuxPlots:
 
 Auxiliary Plots
