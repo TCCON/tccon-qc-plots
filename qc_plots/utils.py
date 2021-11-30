@@ -78,7 +78,7 @@ def add_linfit(ax, x, y, yerr=None, label='{fit}', **style):
 
     fit, cov, R = compute_linfit(x, y, yerr)
 
-    fitstr = 'y=({:.4f} $\pm$ {:.4f})*x + ({:.4f} $\pm$ {:.4f}); R²={:.3f}'.format(
+    fitstr = 'y=({:.4g} $\pm$ {:.4g})*x + ({:.4g} $\pm$ {:.4g}); R²={:.3f}'.format(
         fit[0], np.sqrt(cov[0][0]), fit[1], np.sqrt(cov[1][1]), R ** 2
     )
     label = label.format(fit=fitstr)
