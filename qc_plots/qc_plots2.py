@@ -817,6 +817,8 @@ class AbstractPlot(ABC):
 
         for line in self._extra_qc_lines:
             line_style = deepcopy(line)
+            # Make sure to plot on top of any data plotted after
+            line_style.setdefault('zorder', 10)
             try:
                 value = line_style.pop('value')
             except KeyError:
@@ -2375,8 +2377,9 @@ class ScatterPlot(AbstractPlot):
                 self.plot_outside_ylimits(axs, args['data'], args['kws'])
                 self.plot_outside_both_limits(axs, args['data'], args['kws'])
 
-        self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
-        self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
+        if idata == 0:
+            self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
+            self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
 
         if self._do_add_fit:
             self._add_linfit(axs, data, flag0_only)
@@ -2568,8 +2571,9 @@ class HexbinPlot(ScatterPlot):
 
         self._add_linfit(axs, data, flag0_only)
 
-        self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
-        self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
+        if idata == 0:
+            self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])
+            self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
         axs.legend(**args['legend_kws'])
 
     def get_plot_args(self, data: TcconData, flag0_only: bool = False):
@@ -2679,7 +2683,8 @@ class TimeseriesPlot(ScatterPlot, TimeseriesMixin):
             for args in plot_args:
                 self.plot_outside_ylimits(axs, args['data'], args['kws'], limit_by_x=False)
 
-        self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
+        if idata == 0:
+            self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
 
         # legend kws are always in the first set of plot argument
         axs.legend(**plot_args[0]['legend_kws'])
@@ -2931,8 +2936,9 @@ class Timeseries2PanelPlot(TimeseriesPlot):
                 self.plot_outside_ylimits(axs['main'], args['data'], args['kws'], limit_by_x=False)
                 self.plot_outside_ylimits(axs['error'], {'x': args['data']['x'], 'y': args['data']['yerr']}, args['kws'], limit_by_x=False)
 
-        self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
-        self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
+        if idata == 0:
+            self.add_qc_lines(axs['main'], 'y', data.nc_dset[self.yvar])
+            self.add_qc_lines(axs['error'], 'y', data.nc_dset[self.yerror_var])
 
         # Legend keywords are always in the first set of plot args
         axs['main'].legend(**plot_args[0]['legend_kws'])
