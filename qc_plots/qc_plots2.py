@@ -1528,10 +1528,14 @@ class NanCheckPlot(AbstractPlot):
             # min_nans = df_nans['num_nans'].min()
             max_nans = df_nans['num_nans'].max()
             space = 0.05 * max(1, max_nans)
-            cmap = utils.ColorMapper(1, max_nans, color_map)
+            # this will lose the bottom color if not doing percentages (because we'll always have at least 1
+            # NaN to call the colormapper) but if this is 1 we get an error for percentages < 1
+            cmap = utils.ColorMapper(0, max_nans, color_map)
 
             for n, windows in df_nans.groupby('num_nans'):
-                color = zero_color if n == 0 else cmap(n)
+                # must be an isclose check, because percentages are floats that
+                # may fail
+                color = zero_color if np.isclose(n, 0) else cmap(n)
                 if n == 0:
                     ax.bar(centers[windows.index], 0.01 * np.ones(windows.shape[0]), color=color, width=wb)
                 else:
