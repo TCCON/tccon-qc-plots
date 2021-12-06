@@ -193,3 +193,10 @@ class ColorMapper(mpl.cm.ScalarMappable):
         :rtype: :class:`ColorMapper`
         """
         return cls(vmin=np.nanmin(data), vmax=np.nanmax(data), **kwargs)
+
+
+def fill_if_masked(arr):
+    if isinstance(arr, np.ma.core.MaskedArray):
+        return arr.filled(np.nan)
+    else:
+        return arr

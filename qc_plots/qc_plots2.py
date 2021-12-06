@@ -2393,10 +2393,16 @@ class ScatterPlot(AbstractPlot):
         ylims = ax.get_ylim()
         markers = ['<', '>']
 
-        under = (data['x'] < xlims[0])
-        over = (data['x'] > xlims[1])
+        # There is a weird edge case that if one of the logical comparisons has a True
+        # value which is masked, the sum will ignore the masked elements and the indexing
+        # will not, so our x and y vectors below will have different lengths
+        xvals = utils.fill_if_masked(data['x'])
+        yvals = utils.fill_if_masked(data['y'])
+        
+        under = (xvals < xlims[0])
+        over = (xvals > xlims[1])
         if limit_by_y:
-            inside_y = (data['y'] >= ylims[0]) & (data['y'] <= ylims[1])
+            inside_y = (yvals >= ylims[0]) & (yvals <= ylims[1])
             under &= inside_y
             over &= inside_y
         subsets = [under, over]
@@ -2407,7 +2413,7 @@ class ScatterPlot(AbstractPlot):
 
             this_style = cls._set_outside_style(kws, mkr)
             xarr = np.full(np.sum(idx), x)
-            ax.plot(xarr, data['y'][idx], clip_on=False, **this_style)
+            ax.plot(xarr, yvals[idx], clip_on=False, **this_style)
 
     @classmethod
     def plot_outside_ylimits(cls, ax, data, kws, limit_by_x=True):
@@ -2415,10 +2421,16 @@ class ScatterPlot(AbstractPlot):
         ylims = ax.get_ylim()
         markers = ['v', '^']
 
-        under = (data['y'] < ylims[0])
-        over = (data['y'] > ylims[1])
+        # There is a weird edge case that if one of the logical comparisons has a True
+        # value which is masked, the sum will ignore the masked elements and the indexing
+        # will not, so our x and y vectors below will have different lengths
+        xvals = utils.fill_if_masked(data['x'])
+        yvals = utils.fill_if_masked(data['y'])
+        
+        under = (yvals < ylims[0])
+        over = (yvals > ylims[1])
         if limit_by_x:
-            inside_x = (data['x'] >= xlims[0]) & (data['x'] <= xlims[1])
+            inside_x = (xvals >= xlims[0]) & (xvals <= xlims[1])
             under &= inside_x
             over &= inside_x
         
@@ -2430,7 +2442,7 @@ class ScatterPlot(AbstractPlot):
 
             this_style = cls._set_outside_style(kws, mkr)
             yarr = np.full(np.sum(idx), y)
-            ax.plot(data['x'][idx], yarr, clip_on=False, **this_style)
+            ax.plot(xvals[idx], yarr, clip_on=False, **this_style)
 
     @classmethod
     def plot_outside_both_limits(cls, ax, data, kws):
@@ -2438,10 +2450,16 @@ class ScatterPlot(AbstractPlot):
         ylims = ax.get_ylim()
         markers = ['X', 'X', 'X', 'X']
 
-        under_x = data['x'] < xlims[0]
-        over_x = data['x'] > xlims[1]
-        under_y = data['y'] < ylims[0]
-        over_y = data['y'] > ylims[1]
+        # There is a weird edge case that if one of the logical comparisons has a True
+        # value which is masked, the sum will ignore the masked elements and the indexing
+        # will not, so our x and y vectors below will have different lengths
+        xvals = utils.fill_if_masked(data['x'])
+        yvals = utils.fill_if_masked(data['y'])
+
+        under_x = xvals < xlims[0]
+        over_x = xvals > xlims[1]
+        under_y = yvals < ylims[0]
+        over_y = yvals > ylims[1]
         subsets = [under_x & under_y,
                    under_x & over_y,
                    over_x & under_y,
