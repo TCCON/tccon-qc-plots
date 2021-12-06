@@ -1,6 +1,7 @@
 import froll
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
 
@@ -37,6 +38,14 @@ def preformat_string(s, **frozen_kwargs):
             return super().format(*args, *args, **all_kws)
 
     return PreformattedString(s)
+
+
+def pandas_time_minmax(op, *times):
+    times = [t for t in times if not pd.isna(t)]
+    if len(times) == 0:
+        return pd.NaT
+    else:
+        return op(times)
 
 
 def _lin_model(x, a, b):

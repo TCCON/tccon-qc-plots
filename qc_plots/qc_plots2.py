@@ -1761,8 +1761,8 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         df_am, df_pm = self._resample_data(df)
         if df_am.shape[0] == 0 and df_pm.shape[0] == 0:
             raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}]')
-        xmin = min(df_am.index.min(), df_pm.index.min()) - pd.Timedelta(days=self._time_buffer_days)
-        xmax = max(df_am.index.max(), df_pm.index.max()) + pd.Timedelta(days=self._time_buffer_days)
+        xmin = utils.pandas_time_minmax(min, df_am.index.min(), df_pm.index.min()) - pd.Timedelta(days=self._time_buffer_days)
+        xmax = utils.pandas_time_minmax(max, df_am.index.max(), df_pm.index.max()) + pd.Timedelta(days=self._time_buffer_days)
         axs.set_xlim(xmin, xmax)
 
         # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
