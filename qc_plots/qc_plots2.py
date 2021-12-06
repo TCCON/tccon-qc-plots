@@ -1953,8 +1953,8 @@ class TimingErrorAMvsPMDelta(TimingErrorAMvsPM):
 
         _df_am, _df_pm = self._resample_data(df)
         df = _df_pm - _df_am
-        if df.shape[0] == 0:
-            raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}]')
+        if df.shape[0] == 0 or df['y'].isna().all():
+            raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}] for the morning, afternoon, or both')
         xmin = df.index.min() - pd.Timedelta(days=self._time_buffer_days)
         xmax = df.index.max() + pd.Timedelta(days=self._time_buffer_days)
         axs.set_xlim(xmin, xmax)
