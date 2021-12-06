@@ -22,6 +22,7 @@ import warnings
 import tomli
 
 from . import utils
+from .utils import SkipPlotError
 from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
 
@@ -173,6 +174,14 @@ class TcconData:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.nc_dset.close()
+
+    @property
+    def full_file_name(self):
+        return self.nc_dset.filepath()
+
+    @property
+    def base_file_name(self):
+        return Path(self.full_file_name).name
 
     def has_flag_category(self, flag_category: FlagCategory) -> bool:
         """Check whether this instance can provide data in a certain flag category.
@@ -1750,6 +1759,8 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
         afternoon_kws = plot_args['kws']['pm']
 
         df_am, df_pm = self._resample_data(df)
+        if df_am.shape[0] == 0 and df_pm.shape[0] == 0:
+            raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}]')
         xmin = min(df_am.index.min(), df_pm.index.min()) - pd.Timedelta(days=self._time_buffer_days)
         xmax = max(df_am.index.max(), df_pm.index.max()) + pd.Timedelta(days=self._time_buffer_days)
         axs.set_xlim(xmin, xmax)
@@ -1942,6 +1953,8 @@ class TimingErrorAMvsPMDelta(TimingErrorAMvsPM):
 
         _df_am, _df_pm = self._resample_data(df)
         df = _df_pm - _df_am
+        if df.shape[0] == 0:
+            raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}]')
         xmin = df.index.min() - pd.Timedelta(days=self._time_buffer_days)
         xmax = df.index.max() + pd.Timedelta(days=self._time_buffer_days)
         axs.set_xlim(xmin, xmax)
@@ -2127,6 +2140,10 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
         dfs = self._resample_data(plot_args['data'])
         kws = plot_args['kws']
+
+        if all(df.shape[0] == 0 for df in dfs):
+            sza_rng_strs = ', '.join(f'[{r[0]}, {r[1]}]' for r in self.sza_ranges)
+            raise SkipPlotError(f'{data.base_file_name} has no data in any of the SZA ranges {sza_rng_strs}')
 
         xmin = min(df.index.min() for df in dfs) - pd.Timedelta(days=self._time_buffer_days)
         xmax = max(df.index.max() for df in dfs) + pd.Timedelta(days=self._time_buffer_days)

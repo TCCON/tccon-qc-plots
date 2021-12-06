@@ -14,6 +14,7 @@ import tomli
 from urllib.parse import urljoin
 
 from . import qc_plots2, qc_email
+from .utils import SkipPlotError
 from .constants import DEFAULT_CONFIG, DEFAULT_IMG_DIR, DEFAULT_LIMITS
 
 
@@ -290,16 +291,18 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
 
         fig_paths = []
         n = len(plots)
+        completed_plots = []
         for i, plot in enumerate(plots, start=1):
             sys.stdout.write(f'  - Plot {i}/{n}: {plot.get_save_name()}')
             sys.stdout.flush()
             try:
                 this_path = plot.make_plot(data, extra_data=extra_data, flag0_only=flag0, show_all=show_all, img_path=img_dir)
-            except IndexError as err:
+            except (IndexError, SkipPlotError) as err:
                 print(f' SKIPPED ({err})')
             else:
                 print(' DONE')
                 fig_paths.append(this_path)
+                completed_plots.append(plot)
 
         # ------------------------- #
         # Combine plots into PDF(s) #
@@ -308,12 +311,12 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
         flag0_ext = '{}.flag0.pdf'.format(suffix)
         pdf_name = Path(nc_in).with_suffix(reg_ext if not flag0 else flag0_ext).name
         pdf_path = Path(output_dir) / pdf_name
-        images_to_pdf(fig_paths, plots, pdf_path, Path(nc_in), size=size, quality=quality, cfg=config)
+        images_to_pdf(fig_paths, completed_plots, pdf_path, Path(nc_in), size=size, quality=quality, cfg=config)
         
         if attachment_quality != quality or attachment_size != size:
             email_pdf_path = Path(stack.enter_context(tempfile.TemporaryDirectory()))
             email_pdf_path = email_pdf_path / pdf_name
-            images_to_pdf(fig_paths, plots, email_pdf_path, Path(nc_in), size=attachment_size, quality=attachment_quality, cfg=config)
+            images_to_pdf(fig_paths, completed_plots, email_pdf_path, Path(nc_in), size=attachment_size, quality=attachment_quality, cfg=config)
         else:
             email_pdf_path = pdf_path
 

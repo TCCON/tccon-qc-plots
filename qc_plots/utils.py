@@ -7,6 +7,9 @@ from scipy.stats import pearsonr
 from .constants import _FREQ_FULL_NAMES
 
 
+class SkipPlotError(Exception):
+    pass
+
 def cm2inch(*tupl):
     """
     Converts reasonable units (cm) into terrible units (inches).
