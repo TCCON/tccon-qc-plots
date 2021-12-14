@@ -1356,8 +1356,10 @@ class FlagAnalysisPlot(AbstractPlot):
         flag_df_pcnt['Total'] = 100 * nflag_tot / nspec
 
         # For the plot data, we only want to show flags that remove a significant percentage of
-        # data. The exact percentage is configurable.
-        drop_list = [var for var in flag_df_pcnt if flag_df_pcnt[var][0] < self.min_percent]
+        # data. The exact percentage is configurable. However, always keep the total. This both
+        # avoids a crash when trying to plot an empty dataframe and ensures we know if a suspiciously
+        # low number of spectra were flagged.
+        drop_list = [var for var in flag_df_pcnt if flag_df_pcnt[var][0] < self.min_percent and var != 'Total']
         flag_df = flag_df.drop(columns=drop_list)
         flag_df_pcnt = flag_df_pcnt.drop(columns=drop_list)
 
