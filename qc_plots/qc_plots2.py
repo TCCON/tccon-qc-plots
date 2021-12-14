@@ -2147,8 +2147,8 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
             sza_rng_strs = ', '.join(f'[{r[0]}, {r[1]}]' for r in self.sza_ranges)
             raise SkipPlotError(f'{data.base_file_name} has no data in any of the SZA ranges {sza_rng_strs}')
 
-        xmin = min(df.index.min() for df in dfs) - pd.Timedelta(days=self._time_buffer_days)
-        xmax = max(df.index.max() for df in dfs) + pd.Timedelta(days=self._time_buffer_days)
+        xmin = utils.pandas_time_minmax(min, *[df.index.min() for df in dfs]) - pd.Timedelta(days=self._time_buffer_days)
+        xmax = utils.pandas_time_minmax(max, *[df.index.max() for df in dfs]) + pd.Timedelta(days=self._time_buffer_days)
         axs.set_xlim(xmin, xmax)
 
         # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
