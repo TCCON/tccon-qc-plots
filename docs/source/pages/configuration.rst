@@ -821,7 +821,10 @@ level altitude.
 
 * ``annotation_font_size`` (default = ``6``): the font size for the site/GEOS altitude annotation.
 
-The other optional keys are the same as for :ref:`_PT_RollingDeltaTimeseries`.
+The other optional keys are the same as for :ref:`_PT_RollingDeltaTimeseries`. Note that when using the 
+violin auxiliary plot for this, the ``violin_plot_pad`` keyword is given a default value of 1.0 instead
+of 0.5 and the violin plot y-ticks are turned off by default. Both of these changes are to allow space 
+for the estimated pressure difference.
 
 .. _AuxPlots:
 

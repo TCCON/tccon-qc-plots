@@ -3910,9 +3910,6 @@ class TimeseriesRollingDeltaZmin(TimeseriesRollingDeltaPlot):
 
     Parameters
     ----------
-    yvar1, yvar2
-        Variables to take the difference of to plot on the y-axis. Difference
-        will be ``yvar1 - yvar2``.
 
     ops
         A single operation name (e.g. "mean", "median", "std" etc.) or list of names to apply to the rolling
@@ -4040,13 +4037,16 @@ class TimeseriesRollingDeltaZmin(TimeseriesRollingDeltaPlot):
         axs.text(0.01, 0.98, msg, transform=axs.transAxes, color=text_color, backgroundcolor=(0.8,0.8,0.8,0.5), 
                  va='top', fontsize=self._annote_font_size)
 
+        # Needed for the violin plot mixin
+        return ax2
+
 
 class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAuxPlotMixin):
     """Concrete plotting class for time series that plots the difference of two variables with rolling operations.
 
     Configuration plot kind = ``"delta-rolling-timeseries+violin"``
 
-    For parameters not listed here, see :py:class:`AbstractPlot`.
+    For parameters not listed here, see :py:class:`AbstractPlot` or :py:class:`ViolinAuxPlotMixin`.
 
     Parameters
     ----------
@@ -4146,6 +4146,84 @@ class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAux
 
     def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
         return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+
+class TimeseriesRollingDeltaZminWithViolin(TimeseriesRollingDeltaZmin, ViolinAuxPlotMixin):
+    """Concrete plotting class for time series that plots the difference of zmin and zobs with rolling operations.
+
+    Configuration plot kind = ``"zmin-zobs-delta-rolling-timeseries+violin"``. This plot adds two elements to the normal
+    rolling plot:
+
+    1. The estimated differences in pressure will be assigned to ticks on the right hand side
+    2. The usual GEOS-FP IT bottom level and the site GPS altitude will be written in the top
+       left corner. If the latter is below the former, it will be colored red to indicate that
+       GGG must extrapolate.
+
+    For all parameters, see :py:class:`TimeseriesRollingDeltaZmin` or :py:class:`ViolinAuxPlotMixin`.
+
+    """
+    plot_kind = 'zmin-zobs-delta-rolling-timeseries+violin'
+
+    def __init__(self, 
+                 other_plots, 
+                 ops: Union[str, Sequence[str]], 
+                 violin_data_file,
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
+                 gap: str = '20000 days', 
+                 rolling_window: int = 500, 
+                 uncertainty: bool = False, 
+                 flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
+                 annotation_font_size: int = 6,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=1.0,
+                 violin_plot_hide_yticks=True):
+
+        super().__init__(other_plots=other_plots, 
+                         ops=ops, 
+                         default_style=default_style, 
+                         limits=limits, 
+                         key=key, 
+                         name=name, 
+                         bookmark=bookmark, 
+                         width=width, 
+                         height=height, 
+                         legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines,
+                         gap=gap, 
+                         rolling_window=rolling_window, 
+                         uncertainty=uncertainty, 
+                         flag_category=flag_category, 
+                         time_buffer_days=time_buffer_days,
+                         show_out_of_range_data=show_out_of_range_data,
+                         annotation_font_size=annotation_font_size)
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+            aux_plot_pad=violin_plot_pad
+        )
+    
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        ax2 = super()._plot(data, idata, axs=axs, flag0_only=flag0_only)
+        # Twinning a resized axis creates axes at the original size. To fix this, we duplicate
+        # the resize on the twinned axes, then hide the axes created in this process.
+        dummy_ax = self.create_side_plot_axes(ax2)
+        dummy_ax.set_visible(False)
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):
