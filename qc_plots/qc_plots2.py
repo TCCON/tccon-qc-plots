@@ -25,16 +25,39 @@ from . import utils
 from .utils import SkipPlotError
 from .constants import DEFAULT_LIMITS, DEFAULT_IMG_DIR
 
+from typing import Union
+
 
 # TODO:
-#   - [x] Rolling timeseries
-#       + Test that gap splitting works
-#   - Do a 1:1 comparison with the old code
-#   - Test reference file
-#   - Test context file
-#   - Test limits file works
-#       + It did for the o2_7885_vsf_o2 resampled plots
 #   - Test uncertainty and multiple ops for the rolling plots
+class AncillaryData:
+    _default_toml_file = Path(__file__).resolve().parent.parent / 'inputs' / 'site_ancillary_data.toml'
+    def __init__(self, toml_file=_default_toml_file):
+        with open(toml_file) as f:
+            self.data = tomli.load(f)
+
+    def get_site_value(self, site_id: str, data_type: str, level: Union[int, str], variable: str) -> float:
+        """Return a scalar value from the ancillary data for a specific site
+
+        Parameters
+        ----------
+        site_id
+            The two letter site ID
+
+        data_type
+            Where the data came from, e.g. "mod", "vmr", etc.
+
+        level
+            An integer for the 0-based index of a profile variable.
+
+        variable
+            What variable to get, must match the name in the .mod/.vmr/etc. file
+        """
+        if isinstance(level, int):
+            # In the future, we may want to have "surf" data as well, or other non-profile values
+            level = f'level{level}'
+
+        return self.data['site_data'][site_id][f'{data_type}_data'][level][variable]
 
 class FlagCategory(Enum):
     """An enumeration representing different subsets of data
@@ -3870,6 +3893,152 @@ class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
             t = data.get_data('datetime', flag_category)
         
         return {'x': x, 'y': y1 - y2, 't': t}
+
+
+class TimeseriesRollingDeltaZmin(TimeseriesRollingDeltaPlot):
+    """Concrete plotting class for time series that plots the difference of zmin and zobs with rolling operations.
+
+    Configuration plot kind = ``"zmin-zobs-delta-rolling-timeseries"``. This plot adds two elements to the normal
+    rolling plot:
+
+    1. The estimated differences in pressure will be assigned to ticks on the right hand side
+    2. The usual GEOS-FP IT bottom level and the site GPS altitude will be written in the top
+       left corner. If the latter is below the former, it will be colored red to indicate that
+       GGG must extrapolate.
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar1, yvar2
+        Variables to take the difference of to plot on the y-axis. Difference
+        will be ``yvar1 - yvar2``.
+
+    ops
+        A single operation name (e.g. "mean", "median", "std" etc.) or list of names to apply to the rolling
+        window. A list will cause multiple rolling values to be plotted; each can have a different style applied
+        to it. Quantile operations require special note: since computing the quantile on data requires an extra
+        argument to specify *which* quantile, a string like "quantile0.25" is required to give both the operation
+        and quantile value.
+
+    gap
+        a `Pandas Timedelta string <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases>`_
+        specifying the longest time difference between adjacent points that a rolling window can operate over.
+        That is, if this is set to "7 days" and there is a data gap a 14 days, the data before and after that
+        gap will have the rolling operation applied to each separately.
+
+    rolling_window
+        How many spectra to use to calculate the rolling value at each time.
+
+    uncertainty
+        Whether to include uncertainty on median or mean operations. Median values will have the interquartile 
+        range as the uncertainty; mean values will have the 1-sigma standard deviation.
+
+    flag_category
+        What subset of data to use to compute the rolling value. If this is ``None``, then the "default" subset
+        (flag = 0 if available, all data if not) is used.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the 
+        axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
+
+    annotation_font_size
+        Font size for the site/GEOS altitude annotation.
+    """
+
+    plot_kind = 'zmin-zobs-delta-rolling-timeseries'
+
+    def __init__(self, 
+                 other_plots, 
+                 ops: Union[str, Sequence[str]], 
+                 default_style: dict, 
+                 limits: Limits, 
+                 key=None, 
+                 name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, 
+                 width=20, 
+                 height=10, 
+                 legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
+                 gap: str = '20000 days', 
+                 rolling_window: int = 500, 
+                 uncertainty: bool = False, 
+                 flag_category: Optional[FlagCategory] = None, 
+                 time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
+                 annotation_font_size: int = 6):
+
+        super().__init__(other_plots=other_plots, 
+                         yvar1='zmin', 
+                         yvar2='zobs',
+                         ops=ops, 
+                         default_style=default_style, 
+                         limits=limits, 
+                         key=key, 
+                         name=name,
+                         bookmark=bookmark, 
+                         width=width, 
+                         height=height, 
+                         legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines,
+                         gap=gap, 
+                         rolling_window=rolling_window, 
+                         uncertainty=uncertainty, 
+                         flag_category=flag_category, 
+                         time_buffer_days=time_buffer_days,
+                         show_out_of_range_data=show_out_of_range_data)
+        self._annote_font_size = annotation_font_size
+
+    def get_save_name(self):
+        ops = '+'.join(self.ops)
+        return f'{self.yvar}_MINUS_{self.yvar2}_special_rolling{self.rolling_window}_{ops}_timeseries.png'
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        super()._plot(data=data, idata=idata, axs=axs, flag0_only=flag0_only)
+
+        # We want to add approximate delta-pressure to the plot as a reference, so we
+        # need to twin the axes and modify the right ticks. We also need to calculate
+        # the scale height, which is (RT)/(Mg). R = gas constant, M = mean molar mass 
+        # of the atmosphere, g = gravity.
+
+        # Okay to use all data - only approximate temperature needed, and flagging
+        # isn't really related to met variables.
+        temperature = data.get_data('tout', FlagCategory.ALL_DATA).filled(np.nan)
+        temperature = np.nanmean(temperature) + 273.15
+        scale_height = 8.3144 * temperature / (29 * 9.81)  # the conversion g -> kg (in molar mass) and m -> km cancel out
+
+        zlims = np.array(axs.get_ylim())
+        zticks = np.array(axs.get_yticks())
+        plims = 1013.25 * np.exp(-zlims / scale_height) - 1013.25
+        pticks = 1013.25 * np.exp(-zticks / scale_height) - 1013.25
+        ax2 = axs.twinx()
+        ax2.set_ylim(*plims)
+        ax2.set_yticks(pticks)
+        ax2.set_ylabel(r'Estimated $\Delta$ pres. (hPa)')
+
+        # Also annotate the site GPS altitue vs. the lowest level of the GEOS profiles -
+        # if the site is below, then we've had to extrapolate the GEOS variables, and 
+        # zmin is more uncertain than it would be otherwise.
+        anc_data = AncillaryData()
+        site_id = data.base_file_name[:2]
+        bottom_geos_alt = anc_data.get_site_value(site_id, 'mod', 0, 'Height')
+        site_gps_alt = np.nanmedian(data.get_data('zobs', FlagCategory.ALL_DATA).filled(np.nan))
+
+        # Put the legend in a known place so we can put the text elsewhere
+        leg_kws = self.get_legend_kws()
+        leg_kws['loc'] = 'lower left'
+        axs.legend(**leg_kws)
+
+        text_color = 'k' if bottom_geos_alt < site_gps_alt else 'r'
+        msg = f'Bottom GEOS alt = {bottom_geos_alt:.3f} km\nSite alt = {site_gps_alt:.3f} km'
+        axs.text(0.01, 0.98, msg, transform=axs.transAxes, color=text_color, backgroundcolor=(0.8,0.8,0.8,0.5), 
+                 va='top', fontsize=self._annote_font_size)
 
 
 class TimeseriesRollingDeltaWithViolinPlot(TimeseriesRollingDeltaPlot, ViolinAuxPlotMixin):

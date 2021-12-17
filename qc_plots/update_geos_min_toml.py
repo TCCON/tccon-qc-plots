@@ -34,9 +34,12 @@ def get_level_values_for_sites(std_site_root, level=0):
 
 def write_site_data_toml(std_site_root, level=0, toml_file=_DEFAULT_TOML_FILE, variables=('Height',)):
     site_data = get_level_values_for_sites(std_site_root, level=level)
-    output_data = {'mod_data': {f'level{level}': dict()}}
+    level_key = f'level{level}'
+    output_data = {
+        'site_data': {k: {'mod_data': {level_key: dict()}} for k in site_data}
+    }
     for site_id, data in site_data.items():
-        output_data['mod_data'][f'level{level}'][site_id] = {k: data[k] for k in variables}
+        output_data['site_data'][site_id]['mod_data'][level_key] = {k: data[k] for k in variables}
 
     print(f'Writing to {toml_file}')
     with open(toml_file, 'w') as f:

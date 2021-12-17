@@ -730,6 +730,7 @@ If the final style (composed from data-specific + default styles) does not inclu
 the linestyle value is set to "none", as for scatter plots. Avoid using the "ls" shorthand for "linestyle"
 since "linestyle" will always be set if absent.
 
+.. _PT_RollingDeltaTimeseries:
 
 delta-rolling-timeseries
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -805,6 +806,23 @@ rolling window of 500 spectra, this will take spectra 1 through 500 and fit a sl
    The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
    If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers "v", "^", "<", ">", or "D" in your styles. 
    
+zmin-zobs-delta-rolling-timeseries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A :ref:`_PT_RollingDeltaTimeseries` plot customized for the zmin - zobs difference. It includes the estimated corresponding
+pressure difference on the right hand side of the axes as well as an annotation indicating the site altitude and bottom GEOS 
+level altitude.
+
+**Required keys**
+
+* ``ops``: same as for :ref:`_PT_RollingDeltaTimeseries`.
+
+**Optional keys**
+
+* ``annotation_font_size`` (default = ``6``): the font size for the site/GEOS altitude annotation.
+
+The other optional keys are the same as for :ref:`_PT_RollingDeltaTimeseries`.
+
 .. _AuxPlots:
 
 Auxiliary Plots
