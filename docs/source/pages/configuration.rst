@@ -636,6 +636,40 @@ Style configuration is identical to that for :ref:`scatter plots <PT_scatter>`. 
 the same data subset.
 
 
+.. _PT_ts3panel:
+
+timeseries-3panel
+~~~~~~~~~~~~~~~~~
+
+A plot of one variable vs. time with the y-axis split into three panels to allow different degrees of zoom on different
+parts of the y-values' ranges. The middle panel will have its y-limits set to those specified in the :ref:`Limits`_
+file or the min/max values indicated in the netCDF file. The lower and upper panels will show data outside these limits
+(less and greater than, respectively) out to either the maximum of the data or limits specified with the ``bottom_limit``
+and ``top_limit`` keywords.
+
+**Required keys**
+
+* ``yvar``: the variable from the netCDF file(s) to plot
+
+**Optional keys**
+
+* ``time_buffer_days`` (default = ``2``): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.
+* ``show_out_of_range_data`` (default = ``true``): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+  default behavior is to plot them; set this to ``false`` to turn that feature off. For this kind of plot, data that exceeds
+  the ``top_limit`` will be plotted on the top edge of the upper panel, and data that is less than the ``bottom_limit``
+  will be plotted on the bottom edge of the lower panel. (If those keywords are not set, this should be moot, as the limits
+  will adjust to include all data.)
+* ``plot_height_ratios`` - a three number sequence giving the relative size of the top, middle, and bottom panels, respectively.
+* ``bottom_limit`` - providing a value for this keyword sets the lower limit of the bottom panel to that value.
+* ``top_limit`` - providing a value for this keyword sets the upper limit of the top panel to that value.
+* ``even_top_bottom`` - set this to ``true`` to automatically set ``bottom_limit`` and ``top_limit`` to be equal in
+  magnitude but opposite in sign.
+
+.. note::
+   ``even_top_bottom`` cannot be set to ``true`` if either ``bottom_limit`` or ``top_limit`` are provided. Doing so will
+   cause an error to be thrown.
+
+
 resampled-timeseries
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -729,6 +763,20 @@ ranges for mean and median operations, respectively.
 If the final style (composed from data-specific + default styles) does not include a linestyle, then
 the linestyle value is set to "none", as for scatter plots. Avoid using the "ls" shorthand for "linestyle"
 since "linestyle" will always be set if absent.
+
+rolling-timeseries-3panel
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A combination of the :ref:`three panel timeseries plot <PT_ts3panel>`_ and the :ref:`rolling timeseries plot <PT_RollingTimeseries>`_.
+This plots rolling means, medians, etc. in the three panel format of :ref:`PT_ts3panel`_.
+
+**Required keys**
+
+Required keys are the same as :ref:`PT_RollingTimeseries`_.
+
+**Optional keys**
+
+All keys accepted by :ref:`PT_RollingTimeseries`_ and :ref:`PT_ts3panel`_ are accepted by this plot.
 
 .. _PT_RollingDeltaTimeseries:
 

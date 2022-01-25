@@ -2799,6 +2799,53 @@ class TimeseriesPlusViolinPlot(TimeseriesPlot, ViolinAuxPlotMixin):
 
 
 class Timeseries3PanelPlot(TimeseriesPlot):
+    """Concrete plotting class for a timeseries of data with 3 panels (data in, below, and above limits)
+
+    This plot is good for showing data where there is a fairly narrow range where data is useful, but potentially
+    a large dynamic range. The middle panel shows the range of data defined by the ``limits`` input (which usually
+    will return either the limits for that plot type set in the limits config file or the min/max values listed
+    in the netCDF file). The bottom panel shows value from the lower limit of the middle panel down to the minimum
+    data value or the limit set by ``bottom_limit``. The top panel is similar, it covers from the upper limit of the
+    middle panel to the data maximum or ``top_limit``.
+
+    Configuration plot kind = ``"timeseries-3panel"``
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    yvar
+        Variable to plot on the y-axis.
+
+    time_buffer_days
+        Number of days before the first and after the last time to push the
+        axis limits out to make the plot nicer to read.
+
+    show_out_of_range_data
+        Whether or not to include data points that would fall outside the plot limits on the edge of the
+        plot, using triangle markers to indicate which direction outside the plot limits the point is.
+        Only points outside the y-limits will be shown when this is ``True``, as we assume that points outside
+        the x-axis (time) are intentionally hidden.
+
+        For this 3-panel plot, points above the upper limit of the top plot and below the lower limit of the bottom
+        plot are shown this way.
+
+    plot_height_ratios
+        What fraction of the plottable area each of the three panels uses. This must be a three element sequence;
+        the values correspond to the top, middle, and bottom panels, respectively.
+
+    bottom_limit
+        The lower limit of the bottom panel. If not specified, it will be left to the plotting code to determine, which
+        will do its best to include all data that should be plotted in the bottom panel.
+
+    top_limit
+        As ``bottom_limit``, but the upper limit of the top panel.
+
+    even_top_bottom
+        Set this to ``True`` to automatically make ``bottom_limit`` and ``top_limit`` equal in magnitude but opposite
+        in sign. Intended for plots centered on 0. This cannot be used if either ``bottom_limit`` or ``top_limit`` are
+        given. Doing so will raise a :py:class:`ValueError`
+    """
     plot_kind = 'timeseries-3panel'
 
     def __init__(self, other_plots, yvar: str, default_style: dict, limits: Limits, name: Optional[str] = None,
@@ -2818,6 +2865,9 @@ class Timeseries3PanelPlot(TimeseriesPlot):
         self.top_limit = top_limit
         self.even_top_bottom = even_top_bottom
         self.ax_limits = None
+
+    def get_save_name(self):
+        return f'{self.yvar}_timeseries_3panel.png'
 
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
         main_data = self._get_main_data(data)
@@ -2892,6 +2942,68 @@ class Timeseries3PanelPlot(TimeseriesPlot):
 
         # legend kws are always in the first set of plot argument
         axs['above'].legend(**plot_args[0]['legend_kws'])
+        if self.even_top_bottom:
+            axs['above'].set_yticks(axs['above'].get_ylim())
+            axs['below'].set_yticks(axs['below'].get_ylim())
+
+
+class Timeseries3PanelPlotWithViolin(Timeseries3PanelPlot, ViolinAuxPlotMixin):
+    """Concrete plotting class for a three-panel plot (extrema and main data), with violin plots to the side
+
+    Configuration plot kind = ``"timeseries-3panel+violin"``
+
+    For all parameters, see :py:class:`AbstractPlot`, :py:class:`Timeseries3PanelPlot`, or :py:class:`ViolinAuxPlotMixin`.
+    """
+
+    plot_kind = 'timeseries-3panel+violin'
+
+    def __init__(self, other_plots, yvar: str, violin_data_file: str, default_style: dict, limits: Limits,
+                 name: Optional[str] = None, bookmark: Optional[Union[str, bool]] = None, width=20, height=10,
+                 legend_kws: Optional[dict] = None,
+                 key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None,
+                 show_out_of_range_data: bool = True, plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
+                 bottom_limit=None, top_limit=None, even_top_bottom=False,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines, show_out_of_range_data=show_out_of_range_data,
+                         time_buffer_days=time_buffer_days, plot_height_ratios=plot_height_ratios,
+                         bottom_limit=bottom_limit, top_limit=top_limit, even_top_bottom=even_top_bottom)
+
+        self.init_violins(data_file=violin_data_file,
+                          aux_plot_side=violin_plot_side,
+                          aux_plot_size=violin_plot_size,
+                          aux_plot_hide_yticks=violin_plot_hide_yticks,
+                          aux_plot_pad=violin_plot_pad)
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
+                  img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+
+        fig, axs = self.setup_figure_with_violins(data, show_all=show_all)
+        for i, d in enumerate(data):
+            self._plot(d, i, axs=axs['main'], flag0_only=flag0_only)
+
+        for v_key, v_ax in axs['violin'].items():
+            # The shared y-limits should automatically make the violin plots focus on the right part
+            self.plot_violins(extra_data, 'y', v_ax)
+            if v_key != 'main':
+                # Hide the labels on the top and bottom panels, otherwise they overlap
+                v_ax.set_ylabel('')
+
+        fig_path = img_path / self.get_save_name_with_violins()
+        if tight:
+            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
+            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fig.tight_layout()
+        fig.savefig(fig_path, dpi=300)
+        plt.close(fig)
+        return fig_path
 
 
 class TimeseriesDeltaPlot(TimeseriesPlot):
@@ -3188,7 +3300,6 @@ class Timeseries2PanelPlotWithViolins(Timeseries2PanelPlot, ViolinAuxPlotMixin):
         for i, d in enumerate(data):
             self._plot(d, i, axs=axs['main'], flag0_only=flag0_only)
 
-        
         self.plot_violins(extra_data, 'y', axs['violin']['main'])
         self.plot_violins(extra_data, 'yerr', axs['violin']['error'])
         if axs['violin']['main'].get_ylabel() != axs['violin']['error'].get_ylabel():
@@ -3729,7 +3840,6 @@ class RollingTimeseriesPlot(TimeseriesPlot):
             t = data.get_data('datetime', flag_category)
         return {'x': x, 'y': y, 't': t}
 
-
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory], op=None, _format_label: bool = True) -> dict:
         # Get the default style: style dictionaries are organized plot_kind -> flag category,
         # Allow both to be missing, and just provide an empty dictionary as the default
@@ -3873,7 +3983,149 @@ class RollingTimeseriesPlotWithViolin(RollingTimeseriesPlot, ViolinAuxPlotMixin)
 
     def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
         return self.make_plot_with_violins(data, extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
-        
+
+
+class RollingTimeseries3PanelPlot(RollingTimeseriesPlot):
+    """Concrete plotting class for a rolling timeseries of data with 3 panels (data in, below, and above limits)
+
+    Like :py:class:`Timeseries3PanelPlot` except it performs rolling operations (mean, medians, etc) and plots the
+    rolling op result on top of flag == 0 data.
+
+    Configuration plot kind = ``"rolling-timeseries-3panel"``
+
+    For all parameters not listed here, see :py:class:`AbstractPlot`, :py:class:`RollingTimeseriesPlot`,
+    or :py:class:`Timeseries3PanelPlot`.
+    """
+    plot_kind = 'rolling-timeseries-3panel'
+
+    def __init__(self,
+                 other_plots,
+                 yvar: str,
+                 ops: Union[str, Sequence[str]],
+                 default_style: dict,
+                 limits: Limits,
+                 key=None,
+                 name: Optional[str] = None,
+                 bookmark: Optional[Union[str, bool]] = None,
+                 width=20,
+                 height=10,
+                 legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
+                 gap: str = '20000 days',
+                 rolling_window: int = 500,
+                 uncertainty: bool = False,
+                 flag_category: Optional[FlagCategory] = None,
+                 time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
+                 plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
+                 bottom_limit=None,
+                 top_limit=None,
+                 even_top_bottom=False):
+
+        super().__init__(other_plots=other_plots, yvar=yvar, ops=ops, default_style=default_style, limits=limits,
+                         key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines, gap=gap, rolling_window=rolling_window, uncertainty=uncertainty,
+                         flag_category=flag_category, time_buffer_days=time_buffer_days,
+                         show_out_of_range_data=show_out_of_range_data)
+
+        self.plot_height_ratios = plot_height_ratios
+        if even_top_bottom and (bottom_limit is not None or top_limit is not None):
+            raise ValueError('even_top_bottom and bottom_limit/top_limit are mutually exclusive. You may give '
+                             'top/bottom limits or set even_top_bottom to True, but not both.')
+        self.bottom_limit = bottom_limit
+        self.top_limit = top_limit
+        self.even_top_bottom = even_top_bottom
+        self.ax_limits = None
+
+    def get_save_name(self):
+        ops = '+'.join(self.ops)
+        return f'{self.yvar}_rolling{self.rolling_window}_{ops}_timeseries_3panel.png'
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        return Timeseries3PanelPlot.setup_figure(self, data=data, show_all=show_all, fig=fig, axs=axs)
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        return Timeseries3PanelPlot._plot(self, data=data, idata=idata, axs=axs, flag0_only=flag0_only)
+
+
+class RollingTimeseries3PanelPlotWithViolin(RollingTimeseries3PanelPlot, ViolinAuxPlotMixin):
+    """Concrete plotting class for a rolling timeseries of data with 3 panels (data in, below, and above limits)
+
+    Like :py:class:`RollingTimeseries3PanelPlot` except with violin plots to the side of each panel.
+
+    Configuration plot kind = ``"rolling-timeseries-3panel+violin"``
+
+    For all parameters not listed here, see :py:class:`AbstractPlot`, :py:class:`RollingTimeseriesPlot`,
+    :py:class:`Timeseries3PanelPlot`, or :py:class:`ViolinAuxPlotMixin`.
+    """
+    plot_kind = 'rolling-timeseries-3panel+violin'
+
+    def __init__(self,
+                 other_plots,
+                 yvar: str,
+                 ops: Union[str, Sequence[str]],
+                 violin_data_file,
+                 default_style: dict,
+                 limits: Limits,
+                 key=None,
+                 name: Optional[str] = None,
+                 bookmark: Optional[Union[str, bool]] = None,
+                 width=20,
+                 height=10,
+                 legend_kws: Optional[dict] = None,
+                 extra_qc_lines: Optional[Sequence[dict]] = None,
+                 gap: str = '20000 days',
+                 rolling_window: int = 500,
+                 uncertainty: bool = False,
+                 flag_category: Optional[FlagCategory] = None,
+                 time_buffer_days: int = 2,
+                 show_out_of_range_data: bool = True,
+                 plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
+                 bottom_limit=None,
+                 top_limit=None,
+                 even_top_bottom=False,
+                 violin_plot_side='right',
+                 violin_plot_size='10%',
+                 violin_plot_pad=0.5,
+                 violin_plot_hide_yticks=False):
+        super().__init__(
+            other_plots=other_plots,
+            yvar=yvar,
+            ops=ops,
+            default_style=default_style,
+            limits=limits,
+            key=key,
+            name=name,
+            bookmark=bookmark,
+            width=width,
+            height=height,
+            legend_kws=legend_kws,
+            extra_qc_lines=extra_qc_lines,
+            gap=gap,
+            rolling_window=rolling_window,
+            uncertainty=uncertainty,
+            flag_category=flag_category,
+            time_buffer_days=time_buffer_days,
+            show_out_of_range_data=show_out_of_range_data,
+            plot_height_ratios=plot_height_ratios,
+            bottom_limit=bottom_limit,
+            top_limit=top_limit,
+            even_top_bottom=even_top_bottom
+        )
+
+        self.init_violins(
+            data_file=violin_data_file,
+            aux_plot_side=violin_plot_side,
+            aux_plot_size=violin_plot_size,
+            aux_plot_hide_yticks=violin_plot_hide_yticks,
+            aux_plot_pad=violin_plot_pad
+        )
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
+                  img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+
+        return Timeseries3PanelPlotWithViolin.make_plot(self, data=data, extra_data=extra_data, flag0_only=flag0_only,
+                                                        show_all=show_all, img_path=img_path, tight=tight)
 
 
 class TimeseriesRollingDeltaPlot(RollingTimeseriesPlot):
