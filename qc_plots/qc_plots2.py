@@ -860,7 +860,6 @@ class AbstractPlot(ABC):
             axline_fxn = ax.axvline if this_axis == 'x' else ax.axhline
             axline_fxn(value, **line_style)
 
-
     @staticmethod
     def _get_data_for_limits(data: Sequence[TcconData]) -> Sequence[TcconData]:
         """Get the subset of data instances to use when determining limits"""
@@ -2462,7 +2461,7 @@ class ScatterPlot(AbstractPlot):
             ax.plot(xarr, yvals[idx], clip_on=False, **this_style)
 
     @classmethod
-    def plot_outside_ylimits(cls, ax, data, kws, limit_by_x=True):
+    def plot_outside_ylimits(cls, ax, data, kws, limit_by_x=True, side='both'):
         xlims = ax.get_xlim()
         ylims = ax.get_ylim()
         markers = ['v', '^']
@@ -2479,10 +2478,20 @@ class ScatterPlot(AbstractPlot):
             inside_x = (xvals >= xlims[0]) & (xvals <= xlims[1])
             under &= inside_x
             over &= inside_x
-        
-        subsets = [under, over]
 
-        for y, idx, mkr in zip(ylims, subsets, markers):
+        under = (ylims[0], under, markers[0])
+        over = (ylims[1], over, markers[1])
+
+        if side == 'both':
+            subsets = [under, over]
+        elif side == 'bottom':
+            subsets = [under]
+        elif side == 'top':
+            subsets = [over]
+        else:
+            raise ValueError(f'Unknown value for `side`: "{side}"')
+
+        for y, idx, mkr in subsets:
             if np.sum(idx) == 0:
                 continue
 
@@ -2788,6 +2797,101 @@ class TimeseriesPlusViolinPlot(TimeseriesPlot, ViolinAuxPlotMixin):
     def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
         return self.make_plot_with_violins(data=data, extra_data=extra_data, flag0_only=flag0_only, show_all=show_all, img_path=img_path, tight=tight)
 
+
+class Timeseries3PanelPlot(TimeseriesPlot):
+    plot_kind = 'timeseries-3panel'
+
+    def __init__(self, other_plots, yvar: str, default_style: dict, limits: Limits, name: Optional[str] = None,
+                 bookmark: Optional[Union[str, bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None,
+                 key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None,
+                 show_out_of_range_data: bool = True, plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
+                 bottom_limit=None, top_limit=None, even_top_bottom=False):
+        super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
+                         key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines, show_out_of_range_data=show_out_of_range_data,
+                         time_buffer_days=time_buffer_days)
+        self.plot_height_ratios = plot_height_ratios
+        if even_top_bottom and (bottom_limit is not None or top_limit is not None):
+            raise ValueError('even_top_bottom and bottom_limit/top_limit are mutually exclusive. You may give '
+                             'top/bottom limits or set even_top_bottom to True, but not both.')
+        self.bottom_limit = bottom_limit
+        self.top_limit = top_limit
+        self.even_top_bottom = even_top_bottom
+        self.ax_limits = None
+
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        main_data = self._get_main_data(data)
+
+        size = utils.cm2inch(self._width, self._height)
+        fig, axs = plt.subplots(3, 1, figsize=size, sharex='all', gridspec_kw={'height_ratios': self.plot_height_ratios})
+        axs = {'main': axs[1], 'above': axs[0], 'below': axs[2]}
+        for ax in axs.values():
+            ax.grid(True)
+            axs['main'].set_ylabel(self.get_label_string(main_data, self.yvar))
+
+        axs['below'].set_xlabel(self.get_label_string(main_data, self.xvar))
+
+        # Reference data should not affect the limits. For this plot type, we *always* use the plot limits for the
+        # main axes, and for the other two axes either ensure that all data is plotted or use the fixed limits.
+        data_for_limits = self._get_data_for_limits(data)
+        ymin, ymax, yscale = self._limits.get_limit(self.yvar, data_for_limits, self.plot_kind)
+
+        axs['main'].set_ylim(ymin, ymax, auto=False)
+        self.ax_limits = {'below': (None, ymin), 'main': (ymin, ymax), 'above': (ymax, None)}
+
+        # For whatever reason, all axes need their format set for the ticks to behave properly
+        for ax in axs.values():
+            self.format_time_axis(ax, self._get_data_for_limits(data), xvar=self.xvar,
+                                  buffer_days=self._time_buffer_days, show_all=show_all)
+
+        # Remove the x-axis label from the top  and middle axes
+        axs['above'].set_xlabel('')
+        axs['main'].set_xlabel('')
+
+        fig.suptitle(f'{self.yvar} time series')
+        return fig, axs
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        if self.ax_limits is None:
+            raise RuntimeError('Called _plot before setting ax_limits.')
+
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        for plot_key, plot_ax in axs.items():
+            min_lim, max_lim = self.ax_limits[plot_key]
+            for args in plot_args:
+                args['kws'].pop('fit_style', None)
+                xx_plot = np.ones(args['data']['y'].shape, dtype=np.bool_)
+                if min_lim is not None:
+                    xx_plot &= args['data']['y'] >= min_lim
+                if max_lim is not None:
+                    xx_plot &= args['data']['y'] <= max_lim
+                plot_ax.plot(args['data']['x'][xx_plot], args['data']['y'][xx_plot], **args['kws'])
+
+            # We need to reset the axis limits here because only main was set previously
+            plot_ax.set_ylim(min_lim, max_lim)
+
+            # Assume at this point that the y-limits have been fixed
+            # Do not limit to values in the x-direction as this can cause issues
+            # when the x-data are timestamps and the x-limits are datenums.
+            #
+            # We don't show out of range data on the main axes because anything out
+            # of its ranges should be on one of the other plots.
+            if self._show_out_of_range_data and plot_key != 'main':
+                if plot_key == 'below':
+                    side = 'bottom'
+                elif plot_key == 'above':
+                    side = 'top'
+                else:
+                    raise NotImplementedError(f'Do not have specified which side to plot out-of-bounds data on for {plot_key} axes')
+
+                for args in plot_args:
+                    self.plot_outside_ylimits(plot_ax, args['data'], args['kws'], limit_by_x=False, side=side)
+
+            if idata == 0:
+                self.add_qc_lines(plot_ax, 'y', data.nc_dset[self.yvar])
+
+        # legend kws are always in the first set of plot argument
+        axs['above'].legend(**plot_args[0]['legend_kws'])
 
 
 class TimeseriesDeltaPlot(TimeseriesPlot):
