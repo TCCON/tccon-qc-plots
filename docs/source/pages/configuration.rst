@@ -659,10 +659,11 @@ and ``top_limit`` keywords.
   the ``top_limit`` will be plotted on the top edge of the upper panel, and data that is less than the ``bottom_limit``
   will be plotted on the bottom edge of the lower panel. (If those keywords are not set, this should be moot, as the limits
   will adjust to include all data.)
-* ``plot_height_ratios`` - a three number sequence giving the relative size of the top, middle, and bottom panels, respectively.
-* ``bottom_limit`` - providing a value for this keyword sets the lower limit of the bottom panel to that value.
-* ``top_limit`` - providing a value for this keyword sets the upper limit of the top panel to that value.
-* ``even_top_bottom`` - set this to ``true`` to automatically set ``bottom_limit`` and ``top_limit`` to be equal in
+* ``plot_height_ratios`` (default = ``[1.0, 1.0, 1.0]``) - a three number sequence giving the relative size of the top, middle, and bottom panels, respectively.
+* ``height_space`` (default = ``0.01``) - fraction of vertical space reserved for the gap between plots.
+* ``bottom_limit`` (default = ``None``) - providing a value for this keyword sets the lower limit of the bottom panel to that value.
+* ``top_limit`` (default = ``None``) - providing a value for this keyword sets the upper limit of the top panel to that value.
+* ``even_top_bottom`` (default = ``false``) - set this to ``true`` to automatically set ``bottom_limit`` and ``top_limit`` to be equal in
   magnitude but opposite in sign.
 
 .. note::

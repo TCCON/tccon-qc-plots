@@ -9,10 +9,10 @@ hexbin,"xvar, yvar", "show_reference, show_context", "MPL ``hexbin`` kws", Yes,
 timeseries,"yvar","time_buffer_days, show_out_of_range_data","MPL ``plot`` kws",Yes,``violin``
 delta-timeseries, "yvar1, yvar2", "time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
 timeseries-2panel,"yvar, yerror_var", "time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
-timeseries-3panel,"yvar","time_buffer_days, show_out_of_range_data, plot_height_ratios, bottom_limit, top_limit, even_top_bottom", "MPL ``plot`` kws", Yes, ``violin``
+timeseries-3panel,"yvar","time_buffer_days, show_out_of_range_data, plot_height_ratios, height_space, bottom_limit, top_limit, even_top_bottom", "MPL ``plot`` kws", Yes, ``violin``
 resampled-timeseries,"yvar, freq, op", "time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
 rolling-timeseries,"yvar, ops","gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
-rolling-timeseries-3panel,"yvar, ops","gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data, plot_height_ratios, bottom_limit, top_limit, even_top_bottom", "MPL ``plot`` kws", Yes, ``violin``
+rolling-timeseries-3panel,"yvar, ops","gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data, plot_height_ratios, height_space, bottom_limit, top_limit, even_top_bottom", "MPL ``plot`` kws", Yes, ``violin``
 delta-rolling-timeseries, "yvar1, yvar2, ops", "gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
 rolling-derivative, "yvar, dvar", "derivative_order, gap, rolling_window, flag_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
 zmin-zobs-delta-rolling-timeseries, "ops", "gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data, annotation_font_size", "MPL ``plot`` kws", Yes, ``violin``

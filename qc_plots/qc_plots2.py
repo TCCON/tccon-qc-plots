@@ -2834,6 +2834,10 @@ class Timeseries3PanelPlot(TimeseriesPlot):
         What fraction of the plottable area each of the three panels uses. This must be a three element sequence;
         the values correspond to the top, middle, and bottom panels, respectively.
 
+    height_space
+        Fraction of vertical space reserved for gap between plots, between 0 and 1. This is pass as the ``hspace``
+        parameter to :py:func:`matplotlib.pyplot.subplots`.
+
     bottom_limit
         The lower limit of the bottom panel. If not specified, it will be left to the plotting code to determine, which
         will do its best to include all data that should be plotted in the bottom panel.
@@ -2852,15 +2856,17 @@ class Timeseries3PanelPlot(TimeseriesPlot):
                  bookmark: Optional[Union[str, bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None,
                  key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None,
                  show_out_of_range_data: bool = True, plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
-                 bottom_limit=None, top_limit=None, even_top_bottom=False):
+                 height_space: float = 0.01, bottom_limit=None, top_limit=None, even_top_bottom=False):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
                          extra_qc_lines=extra_qc_lines, show_out_of_range_data=show_out_of_range_data,
                          time_buffer_days=time_buffer_days)
-        self.plot_height_ratios = plot_height_ratios
         if even_top_bottom and (bottom_limit is not None or top_limit is not None):
             raise ValueError('even_top_bottom and bottom_limit/top_limit are mutually exclusive. You may give '
                              'top/bottom limits or set even_top_bottom to True, but not both.')
+        
+        self.plot_height_ratios = plot_height_ratios
+        self.plot_height_space = height_space
         self.bottom_limit = bottom_limit
         self.top_limit = top_limit
         self.even_top_bottom = even_top_bottom
@@ -2873,7 +2879,7 @@ class Timeseries3PanelPlot(TimeseriesPlot):
         main_data = self._get_main_data(data)
 
         size = utils.cm2inch(self._width, self._height)
-        fig, axs = plt.subplots(3, 1, figsize=size, sharex='all', gridspec_kw={'height_ratios': self.plot_height_ratios})
+        fig, axs = plt.subplots(3, 1, figsize=size, sharex='all', gridspec_kw={'height_ratios': self.plot_height_ratios, 'hspace': self.plot_height_space})
         axs = {'main': axs[1], 'above': axs[0], 'below': axs[2]}
         for ax in axs.values():
             ax.grid(True)
@@ -2962,7 +2968,7 @@ class Timeseries3PanelPlotWithViolin(Timeseries3PanelPlot, ViolinAuxPlotMixin):
                  legend_kws: Optional[dict] = None,
                  key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None,
                  show_out_of_range_data: bool = True, plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
-                 bottom_limit=None, top_limit=None, even_top_bottom=False,
+                 height_space: float = 0.01, bottom_limit=None, top_limit=None, even_top_bottom=False,
                  violin_plot_side='right',
                  violin_plot_size='10%',
                  violin_plot_pad=0.5,
@@ -2971,7 +2977,7 @@ class Timeseries3PanelPlotWithViolin(Timeseries3PanelPlot, ViolinAuxPlotMixin):
         super().__init__(other_plots=other_plots, yvar=yvar, default_style=default_style, limits=limits,
                          key=key, name=name, bookmark=bookmark, width=width, height=height, legend_kws=legend_kws,
                          extra_qc_lines=extra_qc_lines, show_out_of_range_data=show_out_of_range_data,
-                         time_buffer_days=time_buffer_days, plot_height_ratios=plot_height_ratios,
+                         time_buffer_days=time_buffer_days, plot_height_ratios=plot_height_ratios, height_space=height_space,
                          bottom_limit=bottom_limit, top_limit=top_limit, even_top_bottom=even_top_bottom)
 
         self.init_violins(data_file=violin_data_file,
@@ -4018,6 +4024,7 @@ class RollingTimeseries3PanelPlot(RollingTimeseriesPlot):
                  time_buffer_days: int = 2,
                  show_out_of_range_data: bool = True,
                  plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
+                 height_space: float = 0.01,
                  bottom_limit=None,
                  top_limit=None,
                  even_top_bottom=False):
@@ -4028,10 +4035,11 @@ class RollingTimeseries3PanelPlot(RollingTimeseriesPlot):
                          flag_category=flag_category, time_buffer_days=time_buffer_days,
                          show_out_of_range_data=show_out_of_range_data)
 
-        self.plot_height_ratios = plot_height_ratios
         if even_top_bottom and (bottom_limit is not None or top_limit is not None):
             raise ValueError('even_top_bottom and bottom_limit/top_limit are mutually exclusive. You may give '
                              'top/bottom limits or set even_top_bottom to True, but not both.')
+        self.plot_height_ratios = plot_height_ratios
+        self.plot_height_space = height_space
         self.bottom_limit = bottom_limit
         self.top_limit = top_limit
         self.even_top_bottom = even_top_bottom
@@ -4081,6 +4089,7 @@ class RollingTimeseries3PanelPlotWithViolin(RollingTimeseries3PanelPlot, ViolinA
                  time_buffer_days: int = 2,
                  show_out_of_range_data: bool = True,
                  plot_height_ratios: Sequence[float] = (1.0, 1.0, 1.0),
+                 height_space: float = 0.01,
                  bottom_limit=None,
                  top_limit=None,
                  even_top_bottom=False,
@@ -4108,6 +4117,7 @@ class RollingTimeseries3PanelPlotWithViolin(RollingTimeseries3PanelPlot, ViolinA
             time_buffer_days=time_buffer_days,
             show_out_of_range_data=show_out_of_range_data,
             plot_height_ratios=plot_height_ratios,
+            height_space=height_space,
             bottom_limit=bottom_limit,
             top_limit=top_limit,
             even_top_bottom=even_top_bottom
