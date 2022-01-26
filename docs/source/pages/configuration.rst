@@ -642,7 +642,7 @@ timeseries-3panel
 ~~~~~~~~~~~~~~~~~
 
 A plot of one variable vs. time with the y-axis split into three panels to allow different degrees of zoom on different
-parts of the y-values' ranges. The middle panel will have its y-limits set to those specified in the :ref:`Limits`_
+parts of the y-values' ranges. The middle panel will have its y-limits set to those specified in the :ref:`Limits`
 file or the min/max values indicated in the netCDF file. The lower and upper panels will show data outside these limits
 (less and greater than, respectively) out to either the maximum of the data or limits specified with the ``bottom_limit``
 and ``top_limit`` keywords.
@@ -768,16 +768,16 @@ since "linestyle" will always be set if absent.
 rolling-timeseries-3panel
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A combination of the :ref:`three panel timeseries plot <PT_ts3panel>`_ and the :ref:`rolling timeseries plot <PT_RollingTimeseries>`_.
-This plots rolling means, medians, etc. in the three panel format of :ref:`PT_ts3panel`_.
+A combination of the :ref:`three panel timeseries plot <PT_ts3panel>` and the :ref:`rolling timeseries plot <PT_RollingTimeseries>`.
+This plots rolling means, medians, etc. in the three panel format of :ref:`PT_ts3panel`.
 
 **Required keys**
 
-Required keys are the same as :ref:`PT_RollingTimeseries`_.
+Required keys are the same as :ref:`PT_RollingTimeseries`.
 
 **Optional keys**
 
-All keys accepted by :ref:`PT_RollingTimeseries`_ and :ref:`PT_ts3panel`_ are accepted by this plot.
+All keys accepted by :ref:`PT_RollingTimeseries` and :ref:`PT_ts3panel` are accepted by this plot.
 
 .. _PT_RollingDeltaTimeseries:
 
@@ -858,19 +858,19 @@ rolling window of 500 spectra, this will take spectra 1 through 500 and fit a sl
 zmin-zobs-delta-rolling-timeseries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A :ref:`_PT_RollingDeltaTimeseries` plot customized for the zmin - zobs difference. It includes the estimated corresponding
+A :ref:`PT_RollingDeltaTimeseries` plot customized for the zmin - zobs difference. It includes the estimated corresponding
 pressure difference on the right hand side of the axes as well as an annotation indicating the site altitude and bottom GEOS 
 level altitude.
 
 **Required keys**
 
-* ``ops``: same as for :ref:`_PT_RollingDeltaTimeseries`.
+* ``ops``: same as for :ref:`PT_RollingDeltaTimeseries`.
 
 **Optional keys**
 
 * ``annotation_font_size`` (default = ``6``): the font size for the site/GEOS altitude annotation.
 
-The other optional keys are the same as for :ref:`_PT_RollingDeltaTimeseries`. Note that when using the 
+The other optional keys are the same as for :ref:`PT_RollingDeltaTimeseries`. Note that when using the 
 violin auxiliary plot for this, the ``violin_plot_pad`` keyword is given a default value of 1.0 instead
 of 0.5 and the violin plot y-ticks are turned off by default. Both of these changes are to allow space 
 for the estimated pressure difference.
