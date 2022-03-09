@@ -1,11 +1,13 @@
 from argparse import ArgumentParser
+from matplotlib import dates as mdates
 import numpy as np
 import pandas as pd
+import sys
 
 from . import qc_plots2
 
 
-def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_of_bounds_period=pd.Timedelta(days=7), plot_file=None, include_all=False):
+def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_of_bounds_period=pd.Timedelta(days=7), plot_file=None, include_all=False, time_period_file=None):
     time_periods = []
     time_period_strings = []
     all_dec_times = []
@@ -62,7 +64,8 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
                 # This means that we exited an out-of-bounds time period. Check that
                 # it is sufficiently long and print it if so. 
                 if (time - time_start_oob) >= min_out_of_bounds_period:
-                    print(f'Xluft out of bounds: {time_start_oob.date()} to {time.date()}')
+                    if time_period_file is None:
+                        print(f'Xluft out of bounds: {time_start_oob.date()} to {time.date()}')
                     time_periods.append((True, decimal_time[index_start_oob], decimal_time[index]))
                     time_period_strings.append(f'- {time_start_oob.date()} to {time.date()}')
                 elif include_all:
@@ -75,7 +78,8 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
         if direction > 0:
             time = times[-1]
             if (time - time_start_oob) >= min_out_of_bounds_period:
-                print(f'Xluft out of bounds: {time_start_oob.date()} to {time.date()}')
+                if time_period_file is None:
+                    print(f'Xluft out of bounds: {time_start_oob.date()} to {time.date()}')
                 time_periods.append((True, decimal_time[index_start_oob], decimal_time[index]))
                 time_period_strings.append(f'- {time_start_oob.date()} to {time.date()}')
             elif include_all:
@@ -84,6 +88,14 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
 
         all_dec_times.append(decimal_time)
         all_xluft.append(xluft)
+
+
+    if time_period_file is not None:
+        # Override the time periods calculated with those given in the input file.
+        # This is just easier than refactoring above to only run if no time period file
+        # is provided.
+        time_periods, time_period_strings = read_time_period_file(time_period_file)
+
 
     if plot_file is not None:
         import matplotlib.pyplot as plt
@@ -110,13 +122,40 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
         plt.savefig(plot_file, bbox_inches='tight')
 
 
+def read_time_period_file(time_period_file):
+    time_periods = []
+    time_period_strings = []
+
+    with open(time_period_file) as f:
+        for line in f:
+            # ignore everything after a # for comments
+            line = line.split('#')[0].strip()
+            if len(line) == 0:
+                continue
+
+            start, stop = line.split()
+            start = pd.to_datetime(start)
+            stop = pd.to_datetime(stop)
+            dec_start = mdates.date2num(start)
+            dec_stop = mdates.date2num(stop)
+
+            time_periods.append((True, dec_start, dec_stop))
+            time_period_strings.append(f'- {start.date()} {stop.date()}')
+
+    return time_periods, time_period_strings
+
+
 def main():
     p = ArgumentParser(description='Print a report on out-of-bounds Xluft from a private TCCON file')
     p.add_argument('nc_files', nargs='+', help='The netCDF file(s) to check')
-    p.add_argument('--plot-file', help='File to output a plot as, if not given, no plot is created.')
+    p.add_argument('-p', '--plot-file', help='File to output a plot as, if not given, no plot is created.')
     p.add_argument('-a', '--include-all', action='store_true', help='Flag periods shorter than 7 days as well as longer ones')
+    p.add_argument('-f', '--time-period-file', help='A file containing time periods to mark, with one period per line, as YYYYMMDD YYYYMMDD. If this argument is given, --plot-file must be given as well.')
 
     clargs = vars(p.parse_args())
+    if clargs['time_period_file'] is not None and clargs['plot_file'] is None:
+        print('ERROR: --time-period-file requires that --plot-file be given as well.', file=sys.stderr)
+        sys.exit(1)
     driver(**clargs)
 
 
