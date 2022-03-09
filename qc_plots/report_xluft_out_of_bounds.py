@@ -26,7 +26,7 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
 
         # The rolling values don't have time as objects because of how rolling ops work,
         # but the raw data times should be fine to use, assuming the rolling window is centered.
-        time = args[0]['data']['t']
+        times = args[0]['data']['t']
         decimal_time = args[1]['data']['x']
         xluft = args[1]['data']['y']
         
@@ -40,9 +40,11 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
         changes = np.concatenate([[start], changes])
         change_inds = np.flatnonzero(changes)
 
-        time_start_oob = time[0] if start == 1 else None
+        # This handles the beginning of the record - if we start out of bounds, we'll look
+        # for the time when it comes back in bounds
+        time_start_oob = times[0] if start == 1 else None
         index_start_oob = 0 if start == 1 else None
-        for time, direction, index in zip(time[change_inds], changes[change_inds], change_inds):
+        for time, direction, index in zip(times[change_inds], changes[change_inds], change_inds):
             if direction > 0 and time_start_oob is None:
                 # Started a new out of bounds time period. Record when it began.
                 time_start_oob = time
@@ -67,6 +69,18 @@ def driver(nc_files, xluft_lower_limit=0.995, xluft_upper_limit=1.003, min_out_o
                     time_periods.append((False, decimal_time[index_start_oob], decimal_time[index]))
                     time_period_strings.append(f'- {time_start_oob.date()} to {time.date()}')
                 time_start_oob = None
+
+        # If the last change was into an out-of-bounds period, we need to record everything
+        # from the last change up to the end of the record as out of bounds.
+        if direction > 0:
+            time = times[-1]
+            if (time - time_start_oob) >= min_out_of_bounds_period:
+                print(f'Xluft out of bounds: {time_start_oob.date()} to {time.date()}')
+                time_periods.append((True, decimal_time[index_start_oob], decimal_time[index]))
+                time_period_strings.append(f'- {time_start_oob.date()} to {time.date()}')
+            elif include_all:
+                time_periods.append((False, decimal_time[index_start_oob], decimal_time[index]))
+                time_period_strings.append(f'- {time_start_oob.date()} to {time.date()}')
 
         all_dec_times.append(decimal_time)
         all_xluft.append(xluft)
