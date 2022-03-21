@@ -34,7 +34,12 @@ Height = 1.921
 [site_data.gm.mod_data.level0]
 Height = 1.309
 
+# An incorrect abbreviation for Hefei - ginput has "he" in it incorrectly
 [site_data.he.mod_data.level0]
+Height = 0.091
+
+# The correct abbreviation for Hefei - ginput has "he" in it incorrectly
+[site_data.hf.mod_data.level0]
 Height = 0.091
 
 [site_data.hw.mod_data.level0]
