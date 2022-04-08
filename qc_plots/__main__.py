@@ -63,6 +63,10 @@ def _add_plot_info_to_image(this_img, ifig: int, nfig: int, fig_name: str, nc_pa
     if cfg is None:
         cfg = dict()
 
+    if cfg.get('image_postprocessing', dict()).get('disable_info', False):
+        # If users can't find font files on their computers, this lets them skip the step
+        # that required them
+        return
     font_file = cfg.get('image_postprocessing', dict()).get('font_file', 'LiberationSans-Regular.ttf')
     font_size = cfg.get('image_postprocessing', dict()).get('font_size', 20)
     font = ImageFont.truetype(font_file, size=font_size)

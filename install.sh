@@ -31,3 +31,7 @@ else
     echo "Creating tccon-qc python environment from environment.yml"
     conda env create -f environment.yml
 fi
+
+conda activate tccon-qc
+cd $mydir
+python setup.py develop
