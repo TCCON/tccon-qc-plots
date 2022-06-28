@@ -13,7 +13,9 @@ import tempfile
 import tomli
 from urllib.parse import urljoin
 
-from . import qc_plots2, qc_email
+from qc_email import qc_email
+
+from . import qc_plots2
 from .utils import SkipPlotError
 from .constants import DEFAULT_CONFIG, DEFAULT_IMG_DIR, DEFAULT_LIMITS
 
