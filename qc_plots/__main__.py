@@ -264,8 +264,11 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 exclude_times=data[0].times,
                 styles=context_styles
             )
-            data.append(stack.enter_context(context_data))
-            ref_include_times += [np.min(data[1].times), np.max(data[1].times)]
+            if np.any(context_data.all_idx):
+                data.append(stack.enter_context(context_data))
+                ref_include_times += [np.min(data[1].times), np.max(data[1].times)]
+            else:
+                print('WARNING: The given context file has no points outside the times in the main file; it will not be added', file=sys.stderr)
 
         if ref is not None:
             ref_styles = config.get('style', dict()).get('ref', dict())
@@ -276,7 +279,10 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 include_times=ref_include_times,  # ensure reference data only plotted for times when context or main data exists
                 allowed_flag_categories={qc_plots2.FlagCategory.FLAG0}
             )
-            data.append(stack.enter_context(ref_data))
+            if np.any(ref_data.all_idx):
+                data.append(stack.enter_context(ref_data))
+            else:
+                print('WARNING: The given reference file has no points inside the times in the main file; it will not be added', file=sys.stderr)
 
         # -------------------- #
         # Setup and make plots #
