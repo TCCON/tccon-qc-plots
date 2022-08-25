@@ -219,9 +219,84 @@ def parse_args():
     return vars(parser.parse_args())
 
 
-def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=False, output_dir='.', suffix='',
+def driver(nc_in, config, limits, ref=None, context=None, allow_all_ref=False, flag0=False, show_all=False, output_dir='.', suffix='',
            use_tmp_img_dir=False, size='medium', quality='high', attachment_size=None, attachment_quality=None,
            emails=(None, None), email_config=None, plot_url=None, attach_plots=True, **_):
+    """Main function to create QA/QC plots and optionally email them to GGGBugs.
+
+    Parameters
+    ----------
+    nc_in : str | Path
+        Path to the main TCCON netCDF file to plot
+
+    config : str | Path
+        Path to the plot configuration .toml file that specifies which plots to make.
+
+    limits : str | Path
+        Path to the plot limits .toml file that specifies the limits for different variables in different plots
+
+    ref : Optional[str | Path]
+        If given, a path to a TCCON netCDF file to use as a reference to plot behind the main data. Only data within the temporal
+        extend of the main data will be plotted.
+
+    context : Optional[str | Path]
+        If given, a path to a TCCON netCDF file to use as context (i.e. fill in the rest of the timeseries) to plot around the main
+        data. Only data outside the temporal range of the main data will be plotted.
+
+    allow_all_ref : bool
+        By default, only flag = 0 data are plotted from reference files. Set this to ``True`` to allow all data (needed for some figures).
+
+    flag0 : bool
+        Set this to ``True`` to only plot flag = 0 data.
+
+    show_all : bool
+        Set this to ``True`` to ignore plot limits and show all data.
+
+    output_dir : str | Path
+        Where to save the final PDF file.
+
+    suffix : str
+        An extra suffix to include just before the ".pdf" extension in the output filename.
+
+    use_tmp_img_dir : bool
+        Set to ``True`` to use a temporary directory for the intermediate image files that are concatenated into the final PDF.
+        If this is ``False`` (default), then the images are written to the "outputs" directory in the ``qc_plots`` package directory.
+
+    size : str
+        How large each image is; may be "small", "medium", or "large". "Small" and "medium" reduce the native image size by a factor of
+        3 and 2, respectively.
+
+    quality : str
+        Compression quality for the images; may be "low", "medium", or "high".
+
+    attachment_size : str
+        Like size, but for the email attachment. Note that GGGBugs requires that attached files be less than 10 MB. If this is not given,
+        it uses the ``size`` value.
+
+    attachment_quality : str
+        Like quality, but for the email attachment. Note that GGGBugs requires that attached files be less than 10 MB. If this is not given,
+        it uses the ``quality`` value.
+
+    emails : Tuple[str, str]
+        If given, must be a tuple of strings that give a sending and receiving email address for the plots to be sent. This option is generally
+        discouraged; ``email_config`` is preferred.
+
+    email_config : Optional[str | Path]
+        A path to the email configuration .toml file that specifies how to send the email, what addresses to use, the email body & subject,
+        and potentially a mapping between TCCON site IDs and GGGBugs topic numbers. If neither ``emails`` nor this are given, then an
+        email is not sent.
+
+    plot_url : Optional[str]
+        A web address where the plots may be accessed. Specifically, appending the plot's file name to this URL must resolve to where the
+        plot will be hosted. Note that if ``emails`` or ``email_config`` is given, then one of ``plot_url`` or ``attach_plots`` should be
+        given as well. If this is ``None`` and ``attach_plots`` is false, then the email will not have any information about how to access 
+        the plots.
+
+    attach_plots : bool
+        Whether to include the final PDF as an attachment in the GGGBugs email. The PDF will use the ``attachment_size`` and ``attachment_quality``
+        settings. Note that it must be < 10 MB or GGGBugs will not accept it. If an email should be sent, then this should be true or 
+        ``plot_url`` should be given. Otherwise, the email will have no information about where to access the plots.
+    """
 
     if not attach_plots and plot_url is None:
         print('WARNING: attach_plots is False and plot_url is None; the email will give no indication how to access the plots', file=sys.stderr)
@@ -277,7 +352,7 @@ def driver(nc_in, config, limits, ref=None, context=None, flag0=False, show_all=
                 ref,
                 styles=ref_styles,
                 include_times=ref_include_times,  # ensure reference data only plotted for times when context or main data exists
-                allowed_flag_categories={qc_plots2.FlagCategory.FLAG0}
+                allowed_flag_categories=None if allow_all_ref else {qc_plots2.FlagCategory.FLAG0}
             )
             if np.any(ref_data.all_idx):
                 data.append(stack.enter_context(ref_data))
