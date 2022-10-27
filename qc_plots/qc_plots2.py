@@ -1612,6 +1612,19 @@ class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
         self._time_buffer_days = time_buffer_days
         self._flag_cat_override = None if flag_cat_override is None else FlagCategory(flag_cat_override)
 
+        # Because the xlimits need to be set manually in the plotting function, if that function is called multiple times with different
+        # data categories, the x-limits will only respect the last one. We need to save the x-limits between calls to avoid that.
+        self._xlims = None
+
+    def update_xlims(self, ax, xmin, xmax):
+        if self._xlims is None:
+            self._xlims = (xmin, xmax)
+        else:
+            xmin_old, xmax_old = self._xlims
+            self._xlims = (min(xmin_old, xmin), max(xmax_old, xmax))
+
+        ax.set_xlim(self._xlims)
+
     def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False,
                   img_path: Path = DEFAULT_IMG_DIR, tight=True):
         data = self._get_main_data(data)
@@ -1787,7 +1800,7 @@ class TimingErrorAMvsPM(TimingErrorAbstractPlot):
             raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}]')
         xmin = utils.pandas_time_minmax(min, df_am.index.min(), df_pm.index.min()) - pd.Timedelta(days=self._time_buffer_days)
         xmax = utils.pandas_time_minmax(max, df_am.index.max(), df_pm.index.max()) + pd.Timedelta(days=self._time_buffer_days)
-        axs.set_xlim(xmin, xmax)
+        self.update_xlims(axs, xmin, xmax)
 
         # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
         # Calling the matplotlib plotting methods seems to avoid that behavior
@@ -1981,7 +1994,7 @@ class TimingErrorAMvsPMDelta(TimingErrorAMvsPM):
             raise SkipPlotError(f'{data.base_file_name} has no data in SZA [{self.sza_ranges[0][0]}, {self.sza_ranges[0][1]}] for the morning, afternoon, or both')
         xmin = df.index.min() - pd.Timedelta(days=self._time_buffer_days)
         xmax = df.index.max() + pd.Timedelta(days=self._time_buffer_days)
-        axs.set_xlim(xmin, xmax)
+        self.update_xlims(axs, xmin, xmax)
 
         # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
         # Calling the matplotlib plotting methods seems to avoid that behavior
@@ -2118,7 +2131,7 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
         return plot_styles
 
     def get_legend_kws(self) -> dict:
-        kws = self._get_style(self._default_style, self.plot_kind)
+        kws = self._get_style(deepcopy(self._default_style), self.plot_kind)
         kws = deepcopy(kws.get('legend_kws', dict()))
         kws.update(self._legend_kws)
         kws.setdefault('fontsize', 7)
@@ -2126,7 +2139,7 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
     def get_plot_kws(self, data: TcconData, flag_category: Optional[FlagCategory],  _format_label: bool = True) -> list:
         # This
-        style = self._get_style(self._default_style, self.plot_kind)
+        style = self._get_style(deepcopy(self._default_style), self.plot_kind)
         style.update(self._get_style(data.styles, self.plot_kind))
         # style = deepcopy(self._default_style.get(self.plot_kind, dict()))
         # style.update(data.styles.get(self.plot_kind, dict()))
@@ -2171,7 +2184,7 @@ class TimingErrorMultipleSZAs(TimingErrorAbstractPlot):
 
         xmin = utils.pandas_time_minmax(min, *[df.index.min() for df in dfs]) - pd.Timedelta(days=self._time_buffer_days)
         xmax = utils.pandas_time_minmax(max, *[df.index.max() for df in dfs]) + pd.Timedelta(days=self._time_buffer_days)
-        axs.set_xlim(xmin, xmax)
+        self.update_xlims(axs, xmin, xmax)
 
         # Using df_am['y'].plot() causes weird behavior where I couldn't set the xlimits to be what I wanted
         # Calling the matplotlib plotting methods seems to avoid that behavior
