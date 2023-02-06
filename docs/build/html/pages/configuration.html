@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCCON QC Configuration &mdash; TCCON QC  documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="QC plots code design" href="code_design.html" />
+    <link rel="prev" title="TCCON QC Plots installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> TCCON QC
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">TCCON QC Plots installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">TCCON QC Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#primary-file">Primary file</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#variables">Variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#image-postprocessing">Image postprocessing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#plots">Plots</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#styles">Styles</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cloning-styles">Cloning styles</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#plot-types">Plot types</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#common-optional-keys">Common optional keys</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flag-analysis">flag-analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#nan-check">nan-check</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#timing-error-am-pm">timing-error-am-pm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#delta-timing-error-am-pm">delta-timing-error-am-pm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#timing-error-szas">timing-error-szas</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#scatter">scatter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#hexbin">hexbin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#timeseries">timeseries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#delta-timeseries">delta-timeseries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#timeseries-2panel">timeseries-2panel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#timeseries-3panel">timeseries-3panel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#resampled-timeseries">resampled-timeseries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rolling-timeseries">rolling-timeseries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rolling-timeseries-3panel">rolling-timeseries-3panel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#delta-rolling-timeseries">delta-rolling-timeseries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rolling-derivative">rolling-derivative</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#zmin-zobs-delta-rolling-timeseries">zmin-zobs-delta-rolling-timeseries</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#auxiliary-plots">Auxiliary Plots</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#violin-aux-plots">Violin aux plots</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#limits-file">Limits file</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#basic-format">Basic format</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#wildcards">Wildcards</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#precedence">Precedence</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#email-file">Email file</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#server-section">server section</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#server-program-section">server.program section</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#server-smtp-section">server.smtp section</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#email-section">email section</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#email-sites-section">email.sites section</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code_design.html">QC plots code design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_qc_plots2.html">API: qc_plots2 module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">TCCON QC</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>TCCON QC Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/pages/configuration.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tccon-qc-configuration">
+<h1>TCCON QC Configuration<a class="headerlink" href="#tccon-qc-configuration" title="Permalink to this headline"></a></h1>
+<p>There are two configuration files that TCCON QC uses when making plots: the limits file, and the primary plots
+file. The limits file configures what axis limits to use for different variables. The plots configuration file
+controls which plots to make and how to style them.</p>
+<p>Both files use <a class="reference external" href="https://toml.io/en/">TOML format</a>. TOML has some similarities to the <a class="reference external" href="https://en.wikipedia.org/wiki/INI_file">INI format</a>
+often used for Linux configuration file, though TOML is more flexible.</p>
+<p>Defaults for both files can be found in the <code class="docutils literal notranslate"><span class="pre">inputs</span></code> directory of the TCCON QC source code. You may edit these or
+copy them and use the <code class="docutils literal notranslate"><span class="pre">--config</span></code> and <code class="docutils literal notranslate"><span class="pre">--limits</span></code> command line arguments to tell the QC plotting program where to
+look for these.</p>
+<section id="primary-file">
+<h2>Primary file<a class="headerlink" href="#primary-file" title="Permalink to this headline"></a></h2>
+<p>The primary configuration file is broken down into several main parts: variables, image postprocessing, styles, and plots.</p>
+<section id="variables">
+<span id="id1"></span><h3>Variables<a class="headerlink" href="#variables" title="Permalink to this headline"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">[variables]</span></code> section of the configuration allows you to define strings to replace with other values elsewhere
+in the configuration. For example, if my configuration file included:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">variables</span><span class="p">]</span>
+<span class="n">static_ref_file</span> <span class="o">=</span> <span class="s2">&quot;/data/tccon/static/standard_network_data.nc&quot;</span>
+</pre></div>
+</div>
+<p>then I could have a plots subsection like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;timeseries-2panel+violin&quot;</span>
+<span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;XCO2 timeseries&quot;</span>
+<span class="n">yvar</span> <span class="o">=</span> <span class="s2">&quot;xco2&quot;</span>
+<span class="n">yerror_var</span> <span class="o">=</span> <span class="s2">&quot;xco2_error&quot;</span>
+<span class="n">violin_data_file</span> <span class="o">=</span> <span class="s2">&quot;$static_ref_file&quot;</span>
+</pre></div>
+</div>
+<p>This will see <code class="docutils literal notranslate"><span class="pre">&quot;$static_ref_file&quot;</span></code> in the <code class="docutils literal notranslate"><span class="pre">[[plots]]</span></code> section replaced with “/data/tccon/static/standard_network_data.nc”.
+In other words, QC plots interprets the plotting section as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;timeseries-2panel+violin&quot;</span>
+<span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;XCO2 timeseries&quot;</span>
+<span class="n">yvar</span> <span class="o">=</span> <span class="s2">&quot;xco2&quot;</span>
+<span class="n">yerror_var</span> <span class="o">=</span> <span class="s2">&quot;xco2_error&quot;</span>
+<span class="n">violin_data_file</span> <span class="o">=</span> <span class="s2">&quot;/data/tccon/static/standard_network_data.nc&quot;</span>
+</pre></div>
+</div>
+<p>Substitutions obey the following rules:</p>
+<ul>
+<li><p>Variables must be references with a leading dollar sign. Variable names may contain letters, numbers, and/or underscores,
+but may not start with a number.</p></li>
+<li><p>If the variable makes up the entire value, as in the above example, type is preserved. That is, if you have a configuration
+file such as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">variables</span><span class="p">]</span>
+<span class="n">custom_width</span> <span class="o">=</span> <span class="mi">16</span>
+<span class="n">custom_height</span> <span class="o">=</span> <span class="mi">8</span>
+
+<span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;flag-analysis&quot;</span>
+<span class="n">width</span> <span class="o">=</span> <span class="s2">&quot;$custom_width&quot;</span>
+<span class="n">height</span> <span class="o">=</span> <span class="s2">&quot;$custom_height&quot;</span>
+</pre></div>
+</div>
+<p>then <code class="docutils literal notranslate"><span class="pre">width</span></code> and <code class="docutils literal notranslate"><span class="pre">height</span></code> would be integers. This is important as some of the inputs are expected to be actual numeric or
+boolean types.</p>
+</li>
+<li><p>If the variable is inserted in the middle of a longer string, it is expanded using Bash-like rules: a variable begins with a
+dollar sign and ends with the first non-alphanumeric or underscore character, or curly braces can be used to disambiguate where
+the variable ends if it must abut an alphanumeric or underscore character. For example, you could do this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">variables</span><span class="p">]</span>
+<span class="n">ref_path</span> <span class="o">=</span> <span class="s2">&quot;/data/tccon/static&quot;</span>
+<span class="n">ref_site</span> <span class="o">=</span> <span class="s2">&quot;oc&quot;</span>
+
+<span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;timeseries+violin&quot;</span>
+<span class="n">yvar</span> <span class="o">=</span> <span class="s2">&quot;xluft&quot;</span>
+<span class="n">violin_data_file</span> <span class="o">=</span> <span class="s2">&quot;$ref_path/$</span><span class="si">{site}</span><span class="s2">_static.nc&quot;</span>
+</pre></div>
+</div>
+<p>In this example, <code class="docutils literal notranslate"><span class="pre">$ref_path</span></code> does not need curly braces because the next character (<code class="docutils literal notranslate"><span class="pre">/</span></code>) cannot be part of a variable name.
+<code class="docutils literal notranslate"><span class="pre">$site</span></code> <em>does</em> need curly braces; it this were written as <code class="docutils literal notranslate"><span class="pre">$site_static.nc</span></code>, it would look for a variable named <code class="docutils literal notranslate"><span class="pre">site_static</span></code>.
+Any case where the value on the right hand side is not exactly one variable name, with no extra character, will always result in a
+string. That is, something like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">variables</span><span class="p">]</span>
+<span class="n">custom_width</span> <span class="o">=</span> <span class="mi">16</span>
+
+<span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="o">...</span>
+<span class="n">width</span> <span class="o">=</span> <span class="s2">&quot;$width &quot;</span>  <span class="c1"># note the extra space at the end!</span>
+</pre></div>
+</div>
+<p>will cause <code class="docutils literal notranslate"><span class="pre">width</span></code> for this plot to be a string, not an integer.</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When writing references to variables, they must be quoted as shown above. TOML syntax does not allow dollar signs in bare strings.</p>
+</div>
+</section>
+<section id="image-postprocessing">
+<span id="imagepostproc"></span><h3>Image postprocessing<a class="headerlink" href="#image-postprocessing" title="Permalink to this headline"></a></h3>
+<p>This section contains options that pertain to final conversion of the individual figures into combined PDFs.
+It begins with the <code class="docutils literal notranslate"><span class="pre">[image_postprocessing]</span></code> header. All options are optional (with one caveat regarding
+<code class="docutils literal notranslate"><span class="pre">font_file</span></code>). Options are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">disable_info</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): set this to <code class="docutils literal notranslate"><span class="pre">true</span></code> to skip writing plot information (plot number, name,
+and source file) in the upper left corner of each plot. Since writing that information requires that <code class="docutils literal notranslate"><span class="pre">font_file</span></code>
+points to a valid TrueType font file, setting <code class="docutils literal notranslate"><span class="pre">disable_info</span> <span class="pre">=</span> <span class="pre">true</span></code> is a workaround if you cannot find a TrueType
+font on your computer.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">font_file</span></code> (default = “LiberationSans-Regular.ttf”): TrueType font file to use when writing the plot
+number, name, and input file in the top left of each page. This is done using Python’s
+<a class="reference external" href="https://pillow.readthedocs.io/en/stable/">Pillow library</a> for image manipulation. Pillow searches common
+directories for TrueType files, so in many cases you only need give the file name, and not a full path.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="file docutils literal notranslate"><span class="pre">LiberationSans-Regular.ttf</span></code> is not available on your system, you will need to change this option
+to a valid TrueType font file, or set <code class="docutils literal notranslate"><span class="pre">disable_info</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>. Otherwise the QC plots program will crash
+when it reaches this part. On Linux, fonts can usually be found under <code class="file docutils literal notranslate"><span class="pre">/usr/share/fonts</span></code>.</p>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">font_size</span></code> (default = 30): size of the font used to write the plot number, name, etc. in the upper left
+corner of each page.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bookmark_all</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): this controls whether each page in the output PDF automatically receives
+a bookmark. Setting this to <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code> will turn that behavior on or off, respectively.  However, the
+default when this is not specified is to check whether any of the plots have a value for their individual <code class="docutils literal notranslate"><span class="pre">bookmark</span></code>
+properties. If not, QC plots behaves as if <code class="docutils literal notranslate"><span class="pre">bookmark_all</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code> (and so makes a bookmark for every plot);
+if so, then QC plots behaves as if <code class="docutils literal notranslate"><span class="pre">bookmark_all</span></code> is <code class="docutils literal notranslate"><span class="pre">false</span></code> (only making bookmarks for plots that have their
+individual <code class="docutils literal notranslate"><span class="pre">bookmark</span></code> properties set).</p></li>
+</ul>
+</section>
+<section id="plots">
+<h3>Plots<a class="headerlink" href="#plots" title="Permalink to this headline"></a></h3>
+<p>This section is the meat of the configuration, as it specifies which plots to make and in what order.
+A very short example is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;flag-analysis&quot;</span>
+
+<span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;timeseries&quot;</span>
+<span class="n">yvar</span> <span class="o">=</span> <span class="s2">&quot;dip&quot;</span>
+
+<span class="p">[[</span><span class="n">plots</span><span class="p">]]</span>
+<span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;timeseries&quot;</span>
+<span class="n">yvar</span> <span class="o">=</span> <span class="s2">&quot;fvsi&quot;</span>
+</pre></div>
+</div>
+<p>Each plot begins with <code class="docutils literal notranslate"><span class="pre">[[plots]]</span></code>. Within each plot subsection, there are one or more key-value pairs such as
+<code class="docutils literal notranslate"><span class="pre">kind</span> <span class="pre">=</span> <span class="pre">&quot;timeseries&quot;</span></code>. Every plot subsection <em>must</em> include the <code class="docutils literal notranslate"><span class="pre">kind</span></code> key, as this determines what type of plot
+to make. Different plots have different sets of options, which will be covered in the <a class="reference internal" href="#plottypes"><span class="std std-ref">Plot types</span></a> section.</p>
+<p>In this example, we have two types of plots: one “flag-analysis” and two “timeseries”. The two timeseries plots
+have different <code class="docutils literal notranslate"><span class="pre">yvar</span></code> values, so each will plot a time series of their specified variables.</p>
+</section>
+<section id="styles">
+<span id="id2"></span><h3>Styles<a class="headerlink" href="#styles" title="Permalink to this headline"></a></h3>
+<p>The styles section allows you to specify details of how different data are plotted in the QC plots. This section is
+the more complex, so let’s look at an example right away:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">scatter</span><span class="p">]</span>
+<span class="nb">all</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flagged</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">legend_kws</span> <span class="o">=</span> <span class="p">{</span><span class="n">ncol</span> <span class="o">=</span> <span class="mi">2</span><span class="p">}</span>
+
+<span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">scatter</span><span class="p">]</span>
+<span class="nb">all</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;royalblue&quot;</span><span class="p">}</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;royalblue&quot;</span><span class="p">}</span>
+<span class="n">flagged</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;red&quot;</span><span class="p">}</span>
+
+<span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">ref</span><span class="o">.</span><span class="n">scatter</span><span class="p">]</span>
+<span class="nb">all</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;lightgray&quot;</span><span class="p">}</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;lightgray&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Each style subsection is defined by a single bracketed header with the format <code class="docutils literal notranslate"><span class="pre">[style.&lt;data</span> <span class="pre">type&gt;.&lt;plot</span> <span class="pre">kind&gt;]</span></code>.
+In the first subsection of the example, “default” is the data type and “scatter” the plot type. In the second
+subsection, “main” is the data type and “scatter” is again the plot type. The four allowed data types are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">main</span></code> - styles defined for the “main” data type affect how the data in the file passed as a positional argument
+are plotted, that is the “main” focus of the plots.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ref</span></code> - styles defined for the “ref” data type affect reference data (i.e. the file passed to the <code class="docutils literal notranslate"><span class="pre">--ref</span></code> command
+line argument to be used as reference good quality data).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">context</span></code> - styles defined for the “context” data type affect data in the file passed through the <code class="docutils literal notranslate"><span class="pre">--context</span></code>
+command line argument, i.e. data from earlier in the record for the same site as the main data used to place the main
+data in the context of the overall record.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">default</span></code> - style values defined for “default” provide a fallback for the other three.</p></li>
+</ul>
+<p>The allows plot types are the allowed values for the <code class="docutils literal notranslate"><span class="pre">kind</span></code> option in the plots section, which are enumerated in
+the <a class="reference internal" href="#plottypes"><span class="std std-ref">Plot types</span></a> section of this documentation.</p>
+<p>Within each style subsection, how style options are organized depends on the specific plot type. Usually (but not
+always), the keys within the subsection refer to specific subsets of data, and their values are dictionaries of
+key-value pairs that affect the style used when plotting that subtype of data.</p>
+<p>Let’s walk through how the example shown above is interpreted by the QC plotting program. We will assume that we’re
+making a scatter plot, since that is the only plot type defined here. When the code goes to plot the main data, it
+reads the <code class="docutils literal notranslate"><span class="pre">[style.main.scatter]</span></code> section. For a scatter plot, the default behavior is to plot good (<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code>)
+data and not good (<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>) data as two separate series. The style for <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data is set by the
+<code class="docutils literal notranslate"><span class="pre">flag0</span></code> entry. To build the full style, the <code class="docutils literal notranslate"><span class="pre">flag0</span></code> options from <em>both</em> the <code class="docutils literal notranslate"><span class="pre">[style.main.scatter]</span></code> and
+<code class="docutils literal notranslate"><span class="pre">[style.default.scatter]</span></code> sections are combined, with <code class="docutils literal notranslate"><span class="pre">main</span></code> options taking precedence. In this example, the
+<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> style would be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;royalblue&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>All three of these options were in the <code class="docutils literal notranslate"><span class="pre">default</span></code> section, but <code class="docutils literal notranslate"><span class="pre">color</span></code> was also defined in the <code class="docutils literal notranslate"><span class="pre">main</span></code> section, and
+so the latter color takes precedence.  Likewise, the <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> style comes from the combination of the <code class="docutils literal notranslate"><span class="pre">default</span></code>
+and <code class="docutils literal notranslate"><span class="pre">main</span></code> section’s <code class="docutils literal notranslate"><span class="pre">flagged</span></code> entries, and so is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>(In this case, both sections specified the same color, so it didn’t matter that <code class="docutils literal notranslate"><span class="pre">main</span></code> overrode the color value from
+<code class="docutils literal notranslate"><span class="pre">default</span></code>.)</p>
+<p>All plot types are permitted to include <code class="docutils literal notranslate"><span class="pre">legend_kws</span></code> as a key within the “default” subsection, as you see in this
+example. This can point to a dictionary of keywords to pass to the
+<a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html">matplotlib legend function</a>. Unlike the
+other components of styles, the legend keywords can be overridden on individual plots using the <code class="docutils literal notranslate"><span class="pre">legend_kws</span></code> key
+in a <code class="docutils literal notranslate"><span class="pre">[[plots]]</span></code> subsection of the TOML file.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><code class="docutils literal notranslate"><span class="pre">legend_kws</span></code> is only read from the “default” subsection. If you put it in “main”, “ref”, or “context”, it will be
+ignored.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html">legend documentation</a> makes a
+distinction between when <code class="docutils literal notranslate"><span class="pre">legend</span></code> is called on a figure vs. axes. Currently, all plot types in the TCCON QC
+program call <code class="docutils literal notranslate"><span class="pre">legend</span></code> on axes.</p>
+</div>
+<section id="cloning-styles">
+<span id="stylecloning"></span><h4>Cloning styles<a class="headerlink" href="#cloning-styles" title="Permalink to this headline"></a></h4>
+<p>Since many plot types are closely related, many plots offer the option to “clone” their style from another plot.
+For example, in the default configuration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">scatter</span><span class="p">]</span>
+<span class="nb">all</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flagged</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+
+<span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">timeseries</span><span class="p">]</span>
+<span class="n">clone</span> <span class="o">=</span> <span class="s2">&quot;scatter&quot;</span>
+</pre></div>
+</div>
+<p>By specifying <code class="docutils literal notranslate"><span class="pre">clone</span> <span class="pre">=</span> <span class="pre">'scatter'</span></code> in the <code class="docutils literal notranslate"><span class="pre">[style.default.timeseries]</span></code> section, this means that all the styles
+defined for <code class="docutils literal notranslate"><span class="pre">[style.default.scatter]</span></code> are replicated in <code class="docutils literal notranslate"><span class="pre">[style.default.timeseries]</span></code>. In other words, the previous
+example is identical to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">scatter</span><span class="p">]</span>
+<span class="nb">all</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flagged</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+
+<span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">timeseries</span><span class="p">]</span>
+<span class="nb">all</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+<span class="n">flagged</span> <span class="o">=</span> <span class="p">{</span><span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The value that comes after the <code class="docutils literal notranslate"><span class="pre">clone</span> <span class="pre">=</span></code> key is the plot kind to clone from. You can only clone styles from the same
+data type; that is, in this example, we could clone the default styles from scatter plots for the default styles in
+timeseries plots, but we could <em>not</em> clone the <strong>main</strong> data styles from scatter plots for the <strong>default</strong> styles in
+timeseries plots. Default to default, main to main, ref to ref, and context to context only.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Not all plot types support cloning styles. If they do not, this will be noted in <a class="reference internal" href="#plottypes"><span class="std std-ref">Plot types</span></a> below.</p>
+</div>
+<p>You can override specific keys within a subsection after cloning. For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">timeseries</span><span class="p">]</span>
+<span class="n">clone</span> <span class="o">=</span> <span class="s2">&quot;scatter&quot;</span>
+<span class="n">legend_kws</span> <span class="o">=</span> <span class="p">{</span><span class="n">ncol</span> <span class="o">=</span> <span class="mi">2</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>would clone the <code class="docutils literal notranslate"><span class="pre">all</span></code>, <code class="docutils literal notranslate"><span class="pre">flag0</span></code>, and <code class="docutils literal notranslate"><span class="pre">flagged</span></code> values from <code class="docutils literal notranslate"><span class="pre">[style.default.scatter]</span></code> (from the first
+example in this section) but use <code class="docutils literal notranslate"><span class="pre">{ncol</span> <span class="pre">=</span> <span class="pre">2}</span></code> for the <code class="docutils literal notranslate"><span class="pre">legend_kws</span></code> value.</p>
+</section>
+</section>
+<section id="plot-types">
+<span id="plottypes"></span><h3>Plot types<a class="headerlink" href="#plot-types" title="Permalink to this headline"></a></h3>
+<p>The following table summarizes the available plots.</p>
+<ul class="simple">
+<li><p>The “Kind” column lists the string to give as the <code class="docutils literal notranslate"><span class="pre">kind</span> <span class="pre">=</span></code> value in the configuration file to create a plot of this type.</p></li>
+<li><p>“Required keys” lists other keys that must be present in that configuration section to create that kind of plot.</p></li>
+<li><p>“Optional keys” lists keys that may be provided to change the behavior of the given plot.</p></li>
+<li><p>“Style keywords” describes what keys may be passed in the style section for this plot type; using this is “MPL <code class="docutils literal notranslate"><span class="pre">function</span></code> kws”, meaning any keywords for the Matplotlib function named can be given.</p></li>
+<li><p>“Cloning supported” indicates whether that plot type allows <a class="reference internal" href="#stylecloning"><span class="std std-ref">style cloning</span></a></p></li>
+<li><p>“Aux plots” lists auxiliary plots that can be added to that main style plot.</p></li>
+</ul>
+<table class="colwidths-given docutils align-default">
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 18%" />
+<col style="width: 27%" />
+<col style="width: 9%" />
+<col style="width: 9%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Kind</p></th>
+<th class="head"><p>Required keys</p></th>
+<th class="head"><p>Optional keys</p></th>
+<th class="head"><p>Style keywords</p></th>
+<th class="head"><p>Cloning supported</p></th>
+<th class="head"><p>Aux plots</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>flag-analysis</p></td>
+<td></td>
+<td><p>min_percent</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">bar</span></code> kws</p></td>
+<td><p>No</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>nan-check</p></td>
+<td></td>
+<td><p>vsw_windows, groups, percentage, window_font_size, sharey</p></td>
+<td><p>N/A</p></td>
+<td><p>No</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>timing-error-am-pm</p></td>
+<td><p>sza_range</p></td>
+<td><p>yvar, freq, op, time_buffer_days, flag_cat_override</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>delta-timing-error-am-pm</p></td>
+<td><p>sza_range</p></td>
+<td><p>yvar, freq, op, time_buffer_days, flag_cat_override</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>timing-error-szas</p></td>
+<td><p>sza_ranges, am_or_pm</p></td>
+<td><p>yvar, freq, op, time_buffer_days, flag_cat_override</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>scatter</p></td>
+<td><p>xvar, yvar</p></td>
+<td><p>match_axes_size, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>hexbin</p></td>
+<td><p>xvar, yvar</p></td>
+<td><p>show_reference, show_context</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">hexbin</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>timeseries</p></td>
+<td><p>yvar</p></td>
+<td><p>time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>delta-timeseries</p></td>
+<td><p>yvar1, yvar2</p></td>
+<td><p>time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>timeseries-2panel</p></td>
+<td><p>yvar, yerror_var</p></td>
+<td><p>time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>timeseries-3panel</p></td>
+<td><p>yvar</p></td>
+<td><p>time_buffer_days, show_out_of_range_data, plot_height_ratios, height_space, bottom_limit, top_limit, even_top_bottom</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>resampled-timeseries</p></td>
+<td><p>yvar, freq, op</p></td>
+<td><p>time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>rolling-timeseries</p></td>
+<td><p>yvar, ops</p></td>
+<td><p>gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>rolling-timeseries-3panel</p></td>
+<td><p>yvar, ops</p></td>
+<td><p>gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data, plot_height_ratios, height_space, bottom_limit, top_limit, even_top_bottom</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>delta-rolling-timeseries</p></td>
+<td><p>yvar1, yvar2, ops</p></td>
+<td><p>gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>rolling-derivative</p></td>
+<td><p>yvar, dvar</p></td>
+<td><p>derivative_order, gap, rolling_window, flag_category, time_buffer_days, show_out_of_range_data</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>zmin-zobs-delta-rolling-timeseries</p></td>
+<td><p>ops</p></td>
+<td><p>gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data, annotation_font_size</p></td>
+<td><p>MPL <code class="docutils literal notranslate"><span class="pre">plot</span></code> kws</p></td>
+<td><p>Yes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">violin</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<section id="common-optional-keys">
+<h4>Common optional keys<a class="headerlink" href="#common-optional-keys" title="Permalink to this headline"></a></h4>
+<p>All plot types accept the following as optional keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">key</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): a string used to refer to this plot from another plot. If not given, this plot
+cannot be referenced from another plot.</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>There is currently no check to protect against two plots having the same key. If you get odd results when
+trying to refer to another plot, make sure you don’t have duplicated plot keys!</p>
+</div>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): a name to use for the plot alongside the plot number in the upper left corner
+of each page. If this is not given, then the filename used to save the intermediate plot images is inserted
+instead.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bookmark</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): controls whether and how this page gets bookmarked in the output PDF. Assigning
+a string as this property will use that name for the bookmark in the PDF (e.g. setting <code class="docutils literal notranslate"><span class="pre">bookmark</span> <span class="pre">=</span> <span class="pre">&quot;Flags&quot;</span></code> on
+a plot will cause that page in the final PDF to have the bookmark “Flags”). Setting this to <code class="docutils literal notranslate"><span class="pre">true</span></code> will use
+the value of <code class="docutils literal notranslate"><span class="pre">name</span></code> for the bookmark (either the value passed as <code class="docutils literal notranslate"><span class="pre">name</span></code> explicitly or the fallback file name).
+If the <a class="reference internal" href="#imagepostproc"><span class="std std-ref">Image postprocessing</span></a> key <code class="docutils literal notranslate"><span class="pre">bookmark_all</span></code> is <code class="docutils literal notranslate"><span class="pre">true`,</span> <span class="pre">then</span> <span class="pre">all</span> <span class="pre">plots</span> <span class="pre">have</span> <span class="pre">a</span> <span class="pre">bookmark</span> <span class="pre">in</span> <span class="pre">the</span> <span class="pre">final</span> <span class="pre">PDF.</span> <span class="pre">In</span>
+<span class="pre">that</span> <span class="pre">case,</span> <span class="pre">the</span> <span class="pre">value</span> <span class="pre">of</span> <span class="pre">``bookmark</span></code> is used if available, then QC plots falls back on <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">legend_kws</span></code> (default = <code class="docutils literal notranslate"><span class="pre">{}</span></code>): keyword to pass to the <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.legend.html">legend</a>
+call for this plot only. Will be merged with legend keywords defined in the default style for this plot type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">extra_qc_lines</span></code> (default = <code class="docutils literal notranslate"><span class="pre">[]</span></code>): a list of dictionaries specifying extra horizontal or vertical lines to
+plot as a guide for whether data is in family or not. An example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">extra_qc_lines</span> <span class="o">=</span> <span class="p">[{</span><span class="n">value</span> <span class="o">=</span> <span class="mf">0.996</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">linestyle</span> <span class="o">=</span> <span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;darkorange&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Expected range&quot;</span><span class="p">},</span>
+                  <span class="p">{</span><span class="n">value</span> <span class="o">=</span> <span class="mf">1.002</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">linestyle</span> <span class="o">=</span> <span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">color</span> <span class="o">=</span> <span class="s2">&quot;darkorange&quot;</span><span class="p">}]</span>
+</pre></div>
+</div>
+<p>Each dictionary <em>must</em> have the key <code class="docutils literal notranslate"><span class="pre">value</span></code>, which gives the position of the line. The <code class="docutils literal notranslate"><span class="pre">axis</span></code> key is optional;
+it specifies on which axis the lines are positioned on (“y” = horizontal lines, “x” = vertical) and defaults to “y”
+if absent. Any other key-value pairs must be valid keyword arguments to <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.axvline.html#matplotlib.pyplot.axvline" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">axvline()</span></code></a> or
+<a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.axhline.html#matplotlib.pyplot.axhline" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">axhline()</span></code></a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">width</span></code> (default = <code class="docutils literal notranslate"><span class="pre">20</span></code>): initial width of the plot in centimeters</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">height</span></code> (default = <code class="docutils literal notranslate"><span class="pre">10</span></code>): initial height of the plot in centimeters</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This does not guarantee the final page size will be 20 x 10 cm. Excess whitespace is trimmed from the plots
+and the final page size depends on the <code class="docutils literal notranslate"><span class="pre">--size</span></code> command line argument.</p>
+</div>
+<p>If a plot has an auxiliary plot added, it may have additional required or optional keys beyond those described in
+this section (or the plot-specific sections below). See <a class="reference internal" href="#auxplots"><span class="std std-ref">Auxiliary Plots</span></a> for information on which keys are added by
+which auxiliary plots.</p>
+</section>
+<section id="flag-analysis">
+<h4>flag-analysis<a class="headerlink" href="#flag-analysis" title="Permalink to this headline"></a></h4>
+<p>A flag analysis plot shows bar graphs of the number of spectra and percent of spectra marked as bad by different
+variables during the automatic QC process in TCCON post processing.</p>
+<p><strong>Required keys</strong></p>
+<p>None</p>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">min_percent</span></code> (default = <code class="docutils literal notranslate"><span class="pre">1.0</span></code>): the minimum percent of spectra a variable must flag for it to be shown on the plot.</p></li>
+</ul>
+<p><strong>Style</strong></p>
+<p>A flag-analysis style subsection must have the <code class="docutils literal notranslate"><span class="pre">all</span></code> key, this is the only one used. Keywords can be any valid
+keywords for <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html#matplotlib.pyplot.bar" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.bar()</span></code></a>. In addition, <code class="docutils literal notranslate"><span class="pre">legend_fontsize</span></code> (default 7) adjusts the size of the
+text in the legend.</p>
+</section>
+<section id="nan-check">
+<span id="pt-timing-error-am-pm"></span><h4>nan-check<a class="headerlink" href="#nan-check" title="Permalink to this headline"></a></h4>
+<p>A plot that displays the number of percentage of data that is a NaN or fill value in each window. It uses the VSW
+variables, and shows the larger percentage/number for the VSW column amount and error amount for each window.</p>
+<p><strong>Required keys</strong></p>
+<p>None</p>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">vsw_windows</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): which windows from the VSW variables to include (e.g. <code class="docutils literal notranslate"><span class="pre">[&quot;co2_6220&quot;,</span> <span class="pre">&quot;ch4_6002&quot;]</span></code>).
+Generally you will not use this input; use <code class="docutils literal notranslate"><span class="pre">groups</span></code> instead. Only use this if you need to limit to specific windows.
+When this is <code class="docutils literal notranslate"><span class="pre">None</span></code> (the default), all vsw variables are available.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">groups</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): defines how to group the gases into axes. The default is to put all gases into one axes.
+Otherwise, this value must be a list of lists of gas names, e.g. <code class="docutils literal notranslate"><span class="pre">[[&quot;co2&quot;,</span> <span class="pre">&quot;ch4&quot;],</span> <span class="pre">[&quot;!h2o&quot;,</span> <span class="pre">&quot;!co2&quot;,</span> <span class="pre">&quot;!ch4&quot;],</span> <span class="pre">[&quot;h2o&quot;]]</span></code>.
+Each inner list corresponds to one axes; this example would plot CO2 and CH4 in the first, everything <em>except</em> CO2, CH4,
+and H2O in the second, and only H2O in the third. Prefixing a name with exclamation points (as in the second inner list
+of the example) will exclude that gas from the axes. Note that while it is allowed to mix excludes and includes
+(e.g. <code class="docutils literal notranslate"><span class="pre">[&quot;co2&quot;,</span> <span class="pre">&quot;!h2o&quot;]</span></code>), this is identical to only providing the includes (e.g. <code class="docutils literal notranslate"><span class="pre">[&quot;co2&quot;]</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">percentage</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): whether to plot what percentage of the data in each window is a NaN or fill value
+(<code class="docutils literal notranslate"><span class="pre">true</span></code>) or a number of spectra (<code class="docutils literal notranslate"><span class="pre">false</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">window_font_size</span></code> (default = 6): the font size to use for the label over each bar that indicates exactly what window
+it represents.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sharey</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): whether to force all axes in this plot to use the same y-limits.</p></li>
+</ul>
+<p><strong>Style</strong></p>
+<p>A nan-check style subsection must have the <code class="docutils literal notranslate"><span class="pre">all</span></code> key, this is the only one used. Keywords can be:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">width</span></code> (default = 0.8): the width of each window group. Since this scales all groups together, it isn’t generally useful.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">zero_color</span></code> (default = “b”): the color to use for the bars for windows with no NaNs/fill values. May be any valid
+Matplotlib color specification.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">color_map</span></code> (default = “autumn_r”): the name of the color map to use to color bars with &gt;0 NaNs/fill values. May be any
+recognized Matplotlib color map name.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These options have not been tested, please report if they do not work.</p>
+</div>
+</section>
+<section id="timing-error-am-pm">
+<h4>timing-error-am-pm<a class="headerlink" href="#timing-error-am-pm" title="Permalink to this headline"></a></h4>
+<p>A plot that shows a time series of resampled values for a specific range of SZA values in the morning and afternoon.
+This is an experimental plot type to try to detect timing errors from differences in the morning and afternoon values.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This plot uses all data from the main and context files unless the <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> command line flag was given.
+<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> data is not plotted separately.</p>
+</div>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sza_range</span></code>: a 2-element list giving the range of SZA values (in degrees) to average the <code class="docutils literal notranslate"><span class="pre">yvar</span></code> in. Example: <code class="docutils literal notranslate"><span class="pre">[70,</span> <span class="pre">80]</span></code></p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code> (default = <code class="docutils literal notranslate"><span class="pre">&quot;xluft&quot;</span></code>): the variable from the netCDF file to plot on the y-axis.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">freq</span></code> (default = <code class="docutils literal notranslate"><span class="pre">&quot;W&quot;</span></code>): the temporal frequency to bin the data to. Any <a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases">Pandas frequency interval</a> is supported</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">op</span></code> (default = <code class="docutils literal notranslate"><span class="pre">&quot;median&quot;</span></code>): what operation to use in the binning, usually “median” or “mean”, but any operation supported on a Pandas resampled data frame is supported.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">time_buffer_days</span></code> (default = <code class="docutils literal notranslate"><span class="pre">2</span></code>): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">flag_cat_override</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): whether to override the default flag category that the data is drawn from for the medians.
+If this option is not present, the all data (flag = 0 and flag &gt; 0) is used unless the command line argument <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> is given, in which
+case only flag = 0 data is used. If given, this option must be one of the strings “all”, “flag0”, or “flagged”, and that category of data will
+always be used.</p></li>
+</ul>
+<p><strong>Style</strong></p>
+<p>A style subsection for one of these plots may have any or all of the keys <code class="docutils literal notranslate"><span class="pre">both</span></code>, <code class="docutils literal notranslate"><span class="pre">am</span></code>, or <code class="docutils literal notranslate"><span class="pre">pm</span></code>. These provide
+style keywords that apply to the series for the morning data (<code class="docutils literal notranslate"><span class="pre">am</span></code>), afternoon data (<code class="docutils literal notranslate"><span class="pre">pm</span></code>) or both (<code class="docutils literal notranslate"><span class="pre">both</span></code>).
+The keywords given can be any style keywords accepted by <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.plot()</span></code></a>.</p>
+<p>The <cite>label</cite> keyword is treated specially. In Matplotlib, this keyword is used to set the legend text for a given
+data series. The QC plots will include a default label if you do not specify one. If you do specify one, it is
+passed through a format call where three keyword values are available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">data</span></code> will be replaced with a short description of the data (site name and whether flag == 0, flag &gt; 0, etc)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ll</span></code> and <code class="docutils literal notranslate"><span class="pre">ul</span></code> will be replace with the lower and upper SZA limits, respectively.</p></li>
+</ul>
+</section>
+<section id="delta-timing-error-am-pm">
+<h4>delta-timing-error-am-pm<a class="headerlink" href="#delta-timing-error-am-pm" title="Permalink to this headline"></a></h4>
+<p>This is the same as <a class="reference internal" href="#pt-timing-error-am-pm"><span class="std std-ref">timing-error-am-pm</span></a> except that the value plotted on the y-axis
+is the difference (afternoon - morning) instead of plotting them separately. All the required and optional keys are
+the same.</p>
+</section>
+<section id="timing-error-szas">
+<h4>timing-error-szas<a class="headerlink" href="#timing-error-szas" title="Permalink to this headline"></a></h4>
+<p>A plot that shows a time series of resampled values for multiple SZA ranges in the morning or afternoon.
+This is an experimental plot type to detect timing errors from differences in the typical value at different
+SZAs.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This plot uses all data from the main and context files unless the <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> command line flag was given.
+<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> data is not plotted separately.</p>
+</div>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sza_ranges</span></code>: a list of 2-element lists specifying which SZA ranges to plot. Example: <code class="docutils literal notranslate"><span class="pre">[[70,80],</span> <span class="pre">[40,50],</span> <span class="pre">[20,30]]</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">am_or_pm</span></code>: one of the strings “am” or “pm”, indicating that the plot should use morning (“am”) or afternoon (“pm”) data.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<p>Identical to those for <a class="reference internal" href="#pt-timing-error-am-pm"><span class="std std-ref">timing-error-am-pm</span></a> plots.</p>
+<p><strong>Style</strong></p>
+<p>Because these plots have an arbitrary number of data series (one per SZA range) rather than specific data
+categories, their style definitions follow a different pattern from other plots. Valid keywords are those accepted
+by <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.plot()</span></code></a>, but they are not grouped by data subset. These keywords are specified directly
+within a <code class="docutils literal notranslate"><span class="pre">[style.&lt;data</span> <span class="pre">type&gt;.timing-error-szas]</span></code> section, as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">default</span><span class="o">.</span><span class="n">timing</span><span class="o">-</span><span class="n">error</span><span class="o">-</span><span class="n">szas</span><span class="p">]</span>
+<span class="n">marker</span> <span class="o">=</span> <span class="s2">&quot;o&quot;</span>
+<span class="n">markersize</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">linestyle</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span>
+<span class="n">color</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;tab:blue&quot;</span><span class="p">,</span> <span class="s2">&quot;tab:orange&quot;</span><span class="p">,</span> <span class="s2">&quot;tab:green&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The value for each key may be <em>either</em> a scalar value (as in <code class="docutils literal notranslate"><span class="pre">marker</span></code>, <code class="docutils literal notranslate"><span class="pre">markersize</span></code>, and <code class="docutils literal notranslate"><span class="pre">linestyle</span></code> above) <em>or</em>
+a list of values (as with <code class="docutils literal notranslate"><span class="pre">color</span></code>). If a scalar value is provided, that value is used for all data series representing
+different data ranges. If a list is provided, then the plot cycles through the values for the different SZA ranges.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the list has fewer values than there are SZA ranges, then the plot cycles back through the values as many
+times as needed. If you are getting identical styles for two data series, make sure your lists are long enough.</p>
+</div>
+<p>Similar to <a class="reference internal" href="#pt-timing-error-am-pm"><span class="std std-ref">timing-error-am-pm</span></a>, if a value for <code class="docutils literal notranslate"><span class="pre">label</span></code> is provided, then that string
+is formatted with the <code class="docutils literal notranslate"><span class="pre">data</span></code>, <code class="docutils literal notranslate"><span class="pre">ll</span></code>, and <code class="docutils literal notranslate"><span class="pre">ul</span></code> keywords. If <code class="docutils literal notranslate"><span class="pre">label</span></code> is not provided, a default is used.
+See above for their meanings. Like the other options in this plot’s styles, <code class="docutils literal notranslate"><span class="pre">label</span></code> may be a single string or a
+list of strings.</p>
+</section>
+<section id="scatter">
+<span id="pt-scatter"></span><h4>scatter<a class="headerlink" href="#scatter" title="Permalink to this headline"></a></h4>
+<p>A plot of one variable versus another.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">xvar</span></code>: the name of the variable in the netCDF files to plot on the x-axis</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the name of the variable in the netCDF files to plot on the y-axis</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">match_axes_size</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): if given, this must be a valid hex to a “hexbin” plot. The scatter plot’s axes will be compressed to match the width of the hexbin, allowing for colorbars.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>A scatter plot’s style subsection may have the keys <code class="docutils literal notranslate"><span class="pre">all</span></code>, <code class="docutils literal notranslate"><span class="pre">flag0</span></code>, or <code class="docutils literal notranslate"><span class="pre">flagged</span></code>. These provide the style
+keyword arguments for plotting all data, <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data, and <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> data, respectively. Allowed keywords
+are those for <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.plot()</span></code></a>. If <code class="docutils literal notranslate"><span class="pre">linestyle</span></code> is not provided, it defaults to “none”.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Do not use the <code class="docutils literal notranslate"><span class="pre">ls</span></code> shorthand for <code class="docutils literal notranslate"><span class="pre">linestyle</span></code>, since <code class="docutils literal notranslate"><span class="pre">linestyle</span></code> is always set.</p>
+</div>
+<p>A default label is provided that include the site name and what subset of data (<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>, etc) a
+series refers to. If you provide a custom label, this string can be inserted by including <code class="docutils literal notranslate"><span class="pre">{data}</span></code> in your string.</p>
+</section>
+<section id="hexbin">
+<h4>hexbin<a class="headerlink" href="#hexbin" title="Permalink to this headline"></a></h4>
+<p>A plot of one variable versus another similar to a scatter plot, except it plots a 2D histogram rather than individual
+points.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This does not plot <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> data separately. If the <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> command line flag is present,
+only <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data is used, otherwise all data is used.</p>
+</div>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">xvar</span></code>: the name of the variable in the netCDF files to plot on the x-axis</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the name of the variable in the netCDF files to plot on the y-axis</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">show_reference</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): Set to <code class="docutils literal notranslate"><span class="pre">true</span></code> to plot the reference data (if provided) as a second
+2D histogram.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_context</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): Set to <code class="docutils literal notranslate"><span class="pre">true</span></code> to plot the context data (if provided) as a second 2D
+histogram.</p></li>
+</ul>
+<p><strong>Style</strong></p>
+<p>A hexbin’s style subsection may have the keys <code class="docutils literal notranslate"><span class="pre">all</span></code> and <code class="docutils literal notranslate"><span class="pre">flag0</span></code>, used when plotting all data or <code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data,
+respectively. This accepts all style keywords allowed by <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.hexbin.html#matplotlib.pyplot.hexbin" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.hexbin()</span></code></a>. Note that <code class="docutils literal notranslate"><span class="pre">extent</span></code> is
+provided a reasonable default and usually does not need specified.</p>
+<p>There are two special keywords in addition to the standard <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.hexbin.html#matplotlib.pyplot.hexbin" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.hexbin()</span></code></a> keywords:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fit_style</span></code> takes as value another dictionary of style keywords valid for <a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.plot()</span></code></a> to use
+when plotting the linear fit through the hexbin data. If <code class="docutils literal notranslate"><span class="pre">label</span></code> is included in these keywords, the first
+<code class="docutils literal notranslate"><span class="pre">{}</span></code> in it will be replaced with the linear fit information.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">legend_fontsize</span></code> sets the fontsize of the legend. 7 pts is the default, and usually keeps the linear fit
+within the plot bounds.</p></li>
+</ul>
+</section>
+<section id="timeseries">
+<h4>timeseries<a class="headerlink" href="#timeseries" title="Permalink to this headline"></a></h4>
+<p>A plot of a given variable vs. time.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the variable from the netCDF file(s) to plot on the y-axis</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">time_buffer_days</span></code> (default = <code class="docutils literal notranslate"><span class="pre">2</span></code>): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>Style configuration is identical to that for <a class="reference internal" href="#pt-scatter"><span class="std std-ref">scatter plots</span></a>.</p>
+</section>
+<section id="delta-timeseries">
+<h4>delta-timeseries<a class="headerlink" href="#delta-timeseries" title="Permalink to this headline"></a></h4>
+<p>A plot of the difference of two variables vs. time.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar1</span></code> and <code class="docutils literal notranslate"><span class="pre">yvar2</span></code>: the two variables to difference. The quantity plotted on the <em>y</em>-axis will be <code class="docutils literal notranslate"><span class="pre">yvar1</span> <span class="pre">-</span> <span class="pre">yvar2</span></code>.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">time_buffer_days</span></code> (default = <code class="docutils literal notranslate"><span class="pre">2</span></code>): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>Style configuration is identical to that for <a class="reference internal" href="#pt-scatter"><span class="std std-ref">scatter plots</span></a>.</p>
+</section>
+<section id="timeseries-2panel">
+<h4>timeseries-2panel<a class="headerlink" href="#timeseries-2panel" title="Permalink to this headline"></a></h4>
+<p>A plot of two variables vs. time, with the second in a smaller upper panel. Typically used for a retrieved variable
+and its error.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the variable from the netCDF file(s) to plot on the y-axis for the main axes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">yerror_var</span></code>: that variable from the netCDF file(s) to plot on the y-axis for the smaller upper axes.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">time_buffer_days</span></code> (default = <code class="docutils literal notranslate"><span class="pre">2</span></code>): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>Style configuration is identical to that for <a class="reference internal" href="#pt-scatter"><span class="std std-ref">scatter plots</span></a>. Both panels will use the same style for
+the same data subset.</p>
+</section>
+<section id="timeseries-3panel">
+<span id="pt-ts3panel"></span><h4>timeseries-3panel<a class="headerlink" href="#timeseries-3panel" title="Permalink to this headline"></a></h4>
+<p>A plot of one variable vs. time with the y-axis split into three panels to allow different degrees of zoom on different
+parts of the y-values’ ranges. The middle panel will have its y-limits set to those specified in the <a class="reference internal" href="#limits"><span class="std std-ref">Limits file</span></a>
+file or the min/max values indicated in the netCDF file. The lower and upper panels will show data outside these limits
+(less and greater than, respectively) out to either the maximum of the data or limits specified with the <code class="docutils literal notranslate"><span class="pre">bottom_limit</span></code>
+and <code class="docutils literal notranslate"><span class="pre">top_limit</span></code> keywords.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the variable from the netCDF file(s) to plot</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">time_buffer_days</span></code> (default = <code class="docutils literal notranslate"><span class="pre">2</span></code>): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off. For this kind of plot, data that exceeds
+the <code class="docutils literal notranslate"><span class="pre">top_limit</span></code> will be plotted on the top edge of the upper panel, and data that is less than the <code class="docutils literal notranslate"><span class="pre">bottom_limit</span></code>
+will be plotted on the bottom edge of the lower panel. (If those keywords are not set, this should be moot, as the limits
+will adjust to include all data.)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">plot_height_ratios</span></code> (default = <code class="docutils literal notranslate"><span class="pre">[1.0,</span> <span class="pre">1.0,</span> <span class="pre">1.0]</span></code>) - a three number sequence giving the relative size of the top, middle, and bottom panels, respectively.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">height_space</span></code> (default = <code class="docutils literal notranslate"><span class="pre">0.01</span></code>) - fraction of vertical space reserved for the gap between plots.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bottom_limit</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>) - providing a value for this keyword sets the lower limit of the bottom panel to that value.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">top_limit</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>) - providing a value for this keyword sets the upper limit of the top panel to that value.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">even_top_bottom</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>) - set this to <code class="docutils literal notranslate"><span class="pre">true</span></code> to automatically set <code class="docutils literal notranslate"><span class="pre">bottom_limit</span></code> and <code class="docutils literal notranslate"><span class="pre">top_limit</span></code> to be equal in
+magnitude but opposite in sign.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">even_top_bottom</span></code> cannot be set to <code class="docutils literal notranslate"><span class="pre">true</span></code> if either <code class="docutils literal notranslate"><span class="pre">bottom_limit</span></code> or <code class="docutils literal notranslate"><span class="pre">top_limit</span></code> are provided. Doing so will
+cause an error to be thrown.</p>
+</div>
+</section>
+<section id="resampled-timeseries">
+<h4>resampled-timeseries<a class="headerlink" href="#resampled-timeseries" title="Permalink to this headline"></a></h4>
+<p>Similar to “timeseries” plots, except that the data is broken down into chunks of a specified length of time and
+summarized as a mean/median/etc.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the variable from the netCDF file(s) to plot on the y-axis</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">freq</span></code>: the temporal frequency to bin the data to. Any <a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases">Pandas frequency interval</a> is supported</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">op</span></code>: what operation to use in the binning, usually “median” or “mean”, but any operation supported on a Pandas resampled data frame is supported.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">time_buffer_days</span></code> (default = <code class="docutils literal notranslate"><span class="pre">2</span></code>): number of days to buffer the edges of the plot by to ensure the first and last points do not end up on the plot edge.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>Style configuration is identical to that for <a class="reference internal" href="#pt-scatter"><span class="std std-ref">scatter plots</span></a>.</p>
+</section>
+<section id="rolling-timeseries">
+<span id="pt-rollingtimeseries"></span><h4>rolling-timeseries<a class="headerlink" href="#rolling-timeseries" title="Permalink to this headline"></a></h4>
+<p>Similar to “timeseries” plots, but in addition to plotting the raw data, running mean/median/etc. series are
+overplotted.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the variable from the netCDF file(s) to plot on the y-axis</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ops</span></code>: what operation(s) to use for the rolling, usually “median” or “mean”, but any operation supported on a Pandas
+rolling data frame is supported. This can be either a string for a single operation, or a list of strings to plot
+multiple rolled series. A special case is the “quantile” operation, this must include the quantile value to calculate,
+e.g. “quantile0.75” to compute the quantile with <code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">=</span> <span class="pre">0.75</span></code>.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gap</span></code> (default = <code class="docutils literal notranslate"><span class="pre">&quot;20000</span> <span class="pre">days&quot;</span></code>): this specified a gap in time that the rolling operation will not cross. This can
+be any string recognized by <a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html">Pandas timedelta</a>.
+If there is a gap in the data longer than this duration, the data on either side will have the rolling operation
+applied separately. The default of “20000 days” (~50 years) is set to effectively disable this behavior by default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rolling_window</span></code> (default = <code class="docutils literal notranslate"><span class="pre">500</span></code>): the number of points to use in the rolling window.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uncertainty</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): set this to <code class="docutils literal notranslate"><span class="pre">true</span></code> to plot uncertainty ranges for mean or median operations;
+means will use 1-sigma standard deviation and medians the upper and lower quartiles.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_category</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): which subset of the <code class="docutils literal notranslate"><span class="pre">yvar</span></code> data to use, both when plotting the raw data and
+when computing the rolling operation(s). The default behavior is to use the normal subset for a given data type, or
+<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data if the <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> command line argument is set. Passing one of the strings “all”, “flag0”, or
+“flagged” will force the use of that subset (this may result in errors if one of the data files does not have the
+“flag” variable, which is required to figure out the latter two subsets).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>Style configuration is similar to that for <a class="reference internal" href="#pt-scatter"><span class="std std-ref">scatter plots</span></a>, in that the keys within a
+<code class="docutils literal notranslate"><span class="pre">[style.&lt;data</span> <span class="pre">type&gt;.rolling-timeseries]</span></code> section can be the data subsets (<code class="docutils literal notranslate"><span class="pre">all</span></code>, <code class="docutils literal notranslate"><span class="pre">flag0</span></code>, <code class="docutils literal notranslate"><span class="pre">flagged</span></code>),
+each of which has a dictionary of style arguments as its value. However, the rolling operations can each
+have their own style, as additional subsection keys (e.g. <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">median</span></code>, etc.). Quantile operations
+will prefer to use a style for the specific quantile being calculated (if one is available) but will fall
+back on a provided generic <code class="docutils literal notranslate"><span class="pre">quantile</span></code> style if not.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The fallback to a generic <code class="docutils literal notranslate"><span class="pre">quantile</span></code> style is done on a per-data type basis. That is, if your “main”
+data type section has both a <code class="docutils literal notranslate"><span class="pre">quantile</span></code> and <code class="docutils literal notranslate"><span class="pre">quantile0.75</span></code> style and your “default” section has only
+a <code class="docutils literal notranslate"><span class="pre">quantile</span></code> section, then when using the “quantile0.75” operation, the final style will use the
+“main” section’s <code class="docutils literal notranslate"><span class="pre">quantile0.75</span></code> style plus the default section’s <code class="docutils literal notranslate"><span class="pre">quantile</span></code> style. The “main” section’s
+<code class="docutils literal notranslate"><span class="pre">quantile</span></code> style is entirely ignored.</p>
+</div>
+<p>Like scatter plots, if you provide a <code class="docutils literal notranslate"><span class="pre">label</span></code> as one of the style keywords, it will be passed through a
+<code class="docutils literal notranslate"><span class="pre">format</span></code> call. The <code class="docutils literal notranslate"><span class="pre">{data}</span></code> substring will still be replaced by the description of the data (site name
++ data subset). In addition, the <code class="docutils literal notranslate"><span class="pre">{op}</span></code> substring will be replaced with the rolling operation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use <code class="docutils literal notranslate"><span class="pre">{op}</span></code> in a label for regular data (e.g. <code class="docutils literal notranslate"><span class="pre">all</span></code>, <code class="docutils literal notranslate"><span class="pre">flag0</span></code>, <code class="docutils literal notranslate"><span class="pre">flagged</span></code>),
+it will get replaced by the string “None”.</p>
+</div>
+<p>If you provide styles for <code class="docutils literal notranslate"><span class="pre">std</span></code> and <code class="docutils literal notranslate"><span class="pre">quantile</span></code>, those styles will be used if plotting uncertainty
+ranges for mean and median operations, respectively.</p>
+<p>If the final style (composed from data-specific + default styles) does not include a linestyle, then
+the linestyle value is set to “none”, as for scatter plots. Avoid using the “ls” shorthand for “linestyle”
+since “linestyle” will always be set if absent.</p>
+</section>
+<section id="rolling-timeseries-3panel">
+<h4>rolling-timeseries-3panel<a class="headerlink" href="#rolling-timeseries-3panel" title="Permalink to this headline"></a></h4>
+<p>A combination of the <a class="reference internal" href="#pt-ts3panel"><span class="std std-ref">three panel timeseries plot</span></a> and the <a class="reference internal" href="#pt-rollingtimeseries"><span class="std std-ref">rolling timeseries plot</span></a>.
+This plots rolling means, medians, etc. in the three panel format of <a class="reference internal" href="#pt-ts3panel"><span class="std std-ref">timeseries-3panel</span></a>.</p>
+<p><strong>Required keys</strong></p>
+<p>Required keys are the same as <a class="reference internal" href="#pt-rollingtimeseries"><span class="std std-ref">rolling-timeseries</span></a>.</p>
+<p><strong>Optional keys</strong></p>
+<p>All keys accepted by <a class="reference internal" href="#pt-rollingtimeseries"><span class="std std-ref">rolling-timeseries</span></a> and <a class="reference internal" href="#pt-ts3panel"><span class="std std-ref">timeseries-3panel</span></a> are accepted by this plot.</p>
+</section>
+<section id="delta-rolling-timeseries">
+<span id="pt-rollingdeltatimeseries"></span><h4>delta-rolling-timeseries<a class="headerlink" href="#delta-rolling-timeseries" title="Permalink to this headline"></a></h4>
+<p>A rolling timeseries plot of the difference between two quantities in the netCDF file.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar1</span></code> and <code class="docutils literal notranslate"><span class="pre">yvar2</span></code>: the variables from the netCDF file(s) to difference. The quantity plotted on the <em>y</em>-axis is
+<code class="docutils literal notranslate"><span class="pre">yvar1</span> <span class="pre">-</span> <span class="pre">yvar2</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ops</span></code>: what operation(s) to use for the rolling, usually “median” or “mean”, but any operation supported on a Pandas
+rolling data frame is supported. This can be either a string for a single operation, or a list of strings to plot
+multiple rolled series. A special case is the “quantile” operation, this must include the quantile value to calculate,
+e.g. “quantile0.75” to compute the quantile with <code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">=</span> <span class="pre">0.75</span></code>.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gap</span></code> (default = <code class="docutils literal notranslate"><span class="pre">&quot;20000</span> <span class="pre">days&quot;</span></code>): this specified a gap in time that the rolling operation will not cross. This can
+be any string recognized by <a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html">Pandas timedelta</a>.
+If there is a gap in the data longer than this duration, the data on either side will have the rolling operation
+applied separately. The default of “20000 days” (~50 years) is set to effectively disable this behavior by default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rolling_window</span></code> (default = <code class="docutils literal notranslate"><span class="pre">500</span></code>): the number of points to use in the rolling window.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uncertainty</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): set this to <code class="docutils literal notranslate"><span class="pre">true</span></code> to plot uncertainty ranges for mean or median operations;
+means will use 1-sigma standard deviation and medians the upper and lower quartiles.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_category</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): which subset of the <code class="docutils literal notranslate"><span class="pre">yvar</span></code> data to use, both when plotting the raw data and
+when computing the rolling operation(s). The default behavior is to use the normal subset for a given data type, or
+<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data if the <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> command line argument is set. Passing one of the strings “all”, “flag0”, or
+“flagged” will force the use of that subset (this may result in errors if one of the data files does not have the
+“flag” variable, which is required to figure out the latter two subsets).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+<p><strong>Style</strong></p>
+<p>Style is the same as for <a class="reference internal" href="#pt-rollingtimeseries"><span class="std std-ref">rolling-timeseries</span></a>.</p>
+</section>
+<section id="rolling-derivative">
+<h4>rolling-derivative<a class="headerlink" href="#rolling-derivative" title="Permalink to this headline"></a></h4>
+<p>Rolling derivative plots compute a derivative of one variable vs. another across spectra in a rolling
+window. For example, if told to compute the first derivative of <code class="docutils literal notranslate"><span class="pre">y</span></code> with respect to <code class="docutils literal notranslate"><span class="pre">x</span></code> using a
+rolling window of 500 spectra, this will take spectra 1 through 500 and fit a slope of <code class="docutils literal notranslate"><span class="pre">y</span></code> versus
+<code class="docutils literal notranslate"><span class="pre">x</span></code> in those 500 spectra, then do the same for spectra 2 through 501, and so on.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yvar</span></code>: the variable in the numerator of the derivative (the dependent variable).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dvar</span></code>: the varibale in the denominator of the derivative (the independent variable).</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">derivative_order</span></code> (default = <code class="docutils literal notranslate"><span class="pre">1</span></code>): order of the derivative to calculate; <code class="docutils literal notranslate"><span class="pre">1</span></code> will compute a slope, <code class="docutils literal notranslate"><span class="pre">2</span></code> curvature, etc.
+Only <code class="docutils literal notranslate"><span class="pre">1</span></code> is implemented.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gap</span></code> (default = <code class="docutils literal notranslate"><span class="pre">&quot;20000</span> <span class="pre">days&quot;</span></code>): this specified a gap in time that the rolling operation will not cross. This can
+be any string recognized by <a class="reference external" href="https://pandas.pydata.org/pandas-docs/stable/user_guide/timedeltas.html">Pandas timedelta</a>.
+If there is a gap in the data longer than this duration, the data on either side will have the rolling operation
+applied separately. The default of “20000 days” (~50 years) is set to effectively disable this behavior by default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rolling_window</span></code> (default = <code class="docutils literal notranslate"><span class="pre">500</span></code>): the number of points to use in the rolling window.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_category</span></code> (default = <code class="docutils literal notranslate"><span class="pre">None</span></code>): which subset of the data to use when computing the rolling derivative.
+The default behavior is to use the normal subset for a given data type, or
+<code class="docutils literal notranslate"><span class="pre">flag</span> <span class="pre">==</span> <span class="pre">0</span></code> data if the <code class="docutils literal notranslate"><span class="pre">--flag0</span></code> command line argument is set. Passing one of the strings “all”, “flag0”, or
+“flagged” will force the use of that subset (this may result in errors if one of the data files does not have the
+“flag” variable, which is required to figure out the latter two subsets).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show_out_of_range_data</span></code> (default = <code class="docutils literal notranslate"><span class="pre">true</span></code>): determines whether or not to plots points that would fall outside the plot limits at the edge. The
+default behavior is to plot them; set this to <code class="docutils literal notranslate"><span class="pre">false</span></code> to turn that feature off.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The points outside the plot limits will use one of the triangle markers or the large diamond, depending on which limit or limit(s) they are outside.
+If you want to avoid confusing in-limit points for out-of-limit points, do not use any of the markers “v”, “^”, “&lt;”, “&gt;”, or “D” in your styles.</p>
+</div>
+</section>
+<section id="zmin-zobs-delta-rolling-timeseries">
+<h4>zmin-zobs-delta-rolling-timeseries<a class="headerlink" href="#zmin-zobs-delta-rolling-timeseries" title="Permalink to this headline"></a></h4>
+<p>A <a class="reference internal" href="#pt-rollingdeltatimeseries"><span class="std std-ref">delta-rolling-timeseries</span></a> plot customized for the zmin - zobs difference. It includes the estimated corresponding
+pressure difference on the right hand side of the axes as well as an annotation indicating the site altitude and bottom GEOS
+level altitude.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ops</span></code>: same as for <a class="reference internal" href="#pt-rollingdeltatimeseries"><span class="std std-ref">delta-rolling-timeseries</span></a>.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">annotation_font_size</span></code> (default = <code class="docutils literal notranslate"><span class="pre">6</span></code>): the font size for the site/GEOS altitude annotation.</p></li>
+</ul>
+<p>The other optional keys are the same as for <a class="reference internal" href="#pt-rollingdeltatimeseries"><span class="std std-ref">delta-rolling-timeseries</span></a>. Note that when using the
+violin auxiliary plot for this, the <code class="docutils literal notranslate"><span class="pre">violin_plot_pad</span></code> keyword is given a default value of 1.0 instead
+of 0.5 and the violin plot y-ticks are turned off by default. Both of these changes are to allow space
+for the estimated pressure difference.</p>
+</section>
+</section>
+<section id="auxiliary-plots">
+<span id="auxplots"></span><h3>Auxiliary Plots<a class="headerlink" href="#auxiliary-plots" title="Permalink to this headline"></a></h3>
+<p>Auxiliary plots are extra panels that can be added to a main plot to provide extra information. To add an
+auxiliary plot to a page, add <code class="docutils literal notranslate"><span class="pre">+&lt;auxkind&gt;</span></code> to the end of the main plot’s <code class="docutils literal notranslate"><span class="pre">kind</span></code> values. For example, to
+add a violin plot to a timeseries plot, set the <code class="docutils literal notranslate"><span class="pre">kind</span></code> value to <code class="docutils literal notranslate"><span class="pre">&quot;timeseries+violin&quot;</span></code>.  Internally,
+<code class="docutils literal notranslate"><span class="pre">&quot;timeseries&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;timeseries+violin&quot;</span></code> are implemented as separate plot kinds. While this should be
+largely transparent to a user, it does have several implications to be aware of:</p>
+<ol class="arabic simple">
+<li><p>Not all combinations of main + auxiliary plots will be implemented. Which auxiliary plots are supported
+with which main plots is listed above in <a class="reference internal" href="#plottypes"><span class="std std-ref">Plot types</span></a>.</p></li>
+<li><p>Only one auxiliary plot can be combined with a main plot. (Allowing multiple auxiliary plots to be added
+to a single plot would require a separate implementation for each possible combination, which isn’t practical.
+Future work could refactor the approach to auxiliary plots to make this more viable.)</p></li>
+<li><p>A main + auxiliary combination can have different styles and limits than the the main plot type alone;
+to continue our example from the first paragraph, you could readily define a <code class="docutils literal notranslate"><span class="pre">[&quot;timeseries+violin&quot;]</span></code> section
+in the <a class="reference internal" href="#limits"><span class="std std-ref">Limits file</span></a> or a <code class="docutils literal notranslate"><span class="pre">[style.main.&quot;timeseries+violin&quot;]</span></code> <a class="reference internal" href="#styles"><span class="std std-ref">Styles</span></a> section to set limits or a style
+customized for timeseries plots with a violin plot attached only (i.e. not for normal timeseries plots). However,
+the default behavior is for the main plot to use the limits and styles it would without the auxiliary plot.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you do add a section for a main+auxiliary plot, you will need to quote the plot kind in the TOML file.
+Note how in the examples in the last point above, such as <code class="docutils literal notranslate"><span class="pre">[style.main.&quot;timeseries+violin&quot;]</span></code> the
+“timeseries+violin” part is quoted. TOML files will not include plus signs in a string without it being quoted;
+if you did not quote this (i.e. <code class="docutils literal notranslate"><span class="pre">[style.main.timeseries+violin]</span></code>), it would be interpreted as a section
+named <code class="docutils literal notranslate"><span class="pre">[style.main.timeseries]</span></code>. If you already have a section named that, you’ll get a TOML error when
+running QC plots.</p>
+</div>
+<p>Note that in the third point above, the styles referred to are those for the main plot. Styles for the auxiliary
+plots need to be defined separately in the configurations; this will be described with each plot kind below.</p>
+<p>The following subsections describe the available auxiliary plot kinds, including the extra required or optional
+keys they add to their <code class="docutils literal notranslate"><span class="pre">[[plots]]</span></code> section in the configuration file and their style options.</p>
+<section id="violin-aux-plots">
+<h4>Violin aux plots<a class="headerlink" href="#violin-aux-plots" title="Permalink to this headline"></a></h4>
+<p>A violin auxiliary plot adds a small plot to the side of the main plot that shows the distribution of the
+<em>y</em>-variable of the main plot in some standard good-quality data. Note that this is separate from the
+normal reference file.</p>
+<p><strong>Required keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">violin_data_file</span></code>: a path to the netCDF file to use to create the violin plots.</p></li>
+</ul>
+<p><strong>Optional keys</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">violin_plot_side</span></code> (default = “right”): which side of the main plot axes to put the violin plot on.
+Can be “right”, “left”, “bottom”, or “top” (though only “left” or “right” are recommended).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">violin_plot_size</span></code> (default = “10%”): how big to make the violin plot horizontally (if the side is
+“left” or “right”) or vertically (if the side is “bottom” or “top”). To give as a percentage of
+the original plot size (easiest), make this a string ending in the percent sign, as the default is.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">violin_plot_pad</span></code> (default = 0.5): space to reserve between the original axes and the new violin plot
+axes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">violin_plot_hide_yticks</span></code> (default = <code class="docutils literal notranslate"><span class="pre">false</span></code>): set to <code class="docutils literal notranslate"><span class="pre">true</span></code> to hide the <em>y</em>-tick labels on the
+violin plot axes.</p></li>
+</ul>
+<p><strong>Style</strong></p>
+<p>Style for the violin plots is read exclusively from the <code class="docutils literal notranslate"><span class="pre">[style.extra.aux-violin]</span></code> section. While this can
+have all the usual data subsets as keys (<code class="docutils literal notranslate"><span class="pre">flag0</span></code>, <code class="docutils literal notranslate"><span class="pre">flagged</span></code>, <code class="docutils literal notranslate"><span class="pre">all</span></code>), usually only the <code class="docutils literal notranslate"><span class="pre">flag0</span></code> style
+matters since violin plots use flag = 0 exclusively. This can accept any keywords that
+<a class="reference external" href="https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.violinplot.html#matplotlib.pyplot.violinplot" title="(in Matplotlib v3.5.1)"><code class="xref py py-func docutils literal notranslate"><span class="pre">matplotlib.pyplot.violinplot()</span></code></a> does except for <code class="docutils literal notranslate"><span class="pre">dataset</span></code> and <code class="docutils literal notranslate"><span class="pre">positions</span></code> (they are already used),
+plus two additional keywords:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fill_color</span></code>: color to make the violin density kernel.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">line_color</span></code>: color to make any lines (medians, extrema, etc.) on the plot.</p></li>
+</ul>
+<p>An example style section is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">style</span><span class="o">.</span><span class="n">extra</span><span class="o">.</span><span class="n">aux</span><span class="o">-</span><span class="n">violin</span><span class="p">]</span>
+<span class="n">flag0</span> <span class="o">=</span> <span class="p">{</span><span class="n">showmedians</span> <span class="o">=</span> <span class="n">true</span><span class="p">,</span> <span class="n">showextrema</span> <span class="o">=</span> <span class="n">false</span><span class="p">,</span> <span class="n">fill_color</span> <span class="o">=</span> <span class="s2">&quot;silver&quot;</span><span class="p">,</span> <span class="n">line_color</span> <span class="o">=</span> <span class="s2">&quot;dimgray&quot;</span><span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="limits-file">
+<span id="limits"></span><h2>Limits file<a class="headerlink" href="#limits-file" title="Permalink to this headline"></a></h2>
+<section id="basic-format">
+<h3>Basic format<a class="headerlink" href="#basic-format" title="Permalink to this headline"></a></h3>
+<p>The limits file is broken down into sections that specify limits for different kinds of plots. Default values for
+each variable can also be specified. An example of a simple limits file is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">default</span><span class="p">]</span>
+<span class="n">xluft</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.975</span><span class="p">,</span> <span class="mf">1.025</span><span class="p">]</span>
+<span class="n">xch4</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.6</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]</span>
+<span class="n">xch4_error</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">]</span>
+
+<span class="p">[</span><span class="n">scatter</span><span class="p">]</span>
+<span class="n">xluft</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.996</span><span class="p">,</span> <span class="mf">1.002</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Each section starts with a value in brackets. The <code class="docutils literal notranslate"><span class="pre">[default]</span></code> section in this example specifies the default limits
+for three variables: xluft, xch4, and xch4_error. Note that each set of limits is given as a list, also in square
+brackets.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Make sure the limits have the lower value first! The TCCON QC code makes no guarantees about how the plots
+will behave if the limits are reversed.</p>
+</div>
+<p>In this example, we have a second section, <code class="docutils literal notranslate"><span class="pre">[scatter]</span></code> which specifies limits for xluft. This means that any scatter
+plots will use the tighter limits specified in this second section, while all other plots will use the looser limits
+given in <code class="docutils literal notranslate"><span class="pre">[default]</span></code>.</p>
+<p>The allowed section names other than <code class="docutils literal notranslate"><span class="pre">[default]</span></code> are the same as the allowed values for the <code class="docutils literal notranslate"><span class="pre">kind</span></code> argument in the
+primary configuration.</p>
+</section>
+<section id="wildcards">
+<h3>Wildcards<a class="headerlink" href="#wildcards" title="Permalink to this headline"></a></h3>
+<p>The limits file also supports limited wildcards in the variable names, so that a limit can match for all variables
+whose names follow a certain pattern. The allowed wildcards are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">*</span></code> - matches 0 or more characters (i.e. anything)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">?</span></code> - matches any single character</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[seq]</span></code> - matches any character in “seq”</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[!seq]</span></code> - matches any character not in “seq”</p></li>
+</ul>
+<p>Consider this example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">default</span><span class="p">]</span>
+<span class="s2">&quot;*vsf_hcl*&quot;</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]</span>
+<span class="s2">&quot;vsf_*&quot;</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">]</span>
+<span class="s2">&quot;*_fs&quot;</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The first entry will match <em>any</em> variable that includes the substring “vsf_hcl” anywhere, because the two <code class="docutils literal notranslate"><span class="pre">*</span></code> can
+match anything (including nothing). The second entry will only match variables that begin with “vsf_”, while the third
+will only match variables that end in “_fs”.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In this example, the strings on the left side of the equals sign are quoted, when they weren’t in the non-wildcard
+example. Whenever using special characters like <code class="docutils literal notranslate"><span class="pre">*</span></code>, it’s best to quote the string to ensure TOML interprets it
+as a string.</p>
+</div>
+</section>
+<section id="precedence">
+<h3>Precedence<a class="headerlink" href="#precedence" title="Permalink to this headline"></a></h3>
+<p>With wildcards, it is quite easy to have a variable match multiple entries in your limits file. TCCON QC uses three
+rules to determine which limit to use:</p>
+<ol class="arabic simple">
+<li><p>A plot specific section takes precedence over the <code class="docutils literal notranslate"><span class="pre">[default]</span></code> section</p></li>
+<li><p>Use the first entry in a section that matches the variable</p></li>
+<li><p>If no entry matches that variable, use the <code class="docutils literal notranslate"><span class="pre">vmin</span></code> and <code class="docutils literal notranslate"><span class="pre">vmax</span></code> attributes for that variable from the netCDF file(s) being plotted.</p></li>
+</ol>
+</section>
+</section>
+<section id="email-file">
+<h2>Email file<a class="headerlink" href="#email-file" title="Permalink to this headline"></a></h2>
+<p>The email configuration file allows you to specify how to send emails containing the plots. An example file is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">server</span><span class="p">]</span>
+<span class="n">use_external_program</span> <span class="o">=</span> <span class="n">true</span>
+
+<span class="p">[</span><span class="n">server</span><span class="o">.</span><span class="n">program</span><span class="p">]</span>
+<span class="n">program</span> <span class="o">=</span> <span class="s2">&quot;mail&quot;</span>
+<span class="n">subject_flag</span> <span class="o">=</span> <span class="s2">&quot;-s&quot;</span>
+<span class="n">from_addr_flag</span> <span class="o">=</span> <span class="s2">&quot;-r&quot;</span>
+<span class="n">attachment_flag</span> <span class="o">=</span> <span class="s2">&quot;-a&quot;</span>
+<span class="n">body_arg</span> <span class="o">=</span> <span class="s2">&quot;stdin&quot;</span>
+
+<span class="p">[</span><span class="n">server</span><span class="o">.</span><span class="n">smtp</span><span class="p">]</span>
+<span class="n">smtp_address</span> <span class="o">=</span> <span class="s2">&quot;smtp.gmail.com&quot;</span>
+<span class="n">smtp_port</span> <span class="o">=</span> <span class="mi">587</span>
+
+<span class="p">[</span><span class="n">email</span><span class="p">]</span>
+<span class="kn">from</span> <span class="o">=</span> <span class="s2">&quot;me@self.com&quot;</span>
+<span class="n">to</span> <span class="o">=</span> <span class="s2">&quot;you@other.edu&quot;</span>
+<span class="n">body</span> <span class="o">=</span> <span class="s2">&quot;Plots automatically generated by `tccon_qc_plots` on </span><span class="si">{date}</span><span class="s2"> from </span><span class="si">{basename}</span><span class="s2">.&quot;</span>
+<span class="n">subject_from_site_id</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">subject</span> <span class="o">=</span> <span class="s2">&quot;[#275]&quot;</span>
+
+<span class="p">[</span><span class="n">email</span><span class="o">.</span><span class="n">sites</span><span class="p">]</span>
+<span class="n">ae</span> <span class="o">=</span> <span class="mi">226</span>  <span class="c1"># Ascension Island</span>
+<span class="n">an</span> <span class="o">=</span> <span class="mi">224</span>  <span class="c1"># Anmyeondo</span>
+<span class="n">bi</span> <span class="o">=</span> <span class="mi">213</span>  <span class="c1"># Bialystok</span>
+<span class="n">br</span> <span class="o">=</span> <span class="mi">236</span>  <span class="c1"># Bremen</span>
+<span class="n">bu</span> <span class="o">=</span> <span class="mi">220</span>  <span class="c1"># Burgos</span>
+<span class="n">ci</span> <span class="o">=</span> <span class="mi">210</span>  <span class="c1"># Caltech/Pasadena</span>
+<span class="n">db</span> <span class="o">=</span> <span class="mi">214</span>  <span class="c1"># Darwin</span>
+<span class="n">df</span> <span class="o">=</span> <span class="mi">225</span>  <span class="c1"># Armstrong/Dryden/Edwards</span>
+<span class="n">et</span> <span class="o">=</span> <span class="mi">227</span>  <span class="c1"># East Trout Lake</span>
+<span class="n">eu</span> <span class="o">=</span> <span class="mi">222</span>  <span class="c1"># Eureka</span>
+<span class="n">gm</span> <span class="o">=</span> <span class="mi">234</span>  <span class="c1"># Garmisch</span>
+<span class="n">hf</span> <span class="o">=</span> <span class="mi">276</span>  <span class="c1"># Hefei</span>
+<span class="n">hw</span> <span class="o">=</span> <span class="mi">274</span>  <span class="c1"># Harwell</span>
+<span class="n">iz</span> <span class="o">=</span> <span class="mi">216</span>  <span class="c1"># Izana</span>
+<span class="n">js</span> <span class="o">=</span> <span class="mi">233</span>  <span class="c1"># Saga</span>
+<span class="n">ka</span> <span class="o">=</span> <span class="mi">217</span>  <span class="c1"># Karlsruhe</span>
+<span class="n">ll</span> <span class="o">=</span> <span class="mi">219</span>  <span class="c1"># Lauder pre-2018 125HR</span>
+<span class="n">lr</span> <span class="o">=</span> <span class="mi">221</span>  <span class="c1"># Lauder post-2018 125HR</span>
+<span class="n">ni</span> <span class="o">=</span> <span class="mi">240</span>  <span class="c1"># Nicosia</span>
+<span class="n">ny</span> <span class="o">=</span> <span class="mi">237</span>  <span class="c1"># Ny-Alesund</span>
+<span class="n">oc</span> <span class="o">=</span> <span class="mi">223</span>  <span class="c1"># Lamont</span>
+<span class="ow">or</span> <span class="o">=</span> <span class="mi">212</span>  <span class="c1"># Orleans</span>
+<span class="n">pa</span> <span class="o">=</span> <span class="mi">211</span>  <span class="c1"># Park Falls</span>
+<span class="n">pr</span> <span class="o">=</span> <span class="mi">231</span>  <span class="c1"># Paris</span>
+<span class="n">ra</span> <span class="o">=</span> <span class="mi">260</span>  <span class="c1"># Reunion</span>
+<span class="n">rj</span> <span class="o">=</span> <span class="mi">228</span>  <span class="c1"># Rikubetsu</span>
+<span class="n">so</span> <span class="o">=</span> <span class="mi">218</span>  <span class="c1"># Sodankyla</span>
+<span class="n">sp</span> <span class="o">=</span> <span class="mi">237</span>  <span class="c1"># Alternate abbreviation for Ny-Alesund?</span>
+<span class="n">tj</span> <span class="o">=</span> <span class="mi">229</span>  <span class="c1"># Tsukuba 120HR</span>
+<span class="n">tk</span> <span class="o">=</span> <span class="mi">229</span>  <span class="c1"># Tsukuba 125HR</span>
+<span class="n">wg</span> <span class="o">=</span> <span class="mi">215</span>  <span class="c1"># Wollongong</span>
+<span class="n">xh</span> <span class="o">=</span> <span class="mi">271</span>  <span class="c1"># Xianghe</span>
+<span class="n">zs</span> <span class="o">=</span> <span class="mi">235</span>  <span class="c1"># Zugspitze</span>
+</pre></div>
+</div>
+<p>This is a <a class="reference external" href="https://toml.io/en/">TOML</a> document. For details on the TOML syntax, see <a class="reference external" href="https://toml.io/en/">https://toml.io/en/</a>. Now,
+let’s consider each section.</p>
+<section id="server-section">
+<h3>server section<a class="headerlink" href="#server-section" title="Permalink to this headline"></a></h3>
+<p>This section contains general options for what email server to use to send the email. It only has one option presently:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">use_external_program</span></code> - a boolean value that determines whether emails are sent using a command line program like
+<code class="docutils literal notranslate"><span class="pre">mail</span></code> (true) or Python’s own SMTP library (false).</p></li>
+</ul>
+</section>
+<section id="server-program-section">
+<h3>server.program section<a class="headerlink" href="#server-program-section" title="Permalink to this headline"></a></h3>
+<p>This section contains options specific to the case where emails are sent using a command line program. The required options
+are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">program</span></code> - the name of the command line program to call.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">subject_flag</span></code> - what command line flag to use to pass the subject of the email.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">from_addr_flag</span></code> - what command line flag to use to pass the from address.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">attachment_flag</span></code> - what command line flag to use to pass a path to a file to attach.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">body_arg</span></code> - How to pass the body of the email. Currently the only acceptable value is “stdin”, meaning that the program
+accepts the body through piping (e.g. <code class="docutils literal notranslate"><span class="pre">echo</span> <span class="pre">&quot;This</span> <span class="pre">is</span> <span class="pre">the</span> <span class="pre">body&quot;</span> <span class="pre">|</span> <span class="pre">mail</span></code>) or input redirection (e.g. <code class="docutils literal notranslate"><span class="pre">mail</span> <span class="pre">&lt;</span> <span class="pre">body_file</span></code>).
+If you intend to use a program that does not accept the message body in this way, QC plots will need updated.</p></li>
+</ul>
+<p>Note that when using an external program, QC plots assumes that it accepts the “to” email addresses as the sole positional argument.
+If you wish to use an email program for which that is not true, QC plots will need upgraded.</p>
+</section>
+<section id="server-smtp-section">
+<h3>server.smtp section<a class="headerlink" href="#server-smtp-section" title="Permalink to this headline"></a></h3>
+<p>This section contains options specific to the case where emails are sent using Python’s <code class="xref py py-mod docutils literal notranslate"><span class="pre">smtp</span></code> module. Note that this functionality
+has not been thoroughly tested, as it did not work with the SMTP server on tccondata.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">smtp_address</span></code> - what address to connect to to send the email. Common values are “localhost” (use an SMTP server on this computer),
+“smtp.gmail.com” (to send from a Gmail account) and “smtp.outlook.com” (to send from an Outlook account). Note that these last two
+may require an account for which insecure sending is permitted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">smtp_port</span></code> - what port to connect to. A value of 0 will try to guess; gmail and output server both use 587.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">password</span></code> - password to use to connect to the sending account.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">requires_auth</span></code> - whether the sending account needs authentication (true or false). If true, then you will be prompted to enter your
+password interactively (so don’t use this in automated scripts). If false, the sending account does not need authentication to connect.
+If <code class="docutils literal notranslate"><span class="pre">password</span></code> is present, this option is ignored. Otherwise, true is the default.</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you put a login password in this configuration file, you should make sure that only trusted users can read it. On a Unix/Linux system, you should
+remove all access permissions for “other” set of users at the very least, and ideally this file would only be readable by the owner.</p>
+</div>
+</section>
+<section id="email-section">
+<h3>email section<a class="headerlink" href="#email-section" title="Permalink to this headline"></a></h3>
+<p>The section controls the content of the email, as well as where it is sent.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">from</span></code> - the sending email address. This can be used to connect to a Gmail or Outlook server if <code class="docutils literal notranslate"><span class="pre">use_external_program</span></code> is false, in which
+case you will need to provide login authentication. If sending emails with an external (command line) program, this account does not need to
+be logged in to, it will just be set as the sender.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">to</span></code> - the recipient email address. If sending to GGGBugs, this will be the same email that sends alerts about watched topics (that you can
+reply to to update the topic).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">body</span></code> - the main body of the email. There are three substrings that will be substituted with useful values, if present:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>“{date}” will be replaced with the current date, time, and timezone when the email is sent.</p></li>
+<li><p>“{basename}” will be replaced with the name of the netCDF file given as input to the plotting program, without leading directories.</p></li>
+<li><p>“{plot_url}” will be replaced with a URL at which the plots can be accessed. Note that if the plotting program is called without the
+<code class="docutils literal notranslate"><span class="pre">--plot-url</span></code> command line argument (or <code class="docutils literal notranslate"><span class="pre">plot_url=None</span></code> in the driver Python function) then this value will be <code class="docutils literal notranslate"><span class="pre">None</span></code>. If this
+substring is <em>not</em> present in your email body, but the QC plotting program was told to provide a URL, then a short sentence giving the
+URL is appended automatically.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The body is formatted using Python’s <a class="reference external" href="https://docs.python.org/3/library/string.html?highlight=strings#format-string-syntax">string formatter</a>.
+This means that if you have curly brace in the body (other than in the allowed substrings listed above) it will try to replace those curly braces,
+and probably crash due to missing format arguments. Avoid putting curly braces in your body other than around the substrings mentioned above,
+but if you <em>must</em> have a curly brace, write a double brace (<code class="docutils literal notranslate"><span class="pre">{{</span></code> or <code class="docutils literal notranslate"><span class="pre">}}</span></code>) to protect it from formatting.</p>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">subject_from_site_id</span></code> - a boolean indicating if the subject should be derived from the site ID, which is assumed to be the first two
+letters of the netCDF file name. If this is true, then the subject is determined from the email.sites section of this configuration file.
+If this is false, then the subject is set to the value of the <code class="docutils literal notranslate"><span class="pre">subject</span></code> setting in this section.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">subject</span></code> - the subject for the email; only used if <code class="docutils literal notranslate"><span class="pre">subject_from_site_id</span></code> is false.</p></li>
+</ul>
+</section>
+<section id="email-sites-section">
+<h3>email.sites section<a class="headerlink" href="#email-sites-section" title="Permalink to this headline"></a></h3>
+<p>In this section, each key value (on the left site of the equals sign) is a site ID, and the value on the right is the topic number that site
+has in GGG Bugs. When sending an email with <code class="docutils literal notranslate"><span class="pre">subject_from_site_id</span> <span class="pre">=</span> <span class="pre">true</span></code>, the first two letters of the netCDF file name will be compared
+against the keys in this section. If a match is found, the subject will be “[#N]”, where <em>N</em> is the number from this section. This is the
+format GGG Bug’s redmine software uses to match up an incoming email to a topic.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If your netCDF file has a site ID not in this list when <code class="docutils literal notranslate"><span class="pre">subject_from_site_id</span></code> is true, you’ll get an error and the email won’t send.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="TCCON QC Plots installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="code_design.html" class="btn btn-neutral float-right" title="QC plots code design" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Sebastien Roche, Joshua Laughner.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

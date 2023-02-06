@@ -64,7 +64,7 @@ Thumbs.db
 *.egg-info
 
 # build artifacts for the package
-build/
+build/*
 
 # compiled images
 *.so

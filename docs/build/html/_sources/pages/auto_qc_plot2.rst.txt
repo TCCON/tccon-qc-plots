@@ -1,0 +1,4 @@
+API: qc_plots2
+==============
+
+.. automodule:: qc_plots.qc_plots2
