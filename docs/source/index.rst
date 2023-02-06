@@ -10,6 +10,7 @@ Welcome to TCCON QC's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   pages/installation.rst
    pages/configuration.rst
    pages/code_design.rst
    pages/auto_qc_plots2.rst

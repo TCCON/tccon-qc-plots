@@ -106,6 +106,11 @@ This section contains options that pertain to final conversion of the individual
 It begins with the ``[image_postprocessing]`` header. All options are optional (with one caveat regarding
 ``font_file``). Options are:
 
+* ``disable_info`` (default = ``false``): set this to ``true`` to skip writing plot information (plot number, name,
+  and source file) in the upper left corner of each plot. Since writing that information requires that ``font_file``
+  points to a valid TrueType font file, setting ``disable_info = true`` is a workaround if you cannot find a TrueType 
+  font on your computer.
+
 * ``font_file`` (default = "LiberationSans-Regular.ttf"): TrueType font file to use when writing the plot 
   number, name, and input file in the top left of each page. This is done using Python's 
   `Pillow library <https://pillow.readthedocs.io/en/stable/>`_ for image manipulation. Pillow searches common 
@@ -113,8 +118,8 @@ It begins with the ``[image_postprocessing]`` header. All options are optional (
 
 .. note::
    If :file:`LiberationSans-Regular.ttf` is not available on your system, you will need to change this option 
-   to a valid TrueType font file, or the QC plots program will crash when it reaches this part. On Linux, fonts 
-   can usually be found under :file:`/usr/share/fonts`.
+   to a valid TrueType font file, or set ``disable_info`` to ``true``. Otherwise the QC plots program will crash 
+   when it reaches this part. On Linux, fonts can usually be found under :file:`/usr/share/fonts`.
 
 * ``font_size`` (default = 30): size of the font used to write the plot number, name, etc. in the upper left 
   corner of each page. 
