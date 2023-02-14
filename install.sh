@@ -36,6 +36,7 @@ conda activate tccon-qc
 cd $mydir
 mkdir -p deps
 
+echo "Cloning/updating tccon-qc-email email via SSH (may require SSH key passphrase)..."
 if [[ -d deps/tccon-qc-email ]]; then
     (cd deps/tccon-qc-email && git pull)
 else
