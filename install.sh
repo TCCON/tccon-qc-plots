@@ -34,4 +34,12 @@ fi
 
 conda activate tccon-qc
 cd $mydir
+mkdir -p deps
+
+if [[ -d deps/tccon-qc-email ]]; then
+    (cd deps/tccon-qc-email && git pull)
+else
+    (cd deps && git clone git@github.com:TCCON/tccon-qc-email.git)
+fi
+  (cd deps/tccon-qc-email && python setup.py develop)
 python setup.py develop
