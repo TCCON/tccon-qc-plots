@@ -5,6 +5,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "name": "Std config",
             "type": "python",
@@ -18,7 +19,15 @@
             "request": "launch",
             "program": "${workspaceFolder}/.vscode/debug.py",
             "console": "integratedTerminal",
-            "args": ["--config-file=/home/jlaugh/qc-plot-config.toml", "--limits-file=/home/jlaugh/qc-plot-limits.toml"]
+            "args": ["--config-file=/home/jlaugh/automation-testbed/configs/qc-plot-config.toml", "--limits-file=/home/jlaugh/automation-testbed/configs/qc-plot-limits.toml"]
+        },
+        {
+            "name": "Small config",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/.vscode/debug.py",
+            "console": "integratedTerminal",
+            "args": ["--config-file=/home/jlaugh/automation-testbed/configs/qc-plot-config-subset.toml", "--limits-file=/home/jlaugh/automation-testbed/configs/qc-plot-limits.toml"]
         }
     ]
 }

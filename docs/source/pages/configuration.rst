@@ -401,6 +401,26 @@ A nan-check style subsection must have the ``all`` key, this is the only one use
 .. note::
    These options have not been tested, please report if they do not work.
 
+
+neg-time-jump
+~~~~~~~~~~~~~
+
+A plot that displays histograms of differences in ZPD time between adjacent spectra (positive and negative differences shown
+in separate panels) and a timeline of when the negative time differences are in different ranges of values. This is intended
+to check for duplicate spectra.
+
+**Required keys**
+
+None.
+
+**Optional keys**
+
+None supported through configuration.
+
+**Style**
+
+A neg-time-jump style subsection must have the ``all`` key, this is the only one used. The only keyword used is ``marker``.
+
 timing-error-am-pm
 ~~~~~~~~~~~~~~~~~~
 
