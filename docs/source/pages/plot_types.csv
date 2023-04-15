@@ -1,6 +1,7 @@
 Kind,Required keys,Optional keys,Style keywords,Cloning supported,Aux plots
 flag-analysis,,"min_percent","MPL ``bar`` kws",No,
 nan-check,,"vsw_windows, groups, percentage, window_font_size, sharey",N/A,No,
+neg-time-jump,,,"marker",No,
 timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days, flag_cat_override","MPL ``plot`` kws",Yes,``violin``
 delta-timing-error-am-pm,"sza_range","yvar, freq, op, time_buffer_days, flag_cat_override","MPL ``plot`` kws",Yes,``violin``
 timing-error-szas,"sza_ranges, am_or_pm","yvar, freq, op, time_buffer_days, flag_cat_override","MPL ``plot`` kws",No,``violin``

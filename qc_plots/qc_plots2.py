@@ -5,7 +5,9 @@ from enum import Enum
 from fnmatch import fnmatch
 from PyPDF2.generic import Bookmark
 from matplotlib.axes import Axes
+from matplotlib.gridspec import GridSpec
 import matplotlib.dates as mdates
+import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -1586,6 +1588,161 @@ class NanCheckPlot(AbstractPlot):
         ax.grid()
         
         
+class NegativeTimeJumpPlot(AbstractPlot):
+    """Concrete plotting class to check for negative time differences between adjacent spectra
+
+    TCCON files should usually be monotonically increasing in time for one site. If we see small
+    negative time differences, that's probably okay, but if we see bigger ones, that may indicate
+    that some spectra were duplicated.
+
+    For parameters not listed here, see :py:class:`AbstractPlot`.
+
+    Parameters
+    ----------
+    thresholds
+        A list of dictionaries containing the following keys:
+
+            * "ll", "ul" - the lower and upper limits for time deltas to plot for this group. Setting 
+              ``None`` for one will remove that limit, e.g. ``None`` for "ll" will plot everything < "ul"
+            * "label" - tick label to give this group
+            * "color" - color to use for this group
+
+        The timeline plot will show data falling in each of these ll to ul bins, with the first one at y = 0,
+        the second at y = 1 and so on.
+    """
+    plot_kind = 'neg-time-jump'
+
+    def __init__(self, other_plots, default_style: dict, limits: Limits, key: Optional[str] = None, name: Optional[str] = None, 
+                 bookmark: Optional[Union[str, bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None, 
+                 extra_qc_lines: Optional[Sequence[dict]] = None, thresholds: Sequence[dict] = None):
+        super().__init__(other_plots, default_style, limits, key, name, bookmark, width, height, legend_kws, extra_qc_lines)
+        self._timeline_handles = []
+        if thresholds:
+            self.thresholds = thresholds
+        else:
+            self.thresholds = [
+                {'ll': pd.Timedelta(minutes=-5), 'ul': pd.Timedelta(0), 'label': r'$\Delta t \in$ [$-5$ min, $0$ min)', 'color': 'tab:green'},
+                {'ll': pd.Timedelta(hours=-1), 'ul': pd.Timedelta(minutes=-5), 'label': r'$\Delta t \in$ [$-1$ hr, $-5$ min)', 'color': 'tab:blue'},
+                {'ll': pd.Timedelta(hours=-12), 'ul': pd.Timedelta(hours=-1), 'label': r'$\Delta t \in$ [$-12$ hr, $-1$ hr)', 'color': 'tab:pink'},
+                {'ll': pd.Timedelta(days=-1), 'ul': pd.Timedelta(hours=-12), 'label': r'$\Delta t \in$ [$-24$ hr, $-12$ hr)', 'color': 'tab:orange'},
+                {'ll': None, 'ul': pd.Timedelta(days=-1), 'label': r'$\Delta t \leq -1$ day', 'color': 'tab:red'},
+            ]
+
+    def setup_figure(self, data: Sequence[TcconData], show_all: bool = False, fig=None, axs=None):
+        fig, axs = self._make_or_check_fig_ax_args(fig, axs)
+        fig.suptitle('Negative time jumps')
+        return fig, axs
+
+    def _make_or_check_fig_ax_args(self, fig, axs, nrow=1, ncol=1, ax_ndim=None, ax_size=None, ax_shape=None, sharey=False):
+        if (fig is None) != (axs is None):
+            raise TypeError('Must give both or neither of fig and axs')
+        elif fig is None and axs is None:
+            size = utils.cm2inch(self._width, self._height)
+            fig = plt.figure(figsize=size)
+            gs = GridSpec(2, 2)
+            axs = {
+                'neg_hist': fig.add_subplot(gs[0,0]), 
+                'pos_hist': fig.add_subplot(gs[0,1]),
+                'timeline': fig.add_subplot(gs[1,:])
+            }
+        elif not isinstance(axs, dict):
+            raise TypeError('axs must be a dictionary')
+        elif set(axs.keys()) != {'neg_hist', 'pos_hist', 'timelime'}:
+            raise TypeError('axs must have keys "neg_hist", "pos_hist", and "timeline"')
+
+        return fig, axs
+
+    def get_plot_data(self, data: TcconData, flagged_category: FlagCategory):
+        if flagged_category != FlagCategory.ALL_DATA:
+            print('\nWARNING: Negative time jump plots always use all data', file=sys.stderr)
+
+        times = pd.DatetimeIndex(data.get_data('datetime', FlagCategory.ALL_DATA))
+        delta_times = times[1:] - times[:-1]
+        df = pd.DataFrame({'time': times})
+        df.loc[0, 'delta_time'] = pd.Timedelta(0)
+        df.loc[1:, 'delta_time'] = delta_times
+        df.loc[:, 'abs_delta_time'] = df['delta_time'].abs()
+        return df
+
+    def get_save_name(self):
+        return 'neg_time_check.png'
+
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        dt_df = self.get_plot_data(data, FlagCategory.ALL_DATA)
+        style = self.get_plot_kws(data, FlagCategory.ALL_DATA)
+        legend_kws = self.get_legend_kws()
+        legend_kws.setdefault('fontsize', 6)
+        marker = style.get('marker', '+' if data.data_category == DataCategory.PRIMARY else 'x')
+        label = style.get('label', str(data.data_category))
+
+        lt0 = dt_df['delta_time'] < pd.Timedelta(0)
+        
+        self._delta_time_hist_inner(dt_df[lt0], '< 0', label=label, ax=axs['neg_hist'])
+        self._delta_time_hist_inner(dt_df[~lt0], '\\geq 0', label=label, ax=axs['pos_hist'])
+        self._delta_time_timeline(dt_df, marker=marker, label=label, ax=axs['timeline'])
+
+        for key, ax in axs.items():
+            if key == 'timeline':
+                ax.legend(handles=self._timeline_handles, **legend_kws)
+            else:
+                ax.legend(**legend_kws)
+
+    @classmethod
+    def _delta_time_hist_inner(cls, dt_df, criterion, add_text=False, label='', ax=None):
+        ax = ax or plt.gca()
+        delta_minutes = pd.TimedeltaIndex(dt_df['delta_time']).total_seconds() / 60
+        ax.hist(delta_minutes, bins=25, label=label)
+        ax.set_xlabel(rf'$\Delta t {criterion}$ (minutes)')
+        ax.set_ylabel('# differences')
+
+        if add_text:
+            min_dt = cls._dtstr(dt_df['delta_time'].min())
+            max_dt = cls._dtstr(dt_df['delta_time'].max())
+            mean_dt = cls._dtstr(dt_df['delta_time'].mean())
+
+            if delta_minutes.min() < 0:
+                x, y = 0.025, 0.975
+                ha = 'left'
+            else:
+                x, y = 0.975, 0.975
+                ha = 'right'
+
+            ax.text(x, y, f'Min = {min_dt}\nMean = {mean_dt}\nMax = {max_dt}', transform=ax.transAxes, va='top', ha=ha)
+
+    @staticmethod
+    def _dtstr(dt):
+        s = dt.total_seconds()
+        sign = '$-$' if s < 0 else '+'
+        s = np.abs(s)
+
+        hours = int(s / 3600)
+        minutes = int((s - hours * 3600) / 60)
+        seconds = int(s - hours * 3600 - minutes * 60)
+
+        return f'{sign}{hours}:{minutes:02d}:{seconds:02d}'
+
+    def _delta_time_timeline(self, dt_df, marker='o', label='', ax=None):
+        ax = ax or plt.gca()
+        ticks = []
+        ticklabels = []
+        for i, thresh in enumerate(self.thresholds):
+            ticks.append(i)
+            ticklabels.append(thresh['label'])
+            tt = np.ones(dt_df.shape[0], dtype=bool)
+            if thresh['ll'] is not None:
+                tt &= dt_df['delta_time'] >= thresh['ll']
+            if thresh['ul'] is not None:
+                tt &= dt_df['delta_time'] < thresh['ul']
+            
+            ax.plot(dt_df.loc[tt, 'time'], np.full(tt.sum(), i), ls='none', marker=marker, color=thresh['color'])
+        self._timeline_handles.append(mlines.Line2D([0], [0], marker=marker, color='black', ls='none', label=label))
+        ax.set_yticks(ticks)
+        ax.set_yticklabels(ticklabels)
+        ax.set_ylim(ticks[0] - 0.1, ticks[-1] + 0.1)
+        ax.grid()
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=30)
+
+
 class TimingErrorAbstractPlot(AbstractPlot, TimeseriesMixin, ABC):
     """Intermediate abstract plot class for timing error plots
     """
