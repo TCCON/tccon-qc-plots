@@ -276,6 +276,8 @@ class TcconData:
             return self.times
         elif varname == 'datetime':
             return self.datetimes
+        elif varname in {'raw-time', 'raw_time'}:
+            return self.nc_dset['time'][tuple()]
         else:
             return self.nc_dset[varname][tuple()]
 
@@ -1586,7 +1588,7 @@ class NanCheckPlot(AbstractPlot):
         ax.set_xticks(np.arange(xi + 1))
         ax.set_xticklabels(tick_labels)
         ax.grid()
-        
+
         
 class NegativeTimeJumpPlot(AbstractPlot):
     """Concrete plotting class to check for negative time differences between adjacent spectra
@@ -4760,6 +4762,100 @@ class TimeseriesRollingDeltaZminWithViolin(TimeseriesRollingDeltaZmin, ViolinAux
         # the resize on the twinned axes, then hide the axes created in this process.
         dummy_ax = self.create_side_plot_axes(ax2)
         dummy_ax.set_visible(False)
+
+
+
+class PriorTimeMatchupTimeseriesPlot(TimeseriesPlot):
+    plot_kind = 'prior-time-matchup-timeseries'
+
+    def __init__(self, other_plots, default_style: dict, limits: Limits, name: Optional[str] = None, 
+                 bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None, 
+                 key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None, 
+                 show_out_of_range_data: bool = True, max_time_diff_hours: float = 1.51,
+                 mark_out_of_bounds_time_diffs: bool = True, out_of_bounds_style: dict = {'linewidth': 0.5, 'color': 'crimson'}):
+        
+        if extra_qc_lines is None:
+            extra_qc_lines = []
+        extra_qc_lines.extend([
+            {'value': max_time_diff_hours, 'linestyle': '--', 'color': 'red', 'label': 'Max time diff'},
+            {'value': max_time_diff_hours, 'linestyle': '--', 'color': 'red'}
+        ])
+
+        # prior_index is used for the yvar because it is the variable indexed on the "time" dimension. We'll override
+        # the plot label and the data returned so that we use it to extract the prior time.
+        super().__init__(other_plots=other_plots, yvar='prior_index', default_style=default_style, limits=limits,
+                         key=key, width=width, height=height, name=name, bookmark=bookmark, legend_kws=legend_kws,
+                         extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
+        self._max_time_diff_hours = max_time_diff_hours
+        self._mark_out_of_bounds_time_diffs = mark_out_of_bounds_time_diffs
+        self._out_of_bounds_style = out_of_bounds_style
+        
+    def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
+        fig, ax = super().setup_figure(data=data, show_all=show_all, fig=fig, axs=axs)
+        ax.set_ylabel('Prior time - ZPD time (hr)')
+        return fig, ax
+
+    def get_plot_data(self, data: TcconData, flag_category: Optional[FlagCategory]) -> dict:
+        data_dict = super().get_plot_data(data, flag_category=flag_category)
+
+        # "y" should be the prior index, so load the prior time data and use the index to map
+        # it to the right dimension.
+        prior_times = data._get_variable('prior_time')
+        prior_times = prior_times[data_dict['y']]
+
+        # Also load the ZPD times directly; since both variables should be in seconds since 1970-01-01, we can
+        # calculate the time difference more easily if we don't convert to datetimes.
+        if flag_category is None:
+            zpd_times = data.get_flag0_or_all_data('raw-time')
+        else:
+            zpd_times = data.get_data('raw-time', flag_category)
+
+        # convert time difference from seconds to hours
+        data_dict['y'] = (prior_times - zpd_times)/3600.0
+        return data_dict
+    
+    def get_save_name(self):
+        return f'prior_time_matchup_timeseries_{self._max_time_diff_hours}.png'
+    
+    def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
+        # plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        # for args in plot_args:
+        #     args['kws'].pop('fit_style', None)
+        #     axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
+
+        # # Assume at this point that the y-limits have been fixed
+        # # Do not limit to values in the x-direction as this can cause issues
+        # # when the x-data are timestamps and the x-limits are datenums.
+        # if self._show_out_of_range_data:
+        #     for args in plot_args:
+        #         self.plot_outside_ylimits(axs, args['data'], args['kws'], limit_by_x=False)
+
+        # if idata == 0:
+        #     self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
+
+        # # legend kws are always in the first set of plot argument
+        # axs.legend(**plot_args[0]['legend_kws'])
+        super()._plot(data=data, idata=idata, axs=axs, flag0_only=flag0_only)
+
+        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+        style = deepcopy(self._out_of_bounds_style)
+        n_oob = 0
+        for args in plot_args:
+            xx_oob = np.abs(args['data']['y']) > self._max_time_diff_hours
+            n_oob += xx_oob.sum()
+
+            if self._mark_out_of_bounds_time_diffs:
+                for t in args['data']['x'][xx_oob]:
+                    axs.axvline(t, **style)
+
+                    # In case the user passes a label, ensure it is only displayed in the legend once
+                    if 'label' in style:
+                        style.pop('label') 
+
+        axs.text(0.01, 0.01 + 0.05 * idata, f'{n_oob} points exceed {self._max_time_diff_hours} hr ({data.data_category.value} data)', transform=axs.transAxes)
+        kws = {k: v for k, v in self._legend_kws.items() if k != 'loc'}
+        axs.legend(loc='lower right', **kws)
+
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):
