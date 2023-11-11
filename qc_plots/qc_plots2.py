@@ -4772,7 +4772,8 @@ class PriorTimeMatchupTimeseriesPlot(TimeseriesPlot):
                  bookmark: Optional[Union[str,bool]] = None, width=20, height=10, legend_kws: Optional[dict] = None, 
                  key=None, time_buffer_days=2, extra_qc_lines: Optional[Sequence[dict]] = None, 
                  show_out_of_range_data: bool = True, max_time_diff_hours: float = 1.51,
-                 mark_out_of_bounds_time_diffs: bool = True, out_of_bounds_style: dict = {'linewidth': 0.5, 'color': 'crimson'}):
+                 mark_out_of_bounds_time_diffs: bool = True, out_of_bounds_contiguous_days: float = 30,
+                 out_of_bounds_style: dict = {'color': 'crimson', 'alpha': 0.5}):
         
         if extra_qc_lines is None:
             extra_qc_lines = []
@@ -4788,6 +4789,7 @@ class PriorTimeMatchupTimeseriesPlot(TimeseriesPlot):
                          extra_qc_lines=extra_qc_lines, time_buffer_days=time_buffer_days, show_out_of_range_data=show_out_of_range_data)
         self._max_time_diff_hours = max_time_diff_hours
         self._mark_out_of_bounds_time_diffs = mark_out_of_bounds_time_diffs
+        self._out_of_bounds_contiguous_days = out_of_bounds_contiguous_days
         self._out_of_bounds_style = out_of_bounds_style
         
     def setup_figure(self, data: Sequence[TcconData], show_all=False, fig=None, axs=None):
@@ -4816,46 +4818,81 @@ class PriorTimeMatchupTimeseriesPlot(TimeseriesPlot):
     
     def get_save_name(self):
         return f'prior_time_matchup_timeseries_{self._max_time_diff_hours}.png'
+
+    def make_plot(self, data: Sequence[TcconData], extra_data: dict, flag0_only: bool = False, show_all: bool = False, img_path: Path = DEFAULT_IMG_DIR, tight=True) -> Path:
+        fig, axs = self.setup_figure(data, show_all=show_all)
+        for i, d in enumerate(data):
+            self._plot(d, i, axs=axs, flag0_only=flag0_only)
+        self._add_oob_marks(data, flag0_only=flag0_only, axs=axs)
+        fig_path = img_path / self.get_save_name()
+        if tight:
+            # I tried using bbox_inches='tight' in the savefig call, but it causes the scatter plots/hexbins
+            # to not line up, so we'll stick with tight_layout() and just suppress the warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                fig.tight_layout()
+        fig.savefig(fig_path, dpi=300)
+        plt.close(fig)
+        return fig_path
     
     def _plot(self, data: TcconData, idata: int, axs=None, flag0_only: bool = False):
-        # plot_args = self.get_plot_args(data, flag0_only=flag0_only)
-        # for args in plot_args:
-        #     args['kws'].pop('fit_style', None)
-        #     axs.plot(args['data']['x'], args['data']['y'], **args['kws'])
-
-        # # Assume at this point that the y-limits have been fixed
-        # # Do not limit to values in the x-direction as this can cause issues
-        # # when the x-data are timestamps and the x-limits are datenums.
-        # if self._show_out_of_range_data:
-        #     for args in plot_args:
-        #         self.plot_outside_ylimits(axs, args['data'], args['kws'], limit_by_x=False)
-
-        # if idata == 0:
-        #     self.add_qc_lines(axs, 'y', data.nc_dset[self.yvar])
-
-        # # legend kws are always in the first set of plot argument
-        # axs.legend(**plot_args[0]['legend_kws'])
         super()._plot(data=data, idata=idata, axs=axs, flag0_only=flag0_only)
 
-        plot_args = self.get_plot_args(data, flag0_only=flag0_only)
-        style = deepcopy(self._out_of_bounds_style)
-        n_oob = 0
-        for args in plot_args:
-            xx_oob = np.abs(args['data']['y']) > self._max_time_diff_hours
-            n_oob += xx_oob.sum()
-
-            if self._mark_out_of_bounds_time_diffs:
-                for t in args['data']['x'][xx_oob]:
-                    axs.axvline(t, **style)
-
-                    # In case the user passes a label, ensure it is only displayed in the legend once
-                    if 'label' in style:
-                        style.pop('label') 
-
-        axs.text(0.01, 0.01 + 0.05 * idata, f'{n_oob} points exceed {self._max_time_diff_hours} hr ({data.data_category.value} data)', transform=axs.transAxes)
+    def _add_oob_marks(self, all_data: Sequence[TcconData], axs, flag0_only: bool = False):
+        # First add the text for each kind of data - we always want that. Gather the
+        # times too for the marks if we need them. Force the legend away from the text - 
+        # the differences are likely to be negative so the plot is more likely to have negative
+        # extrema pushing the lower y limit down
         kws = {k: v for k, v in self._legend_kws.items() if k != 'loc'}
         axs.legend(loc='lower right', **kws)
 
+        oob_times = []
+        for idata, data in enumerate(all_data):
+            plot_args = self.get_plot_args(data, flag0_only=flag0_only)
+            style = deepcopy(self._out_of_bounds_style)
+            n_oob = 0
+            for args in plot_args:
+                xx_oob = np.abs(args['data']['y']) > self._max_time_diff_hours
+                n_oob += xx_oob.sum()
+                oob_times.append(args['data']['x'][xx_oob])
+            axs.text(0.01, 0.01 + 0.05 * idata, f'{n_oob} points exceed {self._max_time_diff_hours} hr ({data.data_category.value} data)', transform=axs.transAxes)
+
+
+        if not self._mark_out_of_bounds_time_diffs:
+            return
+        
+        oob_times = np.sort(np.concatenate(oob_times))
+        style = deepcopy(self._out_of_bounds_style)
+        time_ranges = self._get_time_ranges_to_mark(oob_times)
+        # Assume y-limits are fixed at this point. Okay if xlimits not; just
+        # need them to make sure that our fills are visible
+        x1, x2 = axs.get_xlim()
+        min_x_width = 0.001 * (x2 - x1)
+        y1, y2 = axs.get_ylim()
+        for t1, t2 in time_ranges:
+            # Expand the fill if likely not big enough to be visible
+            if (t2 - t1) < min_x_width:
+                mid = 0.5 * (t1 + t2)
+                t1 = mid - 0.5 * min_x_width
+                t2 = mid + 0.5 * min_x_width
+
+            axs.fill_between([t1, t2], y1, y2, **style)
+            # In case the user passes a label, ensure it is only displayed in the legend once
+            if 'label' in style:
+                style.pop('label') 
+
+    def _get_time_ranges_to_mark(self, oob_times):
+        # oob_times should be matplotlib date numbers, which are in days from some epoch
+        time_ranges = []
+        curr_start = oob_times[0]
+        last_time = oob_times[0]
+        for t in oob_times[1:]:
+            if t - last_time > self._out_of_bounds_contiguous_days:
+                time_ranges.append((curr_start, last_time))
+                curr_start = t
+            last_time = t
+        time_ranges.append((curr_start, last_time))
+        return time_ranges
 
 
 def setup_plots(config, limits_file=DEFAULT_LIMITS, allow_missing=False):

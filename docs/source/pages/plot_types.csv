@@ -17,3 +17,4 @@ rolling-timeseries-3panel,"yvar, ops","gap, rolling_window, uncertainty, data_ca
 delta-rolling-timeseries, "yvar1, yvar2, ops", "gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
 rolling-derivative, "yvar, dvar", "derivative_order, gap, rolling_window, flag_category, time_buffer_days, show_out_of_range_data", "MPL ``plot`` kws", Yes, ``violin``
 zmin-zobs-delta-rolling-timeseries, "ops", "gap, rolling_window, uncertainty, data_category, time_buffer_days, show_out_of_range_data, annotation_font_size", "MPL ``plot`` kws", Yes, ``violin``
+prior-time-matchup-timeseries,,"max_time_diff_hours, mark_out_of_bounds_time_diffs, out_of_bounds_contiguous_days, out_of_bounds_style", "MPL ``plot`` kws", Yes, 

@@ -587,6 +587,8 @@ There are two special keywords in addition to the standard :func:`matplotlib.pyp
 * ``legend_fontsize`` sets the fontsize of the legend. 7 pts is the default, and usually keeps the linear fit
   within the plot bounds.
 
+.. _PT_timeseries:
+
 timeseries
 ~~~~~~~~~~
 
@@ -899,6 +901,29 @@ The other optional keys are the same as for :ref:`PT_RollingDeltaTimeseries`. No
 violin auxiliary plot for this, the ``violin_plot_pad`` keyword is given a default value of 1.0 instead
 of 0.5 and the violin plot y-ticks are turned off by default. Both of these changes are to allow space 
 for the estimated pressure difference.
+
+prior-time-matchup-timeseries
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A plot similar to :ref:`PT_timeseries` but customized to identify cases where the difference between the prior time
+value and the ZPD time exceed some limit. This is used to detect cases where the prior index has not matched up correctly 
+with the observed data. It includes text in the lower left corner giving the number of observations where this is likely the case.
+There are no required keys.
+
+**Optional keys**
+
+* ``max_time_diff_hours`` (default = ``1.51``): observations with a difference between their prior time and 
+  ZPD time greater than this value will be counted as "out of bounds". The default value of 1.51 was chosen because,
+  for GGG2020, priors change every 3 hours and observations should use the closest prior. Therefore, no observation should
+  have more than 1.5 hour difference in the priors vs. ZPD time, and we add a small cushion to avoid false positives.
+* ``mark_out_of_bounds_time_diffs`` (default = ``true``): when this is true, observations considered out of bounds based
+  on ``max_time_diff_hours`` will be highlighted by a background fill. 
+* ``out_of_bounds_contiguous_days`` (default = ``30``): when ``mark_out_of_bounds_time_diffs`` is true, the background fills
+  will be drawn for contiguous groups of out-of-bounds points. This determines how many days there must be between adjacent 
+  out-of-bounds points for the background fill to break. 30 was chosen as the default since the shortest time period that 
+  groups typically process is one month, so this tries to group together points likely processed together.
+* ``out_of_bounds_style`` (default = ``{color = "crimson", alpha = 0.5}``): this controls the style of the background fills.
+  It can be keywords for Matplotlib patches.
 
 .. _AuxPlots:
 
