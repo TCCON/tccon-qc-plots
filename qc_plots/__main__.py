@@ -213,7 +213,9 @@ def parse_args():
     parser.add_argument('--attachment-size', choices=('small', 'medium', 'large'), default=None,
                         help='Size for the attached plots, will use --size if not specified.')
     parser.add_argument('--attachment-quality', choices=('low', 'medium', 'high'), default=None,
-                        help='Quality for the attached plots, will use --quality if not specified.')        
+                        help='Quality for the attached plots, will use --quality if not specified.')
+    parser.add_argument('--no-skip-errored-plots', action='store_false', dest='skip_errored_plots',
+                        help='Use this flag to raise an exception when a given plot errors, rather than silently skipping it.')
     parser.add_argument('--pdb', action='store_true', help='Launch python debugger')
 
     return vars(parser.parse_args())
@@ -221,7 +223,7 @@ def parse_args():
 
 def driver(nc_in, config, limits, ref=None, context=None, allow_all_ref=False, flag0=False, show_all=False, output_dir='.', suffix='',
            use_tmp_img_dir=False, size='medium', quality='high', attachment_size=None, attachment_quality=None,
-           emails=(None, None), email_config=None, plot_url=None, attach_plots=True, **_):
+           emails=(None, None), email_config=None, plot_url=None, attach_plots=True, skip_errored_plots=True, **_):
     """Main function to create QA/QC plots and optionally email them to GGGBugs.
 
     Parameters
@@ -296,6 +298,9 @@ def driver(nc_in, config, limits, ref=None, context=None, allow_all_ref=False, f
         Whether to include the final PDF as an attachment in the GGGBugs email. The PDF will use the ``attachment_size`` and ``attachment_quality``
         settings. Note that it must be < 10 MB or GGGBugs will not accept it. If an email should be sent, then this should be true or 
         ``plot_url`` should be given. Otherwise, the email will have no information about where to access the plots.
+
+    skip_errored_plots : bool
+        When ``True`` (default), plots that have an error will be skipped. Set to ``False`` to stop on errors and print a full traceback.
     """
 
     if not attach_plots and plot_url is None:
@@ -385,7 +390,10 @@ def driver(nc_in, config, limits, ref=None, context=None, allow_all_ref=False, f
             try:
                 this_path = plot.make_plot(data, extra_data=extra_data, flag0_only=flag0, show_all=show_all, img_path=img_dir)
             except (IndexError, SkipPlotError) as err:
-                print(f' SKIPPED ({err})')
+                if skip_errored_plots:
+                    print(f' SKIPPED ({err})')
+                else:
+                    raise
             else:
                 print(' DONE')
                 fig_paths.append(this_path)
