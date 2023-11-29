@@ -4884,6 +4884,10 @@ class PriorTimeMatchupTimeseriesPlot(TimeseriesPlot):
     def _get_time_ranges_to_mark(self, oob_times):
         # oob_times should be matplotlib date numbers, which are in days from some epoch
         time_ranges = []
+        if len(oob_times) == 0:
+            # edge case: if there were no out of bounds times to mark, exit now
+            # to avoid an error trying to index an empty list
+            return time_ranges
         curr_start = oob_times[0]
         last_time = oob_times[0]
         for t in oob_times[1:]:
