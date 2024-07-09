@@ -12,9 +12,6 @@ To run the install script use:
 
 > ./install.sh
 
-Note that this will need to clone the [qc_email](https://github.com/TCCON/tccon-qc-email) repo via SSH; if your SSH key
-for the TCCON GitHub organization requires a passphrase, you will be prompted to enter it.
-
 For other install options, see https://tccondata.org/qcdocs/index.html. Login is the standard TCCON partner login.
 
 ### Usage ###
