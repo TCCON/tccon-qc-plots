@@ -40,7 +40,7 @@ echo "Cloning/updating tccon-qc-email email via SSH (may require SSH key passphr
 if [[ -d deps/tccon-qc-email ]]; then
     (cd deps/tccon-qc-email && git pull)
 else
-    (cd deps && git clone git@github.com:TCCON/tccon-qc-email.git)
+    (cd deps && git clone https://github.com/TCCON/tccon-qc-email.git)
 fi
   (cd deps/tccon-qc-email && python setup.py develop)
 python setup.py develop
