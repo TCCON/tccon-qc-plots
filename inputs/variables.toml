@@ -1,3 +1,25 @@
+# --------------------------------------------- #
+# Variables for reuse in the rest of the config #
+# --------------------------------------------- #
+[variables]
+static_ref_file = "/data/tccon/static-reference-files/static_qc_ref_data.private.nc"
+xluft_limits = [{value = 0.996, linestyle = "--", color = "darkorange", label="+/- 0.003 range"},
+                {value = 1.002, linestyle = "--", color = "darkorange"},
+                {value = 0.995, linestyle = "--", color = "limegreen", label="+/- 0.004 range"},
+                {value = 1.003, linestyle = "--", color = "limegreen"}]
+dip_limits = [{value = -0.0005, linestyle = "--", color = "darkorange", label="$\\pm 5 \\times 10^{-4}$"},
+              {value =  0.0005, linestyle = "--", color = "darkorange"}]
+
+# ---------------------- #
+# Image postproc options #
+# ---------------------- #
+[image_postprocessing]
+# Available fonts are under /usr/share/fonts on tccondata.gps.calech.edu
+# Look for files with the "ttf" extension.
+font_file = "LiberationSans-Regular.ttf"
+font_size = 30
+
+
 # --------------- #
 # Plotting styles #
 # --------------- #
@@ -36,7 +58,7 @@ flag0 = {cmap = "Greys", bins = "log", mincnt = 1, zorder = 0.8, fit_style = {co
 
 [style.default.timeseries]
 clone = 'scatter'
-legend_kws = {ncol = 2}
+legend_kws = {ncol = 3}
 
 [style.main.timeseries]
 clone = 'scatter'
@@ -50,7 +72,7 @@ clone = 'scatter'
 
 [style.default.timeseries-2panel]
 clone = 'scatter'
-legend_kws = {ncol = 2}
+legend_kws = {ncol = 3}
 
 [style.main.timeseries-2panel]
 clone = 'scatter'
@@ -59,6 +81,20 @@ clone = 'scatter'
 clone = 'scatter'
 
 [style.context.timeseries-2panel]
+clone = 'scatter'
+
+
+[style.default.resampled-timeseries]
+clone = 'scatter'
+legend_kws = {ncol = 3}
+
+[style.main.resampled-timeseries]
+clone = 'scatter'
+
+[style.ref.resampled-timeseries]
+clone = 'scatter'
+
+[style.context.resampled-timeseries]
 clone = 'scatter'
 
 
@@ -75,18 +111,17 @@ clone = 'timeseries'
 clone = 'timeseries'
 
 
-[style.default.resampled-timeseries]
-clone = 'scatter'
-legend_kws = {ncol = 2}
+[style.default."delta-timeseries+violin"]
+clone = 'timeseries'
 
-[style.main.resampled-timeseries]
-clone = 'scatter'
+[style.main."delta-timeseries+violin"]
+clone = 'timeseries'
 
-[style.ref.resampled-timeseries]
-clone = 'scatter'
+[style.ref."delta-timeseries+violin"]
+clone = 'timeseries'
 
-[style.context.resampled-timeseries]
-clone = 'scatter'
+[style.context."delta-timeseries+violin"]
+clone = 'timeseries'
 
 
 [style.default.rolling-timeseries]
@@ -97,7 +132,7 @@ median = {marker = "o", markersize = 1, color="black"}
 mean = {marker = "o", markersize = 1, color="hotpink"}
 std = {marker = "o", markersize = 1, color="green"}
 quantile = {marker = "o", markersize = 1, color="green"}
-legend_kws = {ncol = 2}
+legend_kws = {ncol = 3}
 
 [style.main.rolling-timeseries]
 all = {color = "royalblue"}
@@ -114,6 +149,32 @@ quantile = {marker = "o", markersize = 1, color="lightsteelblue", zorder = 1.7}
 [style.context.rolling-timeseries]
 all = {color = "deepskyblue"}
 flag0 = {color = "deepskyblue"}
+
+
+[style.default.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.main.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.ref.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.context.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+
+[style.default.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.main.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.ref.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.context.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
 
 
 [style.default.rolling-derivative]
@@ -138,6 +199,10 @@ pm = {color = "gray"}
 am = {color = "royalblue"}
 pm = {color = "red"}
 
+[style.extra.timing-error-am-pm]
+am = {color = "royalblue"}
+pm = {color = "red"}
+
 
 [style.default.timing-error-szas]
 marker = "o"
@@ -148,240 +213,124 @@ color = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:br
 [style.main.timing-error-szas]
 color = ["royalblue", "red", "green"]
 
+[style.extra.timing-error-szas]
+color = ["royalblue", "red", "green"]
+
+[style.default.delta-timing-error-am-pm]
+all = {marker = "o", markersize = 1, linestyle = "none", color = "tab:blue"}
+flag0 = {marker = "o", markersize = 1, linestyle = "none", color = "tab:orange"}
+flagged = {marker = "o", markersize = 1, linestyle = "none", color = "tab:green"}
+
+[style.main.delta-timing-error-am-pm]
+all = {color = "black"}
+flag0 = {color = "royalblue"}
+flagged = {color = "red"}
+
+[style.extra.aux-violin]
+flag0 = {showmedians = true, showextrema = false, fill_color = "silver", line_color = "dimgray"}
+
+[style.default.timeseries-3panel]
+clone = 'scatter'
+legend_kws = {ncol = 3}
+ 
+[style.main.timeseries-3panel]
+clone = 'scatter'
+ 
+[style.ref.timeseries-3panel]
+clone = 'scatter'
+ 
+[style.context.timeseries-3panel]
+clone = 'scatter'
+
+[style.default.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+ 
+[style.main.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+ 
+[style.ref.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+ 
+[style.context.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+
+[style.default.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+[style.main.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+[style.ref.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+[style.context.prior-time-matchup-timeseries]
+clone = 'scatter'
 
 # ------------- #
 # List of plots #
 # ------------- #
 
 [[plots]]
+kind = "zmin-zobs-delta-rolling-timeseries+violin"
+name = "Zmin - zobs delta timeseries"
+ops = "median"
+violin_data_file = "$static_ref_file"
+legend_kws = {ncol = 2}
+bookmark = "Critical quality checks"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Outside pressure timeseries"
+yvar = "pout"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Model pressure timeseries"
+yvar = "pmod"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "nan-check"
+name = "NaN/fill check"
+groups = [["!h2o", "!hdo"], ["h2o", "hdo"]]
+
+[[plots]]
 kind = "flag-analysis"
+name = "Flagged spectra"
+#bookmark = "Flags"
 
 [[plots]]
-kind = "timing-error-am-pm"
+kind = "delta-timing-error-am-pm+violin"
+name = "AM-PM Timing Error Check"
 sza_range = [70, 80]
+violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timing-error-szas"
+kind = "timing-error-am-pm+violin"
+name = "Timing error check (AM vs. PM)"
+#bookmark = "Timing error checks"
+sza_range = [70, 80]
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timing-error-szas+violin"
+name = "Timing error check (PM SZA ranges)"
 am_or_pm = "pm"
 sza_ranges = [[70, 80], [40, 50], [20, 30]]
-
-[[plots]]
-kind = "rolling-timeseries"
-yvar = "xluft"
-ops = "median"
-
-[[plots]]
-kind = "rolling-derivative"
-yvar = "zco2_4852a_zo"
-dvar = "solzen"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xluft"
-yerror_var = "xluft_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xco2"
-yerror_var = "xco2_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xch4"
-yerror_var = "xch4_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xco"
-yerror_var = "xco_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xh2o"
-yerror_var = "xh2o_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xhdo"
-yerror_var = "xhdo_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xhf"
-yerror_var = "xhf_error"
-
-[[plots]]
-kind = "timeseries-2panel"
-yvar = "xn2o"
-yerror_var = "xn2o_error"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_co2"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_lco2"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_wco2"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_hcl"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_o2"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_n2o"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_hf"
-
-[[plots]]
-kind = "timeseries"
-yvar = "vsf_h2o"
-
-[[plots]]
-kind = "timeseries"
-yvar = "fvsi"
-
-[[plots]]
-kind = "timeseries"
-yvar = "lse"
-
-[[plots]]
-kind = "timeseries"
-yvar = "lsu"
-
-[[plots]]
-kind = "timeseries"
-yvar = "solzen"
-
-[[plots]]
-kind = "timeseries"
-yvar = "o2_7885_fs"
-
-[[plots]]
-kind = "timeseries"
-yvar = "o2_7885_sg"
-
-[[plots]]
-kind = "timeseries"
-yvar = "zco2_4852a_zo"
-
-[[plots]]
-kind = "timeseries"
-yvar = "fco2_6154_cfampocl"
-
-[[plots]]
-kind = "timeseries"
-yvar = "fco2_6154_cfperiod"
-
-[[plots]]
-kind = "timeseries"
-yvar = "fco2_6154_cfphase"
-
-[[plots]]
-kind = "timeseries"
-yvar = "dip"
-
-[[plots]]
-kind = "timeseries"
-yvar = "mvd"
-
-[[plots]]
-kind = "timeseries"
-yvar = "o2_7885_cl"
-
-[[plots]]
-kind = "timeseries"
-yvar = "lco2_4852_cl"
-
-[[plots]]
-kind = "timeseries"
-yvar = "hout"
-
-[[plots]]
-kind = "timeseries"
-yvar = "tout"
-
-[[plots]]
-kind = "timeseries"
-yvar = "tmod"
-
-[[plots]]
-kind = "delta-timeseries"
-yvar1 = "tout"
-yvar2 = "tmod"
-
-[[plots]]
-kind = "timeseries"
-yvar = "h2o_dmf_out"
-
-[[plots]]
-kind = "timeseries"
-yvar = "h2o_dmf_mod"
-
-[[plots]]
-kind = "delta-timeseries"
-yvar1 = "h2o_dmf_out"
-yvar2 = "h2o_dmf_mod"
-
-[[plots]]
-kind = "timeseries"
-yvar = "pout"
-
-[[plots]]
-kind = "timeseries"
-yvar = "pmod"
-
-[[plots]]
-kind = "delta-timeseries"
-yvar1 = "pout"
-yvar2 = "pmod"
-
-[[plots]]
-kind = "timeseries"
-yvar = "wdir"
-
-[[plots]]
-kind = "timeseries"
-yvar = "wspd"
-
-[[plots]]
-kind = "timeseries"
-yvar = "prior_index"
+violin_data_file = "$static_ref_file"
 
 [[plots]]
 kind = "scatter"
-xvar = "solzen"
-yvar = "xco2"
-match_axes_size = "xco2-vs-sza-hexbin"
-legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.55, 0.5]}
-
-[[plots]]
-kind = "hexbin"
-key = "xco2-vs-sza-hexbin"
-xvar = "solzen"
-yvar = "xco2"
-hexbin_flag_category = "all"
-fit_flag_category = "flag0"
-
-[[plots]]
-kind = "scatter"
+name = "Xluft vs. SZA scatter"
 xvar = "solzen"
 yvar = "xluft"
 match_axes_size = "xluft-vs-sza-hexbin"
-legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.55, 0.5]}
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.5, 0.5]}
 
 [[plots]]
 kind = "hexbin"
+name = "Xluft vs. SZA 2D hist."
 key = "xluft-vs-sza-hexbin"
 xvar = "solzen"
 yvar = "xluft"
@@ -389,26 +338,392 @@ hexbin_flag_category = "all"
 fit_flag_category = "flag0"
 
 [[plots]]
-kind = "resampled-timeseries"
-freq = "D"
-op = "median"
+kind = "prior-time-matchup-timeseries"
+name = "Prior time check"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "Xluft timeseries"
 yvar = "xluft"
+yerror_var = "xluft_error"
+violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "resampled-timeseries"
-freq = "D"
-op = "median"
-yvar = "o2_7885_vsf_o2"
+kind = "rolling-timeseries+violin"
+name = "Xluft rolling median"
+yvar = "xluft"
+ops = "median"
+violin_data_file = "$static_ref_file"
+extra_qc_lines = "$xluft_limits"
+#legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "resampled-timeseries"
+kind = "resampled-timeseries+violin"
+name = "Xluft weekly median timeseries"
 freq = "W"
 op = "median"
 yvar = "xluft"
+violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "resampled-timeseries"
+kind = "resampled-timeseries+violin"
+name = "Xluft daily median timeseries"
+#bookmark = "Resampled timeseries"
+freq = "D"
+op = "median"
+yvar = "xluft"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "HCl VSF timeseries"
+yvar = "vsf_hcl"
+violin_data_file = "$static_ref_file"
+bookmark = "Informational quality checks"
+
+[[plots]]
+kind = "rolling-timeseries+violin"
+name = "HCl VSF rolling median"
+yvar = "vsf_hcl"
+ops = "median"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "FS timeseries from O2 window"
+yvar = "o2_7885_fs"
+violin_data_file = "$static_ref_file"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries+violin"
+name = "DIP timeseries"
+yvar = "dip"
+ops = "median"
+violin_data_file = "$static_ref_file"
+extra_qc_lines = "$dip_limits"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "timeseries+violin"
+name = "CL timeseries from O2 window"
+yvar = "o2_7885_cl"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "scatter"
+name = "dip vs. CL from O2 window scatter"
+xvar = "o2_7885_cl"
+yvar = "dip"
+match_axes_size = "dip-vs-o2_7885_cl-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.5, 0.5]}
+
+[[plots]]
+kind = "hexbin"
+name = "dip vs. CL from O2 window 2D hist."
+key = "dip-vs-o2_7885_cl-hexbin"
+xvar = "o2_7885_cl"
+yvar = "dip"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
+
+[[plots]]
+kind = "rolling-derivative+violin"
+name = "dip/CL rolling derivative"
+yvar = "dip"
+dvar = "o2_7885_cl"
+violin_data_file = "$static_ref_file"
+violin_plot_hide_yticks = true
+
+[[plots]]
+kind = "rolling-derivative+violin"
+name = "ZLO/SZA rolling derivative"
+yvar = "zco2_4852a_zo"
+dvar = "solzen"
+violin_data_file = "$static_ref_file"
+violin_plot_hide_yticks = true
+
+[[plots]]
+kind = "timeseries+violin"
+name = "SZA timeseries"
+yvar = "solzen"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "ZLO timeseries from ZCO2 window"
+yvar = "zco2_4852a_zo"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "rolling-timeseries+violin"
+name = "SG timeseries from O2 window"
+yvar = "o2_7885_sg"
+ops = "median"
+violin_data_file = "$static_ref_file"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries-3panel+violin"
+name = "LSE timeseries"
+yvar = "lse"
+ops = "median"
+violin_data_file = "$static_ref_file"
+even_top_bottom = true
+violin_plot_hide_yticks = true
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries-3panel+violin"
+name = "LSU timeseries"
+yvar = "lsu"
+ops = "median"
+violin_data_file = "$static_ref_file"
+even_top_bottom = true
+violin_plot_hide_yticks = true
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries+violin"
+name = "MVD timeseries"
+yvar = "mvd"
+ops = "median"
+violin_data_file = "$static_ref_file"
+violin_plot_hide_yticks = true
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "timeseries+violin"
+name = "CF/CL timeseries from fCO2 InGaAs window"
+yvar = "fco2_6154_cfampocl"
+violin_data_file = "$static_ref_file"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "neg-time-jump"
+name = "Negative time check"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XCO2 timeseries"
+bookmark = "Xgas timeseries"
+yvar = "xco2"
+yerror_var = "xco2_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XCH4 timeseries"
+yvar = "xch4"
+yerror_var = "xch4_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XCO timeseries"
+yvar = "xco"
+yerror_var = "xco_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XH2O timeseries"
+yvar = "xh2o"
+yerror_var = "xh2o_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XHDO timeseries"
+yvar = "xhdo"
+yerror_var = "xhdo_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XHF timeseries"
+yvar = "xhf"
+yerror_var = "xhf_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries-2panel+violin"
+name = "XN2O timeseries"
+yvar = "xn2o"
+yerror_var = "xn2o_error"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "CO2 VSF timeseries"
+bookmark = "VSF timeseries"
+yvar = "vsf_co2"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "lCO2 VSF timeseries"
+yvar = "vsf_lco2"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+yvar = "vsf_wco2"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "O2 VSF timeseries"
+yvar = "vsf_o2"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "N2O VSF timeseries"
+yvar = "vsf_n2o"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "HF VSF timeseries"
+yvar = "vsf_hf"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "H2O VSF timeseries"
+yvar = "vsf_h2o"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "FVSI timeseries"
+bookmark = "Instrument/obs. qualtity timeseries"
+yvar = "fvsi"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "CF period timeseries from fCO2 InGaAs window"
+yvar = "fco2_6154_cfperiod"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "CF phase timeseries from fCO2 InGaAs window"
+yvar = "fco2_6154_cfphase"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "CL timeseries from lCO2 window"
+yvar = "lco2_4852_cl"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries"
+name = "Prior index"
+yvar = "prior_index"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Outside humidity timeseries"
+bookmark = "Meteorology timeseries"
+yvar = "hout"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Outside temperature timeseries"
+yvar = "tout"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Model temperature timeseries"
+yvar = "tmod"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "delta-timeseries+violin"
+name = "Outside - model temp. delta timeseries"
+yvar1 = "tout"
+yvar2 = "tmod"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "delta-rolling-timeseries+violin"
+name = "Outside - model pres. delta timeseries"
+#bookmark = "Primary QA/QC plots"
+yvar1 = "pout"
+yvar2 = "pmod"
+ops = "median"
+violin_data_file = "$static_ref_file"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Outside H2O DMF timeseries"
+yvar = "h2o_dmf_out"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Model H2O DMF timeseries"
+yvar = "h2o_dmf_mod"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "delta-timeseries+violin"
+name = "Outside - model H2O DMF delta timeseries"
+yvar1 = "h2o_dmf_out"
+yvar2 = "h2o_dmf_mod"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Wind direction timeseries"
+yvar = "wdir"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "timeseries+violin"
+name = "Wind speed timeseries"
+yvar = "wspd"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "scatter"
+name = "XCO2 vs. SZA scatter"
+bookmark = "Scatter plots"
+xvar = "solzen"
+yvar = "xco2"
+match_axes_size = "xco2-vs-sza-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.5, 0.5]}
+
+[[plots]]
+kind = "hexbin"
+name = "XCO2 vs. SZA 2D hist."
+key = "xco2-vs-sza-hexbin"
+xvar = "solzen"
+yvar = "xco2"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
+
+[[plots]]
+kind = "resampled-timeseries+violin"
+name = "O2 VSF daily median timeseries"
+bookmark = "Resampled timeseries"
+freq = "D"
+op = "median"
+yvar = "o2_7885_vsf_o2"
+violin_data_file = "$static_ref_file"
+
+[[plots]]
+kind = "resampled-timeseries+violin"
+name = "O2 VSF weekly median timeseries"
 freq = "W"
 op = "median"
 yvar = "o2_7885_vsf_o2"
+violin_data_file = "$static_ref_file"
 
