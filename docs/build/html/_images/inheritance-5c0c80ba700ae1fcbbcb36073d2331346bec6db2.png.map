@@ -1,9 +1,0 @@
-<map id="inheritance295970adb6" name="inheritance295970adb6">
-<area shape="rect" id="node1" title="Helper class that provides a standard way to create an ABC using" alt="" coords="31,177,98,200"/>
-<area shape="rect" id="node14" href="auto_qc_plots2.html#qc_plots.qc_plots2.TimingErrorAbstractPlot" target="_top" title="Intermediate abstract plot class for timing error plots" alt="" coords="168,177,331,200"/>
-<area shape="rect" id="node2" href="auto_qc_plots2.html#qc_plots.qc_plots2.AbstractPlot" target="_top" title="The abstract parent class for all concrete plotting classes." alt="" coords="18,83,111,107"/>
-<area shape="rect" id="node3" href="auto_qc_plots2.html#qc_plots.qc_plots2.FlagAnalysisPlot" target="_top" title="Concrete plotting class that generates bar graphs for the number/percent of spectra flagged by different variables" alt="" coords="190,83,309,107"/>
-<area shape="rect" id="node12" href="auto_qc_plots2.html#qc_plots.qc_plots2.TimeseriesMixin" target="_top" title="Mixin class that provides common utilities for timeseries plots" alt="" coords="5,130,124,153"/>
-<area shape="rect" id="node13" href="auto_qc_plots2.html#qc_plots.qc_plots2.TimingErrorAMvsPM" target="_top" title="Concrete plotting class that creates plots to detect timing error by morning/afternoon differences" alt="" coords="390,199,529,222"/>
-<area shape="rect" id="node15" href="auto_qc_plots2.html#qc_plots.qc_plots2.TimingErrorMultipleSZAs" target="_top" title="Concrete plot to identify timing errors from averages in different SZA ranges." alt="" coords="375,153,543,177"/>
-</map>

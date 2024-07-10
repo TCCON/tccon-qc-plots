@@ -1,12 +1,17 @@
-import froll
 import matplotlib as mpl
 import numpy as np
+import os
 import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
 
 from .constants import _FREQ_FULL_NAMES
 
+# sphinx needs to import this module to finish documentation,
+# putting this import behind the environmental flag saves us
+# from needing fortran to build the documentation. 
+if not os.getenv('DOC_BUILD', '0') == '1':
+    import froll
 
 class SkipPlotError(Exception):
     pass
