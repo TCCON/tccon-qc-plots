@@ -1,5 +1,7 @@
 # README #
 
+[![Documentation Status](https://readthedocs.org/projects/tccon-qc-plots/badge/?version=latest)](https://tccon-qc-plots.readthedocs.io/en/latest/?badge=latest)
+
 This code can be used to produce plots from TCCON netcdf files.
 
 ### Installation ###
@@ -33,6 +35,7 @@ For usage info run:
 ./qc_plots.sh --help
 ```
 
+Full online documentation is on [readthedocs](https://tccon-qc-plots.readthedocs.io/en/latest/)
 
 ### Who do I talk to? ###
 
