@@ -2,7 +2,6 @@
 # Variables for reuse in the rest of the config #
 # --------------------------------------------- #
 [variables]
-static_ref_file = "/data/tccon/static-reference-files/static_qc_ref_data.private.nc"
 xluft_limits = [{value = 0.996, linestyle = "--", color = "darkorange", label="+/- 0.003 range"},
                 {value = 1.002, linestyle = "--", color = "darkorange"},
                 {value = 0.995, linestyle = "--", color = "limegreen", label="+/- 0.004 range"},
@@ -271,24 +270,21 @@ clone = 'scatter'
 # ------------- #
 
 [[plots]]
-kind = "zmin-zobs-delta-rolling-timeseries+violin"
+kind = "zmin-zobs-delta-rolling-timeseries"
 name = "Zmin - zobs delta timeseries"
 ops = "median"
-violin_data_file = "$static_ref_file"
 legend_kws = {ncol = 2}
 bookmark = "Critical quality checks"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Outside pressure timeseries"
 yvar = "pout"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Model pressure timeseries"
 yvar = "pmod"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
 kind = "nan-check"
@@ -301,24 +297,21 @@ name = "Flagged spectra"
 #bookmark = "Flags"
 
 [[plots]]
-kind = "delta-timing-error-am-pm+violin"
+kind = "delta-timing-error-am-pm"
 name = "AM-PM Timing Error Check"
 sza_range = [70, 80]
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timing-error-am-pm+violin"
+kind = "timing-error-am-pm"
 name = "Timing error check (AM vs. PM)"
 #bookmark = "Timing error checks"
 sza_range = [70, 80]
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timing-error-szas+violin"
+kind = "timing-error-szas"
 name = "Timing error check (PM SZA ranges)"
 am_or_pm = "pm"
 sza_ranges = [[70, 80], [40, 50], [20, 30]]
-violin_data_file = "$static_ref_file"
 
 [[plots]]
 kind = "scatter"
@@ -342,73 +335,64 @@ kind = "prior-time-matchup-timeseries"
 name = "Prior time check"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "Xluft timeseries"
 yvar = "xluft"
 yerror_var = "xluft_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "rolling-timeseries+violin"
+kind = "rolling-timeseries"
 name = "Xluft rolling median"
 yvar = "xluft"
 ops = "median"
-violin_data_file = "$static_ref_file"
 extra_qc_lines = "$xluft_limits"
 #legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "resampled-timeseries+violin"
+kind = "resampled-timeseries"
 name = "Xluft weekly median timeseries"
 freq = "W"
 op = "median"
 yvar = "xluft"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "resampled-timeseries+violin"
+kind = "resampled-timeseries"
 name = "Xluft daily median timeseries"
 #bookmark = "Resampled timeseries"
 freq = "D"
 op = "median"
 yvar = "xluft"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "HCl VSF timeseries"
 yvar = "vsf_hcl"
-violin_data_file = "$static_ref_file"
 bookmark = "Informational quality checks"
 
 [[plots]]
-kind = "rolling-timeseries+violin"
+kind = "rolling-timeseries"
 name = "HCl VSF rolling median"
 yvar = "vsf_hcl"
 ops = "median"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "FS timeseries from O2 window"
 yvar = "o2_7885_fs"
-violin_data_file = "$static_ref_file"
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "rolling-timeseries+violin"
+kind = "rolling-timeseries"
 name = "DIP timeseries"
 yvar = "dip"
 ops = "median"
-violin_data_file = "$static_ref_file"
 extra_qc_lines = "$dip_limits"
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "CL timeseries from O2 window"
 yvar = "o2_7885_cl"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
 kind = "scatter"
@@ -428,75 +412,66 @@ hexbin_flag_category = "all"
 fit_flag_category = "flag0"
 
 [[plots]]
-kind = "rolling-derivative+violin"
+kind = "rolling-derivative"
 name = "dip/CL rolling derivative"
 yvar = "dip"
 dvar = "o2_7885_cl"
-violin_data_file = "$static_ref_file"
 violin_plot_hide_yticks = true
 
 [[plots]]
-kind = "rolling-derivative+violin"
+kind = "rolling-derivative"
 name = "ZLO/SZA rolling derivative"
 yvar = "zco2_4852a_zo"
 dvar = "solzen"
-violin_data_file = "$static_ref_file"
 violin_plot_hide_yticks = true
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "SZA timeseries"
 yvar = "solzen"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "ZLO timeseries from ZCO2 window"
 yvar = "zco2_4852a_zo"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "rolling-timeseries+violin"
+kind = "rolling-timeseries"
 name = "SG timeseries from O2 window"
 yvar = "o2_7885_sg"
 ops = "median"
-violin_data_file = "$static_ref_file"
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "rolling-timeseries-3panel+violin"
+kind = "rolling-timeseries-3panel"
 name = "LSE timeseries"
 yvar = "lse"
 ops = "median"
-violin_data_file = "$static_ref_file"
 even_top_bottom = true
 violin_plot_hide_yticks = true
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "rolling-timeseries-3panel+violin"
+kind = "rolling-timeseries-3panel"
 name = "LSU timeseries"
 yvar = "lsu"
 ops = "median"
-violin_data_file = "$static_ref_file"
 even_top_bottom = true
 violin_plot_hide_yticks = true
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "rolling-timeseries+violin"
+kind = "rolling-timeseries"
 name = "MVD timeseries"
 yvar = "mvd"
 ops = "median"
-violin_data_file = "$static_ref_file"
 violin_plot_hide_yticks = true
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "CF/CL timeseries from fCO2 InGaAs window"
 yvar = "fco2_6154_cfampocl"
-violin_data_file = "$static_ref_file"
 legend_kws = {ncol = 2}
 
 [[plots]]
@@ -504,121 +479,103 @@ kind = "neg-time-jump"
 name = "Negative time check"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XCO2 timeseries"
 bookmark = "Xgas timeseries"
 yvar = "xco2"
 yerror_var = "xco2_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XCH4 timeseries"
 yvar = "xch4"
 yerror_var = "xch4_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XCO timeseries"
 yvar = "xco"
 yerror_var = "xco_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XH2O timeseries"
 yvar = "xh2o"
 yerror_var = "xh2o_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XHDO timeseries"
 yvar = "xhdo"
 yerror_var = "xhdo_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XHF timeseries"
 yvar = "xhf"
 yerror_var = "xhf_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries-2panel+violin"
+kind = "timeseries-2panel"
 name = "XN2O timeseries"
 yvar = "xn2o"
 yerror_var = "xn2o_error"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "CO2 VSF timeseries"
 bookmark = "VSF timeseries"
 yvar = "vsf_co2"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "lCO2 VSF timeseries"
 yvar = "vsf_lco2"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 yvar = "vsf_wco2"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "O2 VSF timeseries"
 yvar = "vsf_o2"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "N2O VSF timeseries"
 yvar = "vsf_n2o"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "HF VSF timeseries"
 yvar = "vsf_hf"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "H2O VSF timeseries"
 yvar = "vsf_h2o"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "FVSI timeseries"
 bookmark = "Instrument/obs. qualtity timeseries"
 yvar = "fvsi"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "CF period timeseries from fCO2 InGaAs window"
 yvar = "fco2_6154_cfperiod"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "CF phase timeseries from fCO2 InGaAs window"
 yvar = "fco2_6154_cfphase"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "CL timeseries from lCO2 window"
 yvar = "lco2_4852_cl"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
 kind = "timeseries"
@@ -626,71 +583,61 @@ name = "Prior index"
 yvar = "prior_index"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Outside humidity timeseries"
 bookmark = "Meteorology timeseries"
 yvar = "hout"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Outside temperature timeseries"
 yvar = "tout"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Model temperature timeseries"
 yvar = "tmod"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "delta-timeseries+violin"
+kind = "delta-timeseries"
 name = "Outside - model temp. delta timeseries"
 yvar1 = "tout"
 yvar2 = "tmod"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "delta-rolling-timeseries+violin"
+kind = "delta-rolling-timeseries"
 name = "Outside - model pres. delta timeseries"
 #bookmark = "Primary QA/QC plots"
 yvar1 = "pout"
 yvar2 = "pmod"
 ops = "median"
-violin_data_file = "$static_ref_file"
 legend_kws = {ncol = 2}
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Outside H2O DMF timeseries"
 yvar = "h2o_dmf_out"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Model H2O DMF timeseries"
 yvar = "h2o_dmf_mod"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "delta-timeseries+violin"
+kind = "delta-timeseries"
 name = "Outside - model H2O DMF delta timeseries"
 yvar1 = "h2o_dmf_out"
 yvar2 = "h2o_dmf_mod"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Wind direction timeseries"
 yvar = "wdir"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "timeseries+violin"
+kind = "timeseries"
 name = "Wind speed timeseries"
 yvar = "wspd"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
 kind = "scatter"
@@ -711,19 +658,17 @@ hexbin_flag_category = "all"
 fit_flag_category = "flag0"
 
 [[plots]]
-kind = "resampled-timeseries+violin"
+kind = "resampled-timeseries"
 name = "O2 VSF daily median timeseries"
 bookmark = "Resampled timeseries"
 freq = "D"
 op = "median"
 yvar = "o2_7885_vsf_o2"
-violin_data_file = "$static_ref_file"
 
 [[plots]]
-kind = "resampled-timeseries+violin"
+kind = "resampled-timeseries"
 name = "O2 VSF weekly median timeseries"
 freq = "W"
 op = "median"
 yvar = "o2_7885_vsf_o2"
-violin_data_file = "$static_ref_file"
 
