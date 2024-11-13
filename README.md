@@ -14,7 +14,7 @@ To run the install script use:
 
 > ./install.sh
 
-For other install options, see https://tccondata.org/qcdocs/index.html. Login is the standard TCCON partner login.
+For other install options, see https://tccon-qc-plots.readthedocs.io/en/latest/pages/installation.html.
 
 ### Usage ###
 
