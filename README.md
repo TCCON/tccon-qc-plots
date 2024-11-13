@@ -6,13 +6,19 @@ This code can be used to produce plots from TCCON netcdf files.
 
 ### Installation ###
 
-Requires anaconda3 to be installed and **conda** console commands available.
+Requires [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html) 
+or [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html) to be available.
 
-The script **install.sh** will check if you have the **tccon-qc** environment installed. If not it will install it from the environment.yml file.
+The script **install-conda.sh** will use `conda` and check if you have the **tccon-qc** environment installed. If not it will install it from the environment.yml file.
+If you already have that environment, it will update from the same file.
 
 To run the install script use:
 
-> ./install.sh
+```
+./install-conda.sh
+```
+
+If you prefer `micromamba`, use the `install-micromamba.sh` script instead.
 
 For other install options, see https://tccon-qc-plots.readthedocs.io/en/latest/pages/installation.html.
 
@@ -21,18 +27,12 @@ For other install options, see https://tccon-qc-plots.readthedocs.io/en/latest/p
 
 #### How to run the code ####
 
-Use **qc_plots.sh** to make sure the code runs with the correct environment.
-
-If you use **qc_plots.py** make sure that you activated the **tccon-qc** environment with
-
-```
-conda activate tccon-qc
-```
+Use **run-qc-plots** to make sure the code runs with the correct environment.
 
 For usage info run:
 
 ```
-./qc_plots.sh --help
+./run-qc-plots --help
 ```
 
 Full online documentation is on [readthedocs](https://tccon-qc-plots.readthedocs.io/en/latest/)
