@@ -6,14 +6,22 @@ The QC plots package requires:
 * Python 3.7 or later 
 * A Fortran compiler compatible with `numpy's f2py module <https://numpy.org/doc/stable/f2py/usage.html>`_. ``gfortran`` is recommended.
 
-Additionally, installation methods 1 and 2 rely on the ``conda`` package manager found in the Anaconda or Miniconda Python distributions,
-though ``conda`` is not a hard dependency. If you need to install QC Plots without ``conda``, see method #3, below.
+Additionally, the default installation scripts expect either the ``conda`` or ``micromamba`` package managers to be installed.
+If they are not available, see method #4, below.
 
-Method 1: install.sh
---------------------
 
-Run the ``install.sh`` script in the top directory of the QC Plots package as any other Bash script. This will create a conda environment
-named "tccon-qc", install the necessary packages, and finally install ``qc_plots`` itself in develop mode. 
+Method 1: install scripts
+-------------------------
+
+We provide ``install-conda.sh`` and ``install-micromamba.sh`` scripts. Choose the one for the package manager you prefer and have
+on your system. Simplying run the script as ``./install-conda.sh`` or ``./install-micromamba.sh``. This will:
+
+- create a conda/micromamba environment named "tccon-qc",
+- install the necessary packages,
+- install ``qc_plots`` itself in develop mode, and
+- link the ``qc_plots`` script to the repo as ``run-qc-plots``.
+
+After this, you can use the ``run-qc-plots`` script to call the package without needing the "tccon-qc" environment to be activated.
 
 .. note::
     Installing in "develop" mode means that the source code for ``qc_plots`` remains in this directory, and any time you import ``qc_plots``
@@ -29,16 +37,38 @@ or ``conda create -p PATH``, then update that environment using the :file:`envir
 `instructions in the conda docs <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#updating-an-environment>`_.
 Finally, activate that environment and run ``python setup.py develop``. 
 
-As an example, to create an environment in the directory :file:`.env` at the current path::
+As an example, you can mimic what ``install.sh`` does with:
+
+    conda create -n tccon-qc
+    conda env update -n tccon-qc --file environment.yml
+    conda activate tccon-qc
+    python setup.py develop
+    ln -s $(which qc_plots) run-qc-plots
+
+Alternatively, to create an environment in the directory :file:`.env` at the current path::
     
     conda create -p ./.env
-    conda update -p ./.env -f environment.yml
+    conda env update -p ./.env --file environment.yml
     conda activate ./.env
     python setup.py develop
+    ln -s $(which qc_plots) run-qc-plots
 
-Note that the second and fourth commands assume you are running in the top directory of the QC Plots repo.
+Note that the second and fourth commands in both examples assume you are running in the top directory of the QC Plots repo.
 
-Method 3: install with pip
+Method 3: manual micromamba install
+-----------------------------------
+
+This is similar to method 2, but with micromamba instead. Assuming you want to use the ``tccon-qc`` named environment:
+
+    micromamba create -n tccon-qc --file environment.yml
+    micromamba activate tccon-qc
+    python setup.py develop
+    ln -s $(which qc_plots) run-qc-plots
+
+As in the conda approach, the first and third commands assume you are running in the top directory of this repo.
+
+
+Method 4: install with pip
 --------------------------
 
 While we recommend installing the necessary dependencies with conda because it tends to work better across all platforms, you should be able to 
@@ -48,6 +78,7 @@ To do so, and assuming you are using bash as your shell, run::
     python -m venv ./.qcenv
     source .qcenv/bin/activate
     python setup.py develop
+    ln -s $(which qc_plots) run-qc-plots
 
 This will create a virtual environment in :file:`.qcenv` in the current directory, activate that environment, and then install everything 
 at once with the ``setup.py`` call. You can replace :file:`./.qcenv` in the first command with any path you wish, as long as you use that 

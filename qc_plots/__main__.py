@@ -9,11 +9,13 @@ from PyPDF2 import PdfFileWriter, PdfFileReader
 import re
 from string import Template
 import sys
-import tempfile
 import tomli
 from urllib.parse import urljoin
 
-from qc_email import qc_email
+try:
+    from qc_email import qc_email
+except ImportError:
+    print('Note: tccon_qc_email not installed, email functionality disabled', file=sys.stderr)
 
 from . import qc_plots2
 from .utils import SkipPlotError

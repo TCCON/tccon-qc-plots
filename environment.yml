@@ -1,7 +1,6 @@
 name: tccon-qc
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - matplotlib=3.3.2
   - matplotlib-base=3.3.2
