@@ -14,7 +14,7 @@ Method 1: install scripts
 -------------------------
 
 We provide ``install-conda.sh`` and ``install-micromamba.sh`` scripts. Choose the one for the package manager you prefer and have
-on your system. Simplying run the script as ``./install-conda.sh`` or ``./install-micromamba.sh``. This will:
+on your system. Simply run the script as ``./install-conda.sh`` or ``./install-micromamba.sh``. This will:
 
 - create a conda/micromamba environment named "tccon-qc",
 - install the necessary packages,
@@ -37,7 +37,7 @@ or ``conda create -p PATH``, then update that environment using the :file:`envir
 `instructions in the conda docs <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#updating-an-environment>`_.
 Finally, activate that environment and run ``python setup.py develop``. 
 
-As an example, you can mimic what ``install.sh`` does with:
+As an example, you can mimic what ``install.sh`` does with::
 
     conda create -n tccon-qc
     conda env update -n tccon-qc --file environment.yml
@@ -53,19 +53,19 @@ Alternatively, to create an environment in the directory :file:`.env` at the cur
     python setup.py develop
     ln -s $(which qc_plots) run-qc-plots
 
-Note that the second and fourth commands in both examples assume you are running in the top directory of the QC Plots repo.
+Note that the second, fourth, and fifth commands in both examples assume you are running in the top directory of the QC Plots repo.
 
 Method 3: manual micromamba install
 -----------------------------------
 
-This is similar to method 2, but with micromamba instead. Assuming you want to use the ``tccon-qc`` named environment:
+This is similar to method 2, but with micromamba instead. Assuming you want to use the ``tccon-qc`` named environment::
 
     micromamba create -n tccon-qc --file environment.yml
     micromamba activate tccon-qc
     python setup.py develop
     ln -s $(which qc_plots) run-qc-plots
 
-As in the conda approach, the first and third commands assume you are running in the top directory of this repo.
+As in the conda approach, the first, third, and fourth commands assume you are running in the top directory of this repo.
 
 
 Method 4: install with pip
