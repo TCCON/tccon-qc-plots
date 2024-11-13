@@ -268,10 +268,11 @@ clone = 'scatter'
 # ------------- #
 # List of plots #
 # ------------- #
-
 [[plots]]
-kind = "zmin-zobs-delta-rolling-timeseries"
-name = "Zmin - zobs delta timeseries"
+kind = "delta-rolling-timeseries"
+name = "Zmin vs. Zobs delta timeseries"
+yvar1 = "zmin"
+yvar2 = "zobs"
 ops = "median"
 legend_kws = {ncol = 2}
 bookmark = "Critical quality checks"
@@ -416,14 +417,12 @@ kind = "rolling-derivative"
 name = "dip/CL rolling derivative"
 yvar = "dip"
 dvar = "o2_7885_cl"
-violin_plot_hide_yticks = true
 
 [[plots]]
 kind = "rolling-derivative"
 name = "ZLO/SZA rolling derivative"
 yvar = "zco2_4852a_zo"
 dvar = "solzen"
-violin_plot_hide_yticks = true
 
 [[plots]]
 kind = "timeseries"
@@ -448,7 +447,6 @@ name = "LSE timeseries"
 yvar = "lse"
 ops = "median"
 even_top_bottom = true
-violin_plot_hide_yticks = true
 legend_kws = {ncol = 2}
 
 [[plots]]
@@ -457,7 +455,6 @@ name = "LSU timeseries"
 yvar = "lsu"
 ops = "median"
 even_top_bottom = true
-violin_plot_hide_yticks = true
 legend_kws = {ncol = 2}
 
 [[plots]]
@@ -465,7 +462,6 @@ kind = "rolling-timeseries"
 name = "MVD timeseries"
 yvar = "mvd"
 ops = "median"
-violin_plot_hide_yticks = true
 legend_kws = {ncol = 2}
 
 [[plots]]
