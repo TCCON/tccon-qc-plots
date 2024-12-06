@@ -1,5 +1,11 @@
+[site_data.00.mod_data.level0]
+Height = 0.096
+
 [site_data.ae.mod_data.level0]
 Height = 0.069
+
+[site_data.al.mod_data.level0]
+Height = 2.307
 
 [site_data.an.mod_data.level0]
 Height = 0.093
@@ -15,6 +21,9 @@ Height = 0.174
 
 [site_data.ci.mod_data.level0]
 Height = 0.475
+
+[site_data.ck.mod_data.level0]
+Height = 0.265
 
 [site_data.db.mod_data.level0]
 Height = 0.079
@@ -78,6 +87,9 @@ Height = 0.814
 [site_data.ma.mod_data.level0]
 Height = 0.103
 
+[site_data.mu.mod_data.level0]
+Height = 0.639
+
 [site_data.ni.mod_data.level0]
 Height = 0.22
 
@@ -96,17 +108,41 @@ Height = 0.537
 [site_data.pr.mod_data.level0]
 Height = 0.165
 
+[site_data.pv.mod_data.level0]
+Height = 0.163
+
 [site_data.ra.mod_data.level0]
 Height = 0.398
 
 [site_data.rj.mod_data.level0]
 Height = 0.477
 
+[site_data.sa.mod_data.level0]
+Height = 0.177
+
+[site_data.sb.mod_data.level0]
+Height = 0.067
+
+[site_data.sc.mod_data.level0]
+Height = 0.2
+
+[site_data.sd.mod_data.level0]
+Height = 0.096
+
+[site_data.se.mod_data.level0]
+Height = 1.438
+
+[site_data.sf.mod_data.level0]
+Height = 3.925
+
 [site_data.so.mod_data.level0]
 Height = 0.283
 
 [site_data.tk.mod_data.level0]
 Height = 0.102
+
+[site_data.to.mod_data.level0]
+Height = 0.2
 
 [site_data.we.mod_data.level0]
 Height = 0.37

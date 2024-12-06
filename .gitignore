@@ -60,6 +60,16 @@ Thumbs.db
 # the conda source file created by install.sh
 .init_conda
 
+# any kind of local environment
+env
+.env
+venv
+.venv
+condaenv
+.condaenv
+mambaenv
+.mambaenv
+
 # .egg-info created by setup.py
 *.egg-info
 
