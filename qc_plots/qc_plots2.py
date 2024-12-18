@@ -2811,10 +2811,14 @@ class HexbinPlot(ScatterPlot):
         # Same for "legend_fontsize"
         args['kws'].pop('fit_style', None)
 
-        h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
-        plt.colorbar(h, cax=self._caxes[idata], label=clabel)
-
-        self._add_linfit(axs, data, flag0_only)
+        if args['data']['x'].size == 0 or args['data']['y'].size == 0:
+            print(f'\nNOTE: no {data.data_category.value} data for plot {self.name or self.__class__.__name__}', file=sys.stderr)
+        elif utils.all_data_outside_limits(args['data']['x'], args['data']['y'], xlim=args['kws']['extent'][0:2], ylim=args['kws']['extent'][2:4]):
+            print(f'\nNOTE: all {data.data_category.value} data for plot {self.name or self.__class__.__name__} outside the plot extents', file=sys.stderr)
+        else:
+            h = axs.hexbin(args['data']['x'], args['data']['y'], **args['kws'])
+            plt.colorbar(h, cax=self._caxes[idata], label=clabel)
+            self._add_linfit(axs, data, flag0_only)
 
         if idata == 0:
             self.add_qc_lines(axs, 'x', data.nc_dset[self.xvar])

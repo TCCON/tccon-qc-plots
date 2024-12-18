@@ -217,3 +217,12 @@ def fill_if_masked(arr):
         return arr.filled(np.nan)
     else:
         return arr
+
+
+def all_data_outside_limits(x, y, xlim, ylim):
+    if np.all((x < xlim[0]) | (x > xlim[1])):
+        return True
+    elif np.all((y < ylim[0]) | (y > ylim[1])):
+        return True
+    else:
+        return False
