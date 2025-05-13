@@ -37,7 +37,7 @@ def images_to_pdf(fig_path_list,
     with ExitStack() as img_stack:
         im_list = []
         nfig = len(fig_path_list)
-        
+
         for ifig, fig_path in enumerate(fig_path_list, start=1):
             fig_name = plots[ifig-1].name
             try:
@@ -168,7 +168,7 @@ def _replace_config_variables(config: dict, variables: dict, section: str = ''):
                     config[k] = Template(v).substitute(**variables)
                 except KeyError as err:
                     print(f'WARNING: setting "{k}" in "{section}" section references unknown variable {err}')
-            
+
 
 
 def parse_args():
@@ -179,7 +179,7 @@ def parse_args():
     parser.add_argument('-c', '--context', help='full path to another netCDF file to use as context (i.e. full record '
                                                 'for the site being plotted)')
     parser.add_argument('-d', '--output-dir', default='.', help='Directory to output the .pdf plots to, the default is '
-                                                                '"outputs" in the code repo')
+                                                                'the current directory.')
     parser.add_argument('--suffix', default='', help='Suffix to append to the PDF name before the extension. Default is nothing.') 
     parser.add_argument('--flag0', action='store_true', help='only plot flag=0 data with axis ranges only within the '
                                                              'vmin/vmax values of each variable')
@@ -409,7 +409,7 @@ def driver(nc_in, config, limits, ref=None, context=None, allow_all_ref=False, f
         pdf_name = Path(nc_in).with_suffix(reg_ext if not flag0 else flag0_ext).name
         pdf_path = Path(output_dir) / pdf_name
         images_to_pdf(fig_paths, completed_plots, pdf_path, Path(nc_in), size=size, quality=quality, cfg=config)
-        
+
         if attachment_quality != quality or attachment_size != size:
             email_pdf_path = Path(stack.enter_context(tempfile.TemporaryDirectory()))
             email_pdf_path = email_pdf_path / pdf_name

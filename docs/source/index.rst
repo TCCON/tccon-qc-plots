@@ -14,6 +14,7 @@ Welcome to TCCON QC's documentation!
    pages/configuration.rst
    pages/code_design.rst
    pages/auto_qc_plots2.rst
+   pages/troubleshooting.rst
 
 
 
