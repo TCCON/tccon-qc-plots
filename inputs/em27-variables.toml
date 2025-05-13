@@ -1,0 +1,593 @@
+# --------------------------------------------- #
+# Variables for reuse in the rest of the config #
+# --------------------------------------------- #
+[variables]
+xluft_limits = [{value = 0.996, linestyle = "--", color = "darkorange", label="+/- 0.003 range"},
+                {value = 1.002, linestyle = "--", color = "darkorange"},
+                {value = 0.995, linestyle = "--", color = "limegreen", label="+/- 0.004 range"},
+                {value = 1.003, linestyle = "--", color = "limegreen"}]
+dip_limits = [{value = -0.0005, linestyle = "--", color = "darkorange", label="$\\pm 5 \\times 10^{-4}$"},
+              {value =  0.0005, linestyle = "--", color = "darkorange"}]
+
+# ---------------------- #
+# Image postproc options #
+# ---------------------- #
+[image_postprocessing]
+# Available fonts are under /usr/share/fonts on tccondata.gps.calech.edu
+# Look for files with the "ttf" extension.
+font_file = "LiberationSans-Regular.ttf"
+font_size = 30
+
+
+# --------------- #
+# Plotting styles #
+# --------------- #
+[style.default.scatter]
+all = {color = "black", marker = "o", markersize = 1}
+flag0 = {color = "black", marker = "o", markersize = 1}
+# zorder moves certain points in front/behind others. The default zorder for line series is 2, so setting
+# it to < 2 for the flagged data ensures that flagged values are behind the flag0 values.
+flagged = {color = "red", marker = "o", markersize = 1, zorder = 1.9}
+
+[style.main.scatter]
+all = {color = "royalblue"}
+flag0 = {color = "royalblue"}
+flagged = {color = "red"}
+
+[style.ref.scatter]
+# use zorder to ensure reference data is always in the background
+all = {color = "lightgray", zorder=1.7, fit_style = {color = "slategray"}}
+flag0 = {color = "lightgray", zorder=1.7, fit_style = {color = "slategray"}}
+
+[style.context.scatter]
+# use zorder to keep context behind main data, with flagged data behind the flag0 data
+all = {color = "deepskyblue", zorder=1.85, fit_style = {color = "navy"}}
+flag0 = {color = "deepskyblue", zorder=1.85, fit_style = {color = "navy"}}
+flagged = {color = "gold", zorder=1.8}
+
+
+[style.main.hexbin]
+all = {cmap = "PuBu", bins = "log", mincnt = 1}
+flag0 = {cmap = "PuBu", bins = "log", mincnt = 1}
+
+[style.context.hexbin]
+all = {cmap = "Greys", bins = "log", mincnt = 1, zorder = 0.8, fit_style = {color = "black"}}
+flag0 = {cmap = "Greys", bins = "log", mincnt = 1, zorder = 0.8, fit_style = {color = "black"}}
+
+
+[style.default.timeseries]
+clone = 'scatter'
+legend_kws = {ncol = 3}
+
+[style.main.timeseries]
+clone = 'scatter'
+
+[style.ref.timeseries]
+clone = 'scatter'
+
+[style.context.timeseries]
+clone = 'scatter'
+
+
+[style.default.timeseries-2panel]
+clone = 'scatter'
+legend_kws = {ncol = 3}
+
+[style.main.timeseries-2panel]
+clone = 'scatter'
+
+[style.ref.timeseries-2panel]
+clone = 'scatter'
+
+[style.context.timeseries-2panel]
+clone = 'scatter'
+
+
+[style.default.resampled-timeseries]
+clone = 'scatter'
+legend_kws = {ncol = 3}
+
+[style.main.resampled-timeseries]
+clone = 'scatter'
+
+[style.ref.resampled-timeseries]
+clone = 'scatter'
+
+[style.context.resampled-timeseries]
+clone = 'scatter'
+
+
+[style.default.delta-timeseries]
+clone = 'timeseries'
+
+[style.main.delta-timeseries]
+clone = 'timeseries'
+
+[style.ref.delta-timeseries]
+clone = 'timeseries'
+
+[style.context.delta-timeseries]
+clone = 'timeseries'
+
+
+[style.default."delta-timeseries+violin"]
+clone = 'timeseries'
+
+[style.main."delta-timeseries+violin"]
+clone = 'timeseries'
+
+[style.ref."delta-timeseries+violin"]
+clone = 'timeseries'
+
+[style.context."delta-timeseries+violin"]
+clone = 'timeseries'
+
+
+[style.default.rolling-timeseries]
+all = {marker = "o", markersize = 1, color="gray"}
+flag0 = {marker = "o", markersize = 1, color="gray"}
+flagged = {marker = "o", markersize = 1, color="red"}
+median = {marker = "o", markersize = 1, color="black"}
+mean = {marker = "o", markersize = 1, color="hotpink"}
+std = {marker = "o", markersize = 1, color="green"}
+quantile = {marker = "o", markersize = 1, color="green"}
+legend_kws = {ncol = 3}
+
+[style.main.rolling-timeseries]
+all = {color = "royalblue"}
+flag0 = {color = "royalblue"}
+
+[style.ref.rolling-timeseries]
+all = {color = "lightgray", zorder = 1.7}
+flag0 = {color = "lightgray", zorder = 1.7}
+median = {marker = "o", markersize = 1, color="slategray", zorder = 1.7}
+mean = {marker = "o", markersize = 1, color="slategray", zorder = 1.7}
+std = {marker = "o", markersize = 1, color="lightsteelblue", zorder = 1.7}
+quantile = {marker = "o", markersize = 1, color="lightsteelblue", zorder = 1.7}
+
+[style.context.rolling-timeseries]
+all = {color = "deepskyblue"}
+flag0 = {color = "deepskyblue"}
+
+
+[style.default.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.main.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.ref.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.context.delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+
+[style.default.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.main.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.ref.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+[style.context.zmin-zobs-delta-rolling-timeseries]
+clone = "rolling-timeseries"
+
+
+[style.default.rolling-derivative]
+clone = "scatter"
+
+[style.main.rolling-derivative]
+clone = "scatter"
+
+[style.ref.rolling-derivative]
+clone = "scatter"
+
+[style.context.rolling-derivative]
+clone = "scatter"
+
+
+[style.default.timing-error-am-pm]
+both = {marker = "o", markersize = 1, linestyle="none"}
+am = {color = "black"}
+pm = {color = "gray"}
+
+[style.main.timing-error-am-pm]
+am = {color = "royalblue"}
+pm = {color = "red"}
+
+[style.extra.timing-error-am-pm]
+am = {color = "royalblue"}
+pm = {color = "red"}
+
+
+[style.default.timing-error-szas]
+marker = "o"
+markersize = 1
+linestyle = "none"
+color = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown", "tab:pink", "tab:gray", "tab:olive"]
+
+[style.main.timing-error-szas]
+color = ["royalblue", "red", "green"]
+
+[style.extra.timing-error-szas]
+color = ["royalblue", "red", "green"]
+
+[style.default.delta-timing-error-am-pm]
+all = {marker = "o", markersize = 1, linestyle = "none", color = "tab:blue"}
+flag0 = {marker = "o", markersize = 1, linestyle = "none", color = "tab:orange"}
+flagged = {marker = "o", markersize = 1, linestyle = "none", color = "tab:green"}
+
+[style.main.delta-timing-error-am-pm]
+all = {color = "black"}
+flag0 = {color = "royalblue"}
+flagged = {color = "red"}
+
+[style.extra.aux-violin]
+flag0 = {showmedians = true, showextrema = false, fill_color = "silver", line_color = "dimgray"}
+
+[style.default.timeseries-3panel]
+clone = 'scatter'
+legend_kws = {ncol = 3}
+ 
+[style.main.timeseries-3panel]
+clone = 'scatter'
+ 
+[style.ref.timeseries-3panel]
+clone = 'scatter'
+ 
+[style.context.timeseries-3panel]
+clone = 'scatter'
+
+[style.default.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+ 
+[style.main.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+ 
+[style.ref.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+ 
+[style.context.rolling-timeseries-3panel]
+clone = "rolling-timeseries"
+
+[style.default.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+[style.main.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+[style.ref.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+[style.context.prior-time-matchup-timeseries]
+clone = 'scatter'
+
+# ------------- #
+# List of plots #
+# ------------- #
+[[plots]]
+kind = "delta-rolling-timeseries"
+name = "Zmin vs. Zobs delta timeseries"
+yvar1 = "zmin"
+yvar2 = "zobs"
+ops = "median"
+legend_kws = {ncol = 2}
+bookmark = "Critical quality checks"
+
+[[plots]]
+kind = "timeseries"
+name = "Outside pressure timeseries"
+yvar = "pout"
+
+[[plots]]
+kind = "timeseries"
+name = "Model pressure timeseries"
+yvar = "pmod"
+
+[[plots]]
+kind = "flag-analysis"
+name = "Flagged spectra"
+#bookmark = "Flags"
+
+[[plots]]
+kind = "delta-timing-error-am-pm"
+name = "AM-PM Timing Error Check"
+sza_range = [70, 80]
+
+[[plots]]
+kind = "timing-error-am-pm"
+name = "Timing error check (AM vs. PM)"
+#bookmark = "Timing error checks"
+sza_range = [70, 80]
+
+[[plots]]
+kind = "timing-error-szas"
+name = "Timing error check (PM SZA ranges)"
+am_or_pm = "pm"
+sza_ranges = [[70, 80], [40, 50], [20, 30]]
+
+[[plots]]
+kind = "scatter"
+name = "Xluft vs. SZA scatter"
+xvar = "solzen"
+yvar = "xluft"
+match_axes_size = "xluft-vs-sza-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.5, 0.5]}
+
+[[plots]]
+kind = "hexbin"
+name = "Xluft vs. SZA 2D hist."
+key = "xluft-vs-sza-hexbin"
+xvar = "solzen"
+yvar = "xluft"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
+
+[[plots]]
+kind = "prior-time-matchup-timeseries"
+name = "Prior time check"
+
+[[plots]]
+kind = "timeseries-2panel"
+name = "Xluft timeseries"
+yvar = "xluft"
+yerror_var = "xluft_error"
+
+[[plots]]
+kind = "rolling-timeseries"
+name = "Xluft rolling median"
+yvar = "xluft"
+ops = "median"
+extra_qc_lines = "$xluft_limits"
+#legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "resampled-timeseries"
+name = "Xluft weekly median timeseries"
+freq = "W"
+op = "median"
+yvar = "xluft"
+
+[[plots]]
+kind = "resampled-timeseries"
+name = "Xluft daily median timeseries"
+#bookmark = "Resampled timeseries"
+freq = "D"
+op = "median"
+yvar = "xluft"
+
+[[plots]]
+kind = "timeseries"
+name = "FS timeseries from O2 window"
+yvar = "o2_7885_fs"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries"
+name = "DIP timeseries"
+yvar = "dip"
+ops = "median"
+extra_qc_lines = "$dip_limits"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "timeseries"
+name = "CL timeseries from O2 window"
+yvar = "o2_7885_cl"
+
+[[plots]]
+kind = "scatter"
+name = "dip vs. CL from O2 window scatter"
+xvar = "o2_7885_cl"
+yvar = "dip"
+match_axes_size = "dip-vs-o2_7885_cl-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.5, 0.5]}
+
+[[plots]]
+kind = "hexbin"
+name = "dip vs. CL from O2 window 2D hist."
+key = "dip-vs-o2_7885_cl-hexbin"
+xvar = "o2_7885_cl"
+yvar = "dip"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
+
+[[plots]]
+kind = "timeseries"
+name = "SZA timeseries"
+yvar = "solzen"
+
+[[plots]]
+kind = "rolling-timeseries"
+name = "SG timeseries from O2 window"
+yvar = "o2_7885_sg"
+ops = "median"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries-3panel"
+name = "LSE timeseries"
+yvar = "lse"
+ops = "median"
+even_top_bottom = true
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries-3panel"
+name = "LSU timeseries"
+yvar = "lsu"
+ops = "median"
+even_top_bottom = true
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "rolling-timeseries"
+name = "MVD timeseries"
+yvar = "mvd"
+ops = "median"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "timeseries"
+name = "CF/CL timeseries from fCO2 InGaAs window"
+yvar = "fco2_6154_cfampocl"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "neg-time-jump"
+name = "Negative time check"
+
+[[plots]]
+kind = "timeseries-2panel"
+name = "XCO2 timeseries"
+bookmark = "Xgas timeseries"
+yvar = "xco2"
+yerror_var = "xco2_error"
+
+[[plots]]
+kind = "timeseries-2panel"
+name = "XCH4 timeseries"
+yvar = "xch4"
+yerror_var = "xch4_error"
+
+[[plots]]
+kind = "timeseries-2panel"
+name = "XCO timeseries"
+yvar = "xco"
+yerror_var = "xco_error"
+
+[[plots]]
+kind = "timeseries"
+name = "CO2 VSF timeseries"
+bookmark = "VSF timeseries"
+yvar = "vsf_co2"
+
+[[plots]]
+kind = "timeseries"
+name = "CH4 VSF timeseries"
+yvar = "vsf_ch4"
+
+[[plots]]
+kind = "timeseries"
+name = "CO VSF timeseries"
+yvar = "vsf_co"
+
+[[plots]]
+kind = "timeseries"
+name = "O2 VSF timeseries"
+yvar = "vsf_o2"
+
+[[plots]]
+kind = "timeseries"
+name = "FVSI timeseries"
+bookmark = "Instrument/obs. qualtity timeseries"
+yvar = "fvsi"
+
+[[plots]]
+kind = "timeseries"
+name = "CF period timeseries from fCO2 InGaAs window"
+yvar = "fco2_6154_cfperiod"
+
+[[plots]]
+kind = "timeseries"
+name = "CF phase timeseries from fCO2 InGaAs window"
+yvar = "fco2_6154_cfphase"
+
+[[plots]]
+kind = "timeseries"
+name = "Prior index"
+yvar = "prior_index"
+
+[[plots]]
+kind = "timeseries"
+name = "Outside humidity timeseries"
+bookmark = "Meteorology timeseries"
+yvar = "hout"
+
+[[plots]]
+kind = "timeseries"
+name = "Outside temperature timeseries"
+yvar = "tout"
+
+[[plots]]
+kind = "timeseries"
+name = "Model temperature timeseries"
+yvar = "tmod"
+
+[[plots]]
+kind = "delta-timeseries"
+name = "Outside - model temp. delta timeseries"
+yvar1 = "tout"
+yvar2 = "tmod"
+
+[[plots]]
+kind = "delta-rolling-timeseries"
+name = "Outside - model pres. delta timeseries"
+#bookmark = "Primary QA/QC plots"
+yvar1 = "pout"
+yvar2 = "pmod"
+ops = "median"
+legend_kws = {ncol = 2}
+
+[[plots]]
+kind = "timeseries"
+name = "Outside H2O DMF timeseries"
+yvar = "h2o_dmf_out"
+
+[[plots]]
+kind = "timeseries"
+name = "Model H2O DMF timeseries"
+yvar = "h2o_dmf_mod"
+
+[[plots]]
+kind = "delta-timeseries"
+name = "Outside - model H2O DMF delta timeseries"
+yvar1 = "h2o_dmf_out"
+yvar2 = "h2o_dmf_mod"
+
+[[plots]]
+kind = "timeseries"
+name = "Wind direction timeseries"
+yvar = "wdir"
+
+[[plots]]
+kind = "timeseries"
+name = "Wind speed timeseries"
+yvar = "wspd"
+
+[[plots]]
+kind = "scatter"
+name = "XCO2 vs. SZA scatter"
+bookmark = "Scatter plots"
+xvar = "solzen"
+yvar = "xco2"
+match_axes_size = "xco2-vs-sza-hexbin"
+legend_kws = {loc = "right", fontsize = 5, bbox_to_anchor = [1.5, 0.5]}
+
+[[plots]]
+kind = "hexbin"
+name = "XCO2 vs. SZA 2D hist."
+key = "xco2-vs-sza-hexbin"
+xvar = "solzen"
+yvar = "xco2"
+hexbin_flag_category = "all"
+fit_flag_category = "flag0"
+
+[[plots]]
+kind = "resampled-timeseries"
+name = "O2 VSF daily median timeseries"
+bookmark = "Resampled timeseries"
+freq = "D"
+op = "median"
+yvar = "o2_7885_vsf_o2"
+
+[[plots]]
+kind = "resampled-timeseries"
+name = "O2 VSF weekly median timeseries"
+freq = "W"
+op = "median"
+yvar = "o2_7885_vsf_o2"
+
